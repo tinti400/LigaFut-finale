@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*- 
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-from PIL import Image
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -102,39 +100,6 @@ if st.session_state.get("mostrar_elenco", False):
 with col1:
     if st.button("👥 Ver Elenco", key="ver_elenco"):
         st.session_state["mostrar_elenco"] = not st.session_state.get("mostrar_elenco", False)
-
-# 📜 Definir Formação Tática Livre
-st.markdown("### 📜 Definir Formação Tática Livre")
-st.markdown("Defina a sua formação tática inserindo os jogadores nas posições desejadas.")
-
-# Crie um campo tático customizável (sem limite de posição)
-campo_tatico = {}
-
-# Configuração do campo tático
-posicoes = ["Posição 1", "Posição 2", "Posição 3", "Posição 4", "Posição 5", "Posição 6", "Posição 7", "Posição 8", "Posição 9", "Posição 10", "Posição 11"]
-
-for posicao in posicoes:
-    jogador_escalado = st.selectbox(f"Selecione um jogador para {posicao}", options=[j["nome"] for j in elenco], key=posicao)
-    campo_tatico[posicao] = jogador_escalado
-
-# ⚽ Salvar Escalação Tática
-if st.button("💾 Salvar Escalação Tática"):
-    # Aqui você pode salvar a formação tática e escalação no banco de dados
-    st.success("Formação tática e escalação salva com sucesso!")
-
-    # Exibir o campo tático
-    st.markdown("### ⚽ Campo Tático")
-
-    # Exibir o campo tático gerado (com base na seleção dos jogadores)
-    for posicao, jogador in campo_tatico.items():
-        st.markdown(f"**{posicao}:** {jogador}")
-
-    # Carregar e exibir a imagem do campo tático
-    try:
-        imagem_campo = Image.open("/mnt/data/c72b32fa-b8ff-4ea6-8129-07f7b0c875b5.png")
-        st.image(imagem_campo, caption="Campo Tático - Escalação", use_column_width=True)
-    except Exception as e:
-        st.error(f"Erro ao carregar a imagem do campo tático: {e}")
 
 # ⚡ Adicionar Jogador (Somente Administrador)
 if "admin" in st.session_state.get("usuario", "").lower():  # Verifica se é administrador
