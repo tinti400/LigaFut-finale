@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from PIL import Image
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -121,19 +122,22 @@ if st.button("💾 Salvar Escalação Tática"):
     # Aqui você pode salvar a formação tática e escalação no banco de dados
     st.success("Formação tática e escalação salva com sucesso!")
 
+    # Exibir o campo tático
+    st.markdown("### ⚽ Campo Tático")
+
+    # Exibir o campo tático gerado (com base na seleção dos jogadores)
+    for posicao, jogador in campo_tatico.items():
+        st.markdown(f"**{posicao}:** {jogador}")
+
+    # Carregar e exibir a imagem do campo tático
+    try:
+        imagem_campo = Image.open("/mnt/data/A_Streamlit-generated_user_interface_for_'Painel_d.png")
+        st.image(imagem_campo, caption="Campo Tático - Escalação", use_column_width=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar a imagem do campo tático: {e}")
+
 # ⚡ Adicionar Jogador (Somente Administrador)
-is_admin = False
-
-# Buscar o valor do administrador no banco de dados
-try:
-    usuario_res = supabase.table("usuarios").select("administrador").eq("usuario", st.session_state["usuario"]).execute()
-    if usuario_res.data:
-        is_admin = usuario_res.data[0]["administrador"]
-except Exception as e:
-    st.error(f"Erro ao verificar admin: {e}")
-
-# Verificação de admin antes de mostrar a opção de adicionar jogador
-if is_admin:
+if "admin" in st.session_state.get("usuario", "").lower():  # Verifica se é administrador
     st.markdown("### ⚡ Adicionar Jogador ao Elenco")
 
     with st.form(key="add_player_form"):
