@@ -72,14 +72,17 @@ st.subheader("✏️ Atualização direta do saldo")
 novo_valor_manual = st.number_input("💼 Novo valor de saldo (R$)", min_value=0, step=1_000_000, format="%d")
 
 if st.button("✏️ Atualizar saldo manualmente"):
-    try:
-        diferenca = novo_valor_manual - saldo_atual
-        tipo = "entrada" if diferenca > 0 else "saida"
-        descricao = "Ajuste manual de saldo pelo administrador"
+    if novo_valor_manual >= 0:
+        try:
+            diferenca = novo_valor_manual - saldo_atual
+            tipo = "entrada" if diferenca > 0 else "saida"
+            descricao = "Ajuste manual de saldo pelo administrador"
 
-        supabase.table("times").update({"saldo": novo_valor_manual}).eq("id", id_time).execute()
-        # Registrar movimentação
-        st.success(f"✅ Saldo do time {nome_time} atualizado para R$ {novo_valor_manual:,.0f}".replace(",", "."))
-        st.rerun()
-    except Exception as e:
-        st.error(f"Erro ao atualizar saldo manualmente: {e}")
+            supabase.table("times").update({"saldo": novo_valor_manual}).eq("id", id_time).execute()
+            # Registrar movimentação
+            st.success(f"✅ Saldo do time {nome_time} atualizado para R$ {novo_valor_manual:,.0f}".replace(",", "."))
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao atualizar saldo manualmente: {e}")
+    else:
+        st.warning("O valor de saldo não pode ser negativo.")
