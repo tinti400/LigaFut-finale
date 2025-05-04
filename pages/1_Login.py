@@ -12,7 +12,9 @@ st.title("🔐 Login - LigaFut")
 # 👉 Verifica se já está logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Já logado como: {st.session_state['usuario']}")
-    st.experimental_rerun()  # Redireciona diretamente para o painel do usuário
+    st.write("Você já está logado! Acesse o painel ao lado.")  # Mensagem de sucesso
+    st.sidebar.success("Bem-vindo ao seu painel!")  # Exibe uma mensagem no painel lateral
+    st.stop()  # Impede que o restante do código seja executado
 
 # 📄 Formulário de login
 with st.form("login_form"):
@@ -47,7 +49,8 @@ if botao_login:
                         st.session_state["nome_time"] = "Sem Nome"
 
                     st.success("✅ Login realizado com sucesso!")
-                    st.experimental_rerun()  # Atualiza e redireciona para o painel
+                    st.write("Você foi logado! Acesse seu painel através do menu ao lado.")
+                    st.sidebar.success("Bem-vindo ao seu painel!")
                 else:
                     st.error("❌ Usuário ou senha inválidos.")
             except Exception as e:
