@@ -1,14 +1,13 @@
 import streamlit as st
 from supabase import create_client
-import pandas as pd
 from datetime import datetime
 
-# 🔐 Conexão Supabase
+st.set_page_config(page_title="Admin - Mercado", layout="wide")
+
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
-
-st.set_page_config(page_title="Admin - Mercado", layout="wide")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
@@ -19,11 +18,21 @@ id_usuario = st.session_state.usuario_id
 email_usuario = st.session_state.get("usuario", "")
 
 # 👑 Verifica se é admin
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-eh_admin = admin_ref.data and len(admin_ref.data) > 0
+if not email_usuario or "/" in email_usuario:  # Verifica se o e-mail não é válido
+    st.error("⚠️ E-mail inválido para verificação de admin.")
+    st.stop()
 
-if not eh_admin:
-    st.warning("🔒 Acesso permitido apenas para administradores.")
+# Verifica se o usuário é admin através do campo 'administrador' na tabela 'usuarios'
+try:
+    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+    eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
+
+    if not eh_admin:
+        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.stop()
+
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
     st.stop()
 
 # 🧭 Título
@@ -113,19 +122,8 @@ try:
     if jogadores_mercado:
         jogadores_df = pd.DataFrame(jogadores_mercado)
         st.dataframe(jogadores_df)
-
-        # Excluir jogadores do mercado
-        for jogador in jogadores_mercado:
-            if st.button(f"❌ Excluir {jogador['nome']}", key=f"excluir_{jogador['id']}"):
-                try:
-                    # Excluir jogador do mercado
-                    supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                    st.success(f"✅ Jogador {jogador['nome']} removido do mercado!")
-                    # Atualiza a tabela sem usar st.rerun()
-                    st.experimental_rerun()
-                except Exception as e:
-                    st.error(f"Erro ao excluir jogador: {e}")
     else:
         st.info("📭 Nenhum jogador no mercado.")
 except Exception as e:
     st.error(f"Erro ao carregar jogadores do mercado: {e}")
+
