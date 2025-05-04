@@ -12,7 +12,7 @@ st.title("🔐 Login - LigaFut")
 # 👉 Verifica se já está logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Já logado como: {st.session_state['usuario']}")
-    st.stop()
+    st.experimental_rerun()  # Redireciona diretamente para o painel do usuário
 
 # 📄 Formulário de login
 with st.form("login_form"):
@@ -23,33 +23,34 @@ with st.form("login_form"):
 # ✅ Só executa se o botão for clicado
 if botao_login:
     if usuario and senha:
-        try:
-            # 🔍 Consulta com ilike para não diferenciar maiúsculas/minúsculas
-            res = supabase.table("usuarios") \
-                .select("*") \
-                .ilike("usuario", usuario) \
-                .ilike("senha", senha) \
-                .execute()
+        with st.spinner("🔄 Verificando suas credenciais..."):
+            try:
+                # 🔍 Consulta com ilike para não diferenciar maiúsculas/minúsculas
+                res = supabase.table("usuarios") \
+                    .select("*") \
+                    .ilike("usuario", usuario) \
+                    .ilike("senha", senha) \
+                    .execute()
 
-            if res.data:
-                user = res.data[0]
-                st.session_state["usuario"] = user["usuario"]
-                st.session_state["usuario_id"] = user["id"]
-                st.session_state["id_time"] = user["time_id"]
-                st.session_state["divisao"] = user.get("divisao", "Divisão 1")  # padrão caso não tenha
+                if res.data:
+                    user = res.data[0]
+                    st.session_state["usuario"] = user["usuario"]
+                    st.session_state["usuario_id"] = user["id"]
+                    st.session_state["id_time"] = user["time_id"]
+                    st.session_state["divisao"] = user.get("divisao", "Divisão 1")  # padrão caso não tenha
 
-                # 🔎 Busca o nome do time (agora na tabela `times`)
-                time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
-                if time_res.data:
-                    st.session_state["nome_time"] = time_res.data[0]["nome"]
+                    # 🔎 Busca o nome do time (agora na tabela `times`)
+                    time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
+                    if time_res.data:
+                        st.session_state["nome_time"] = time_res.data[0]["nome"]
+                    else:
+                        st.session_state["nome_time"] = "Sem Nome"
+
+                    st.success("✅ Login realizado com sucesso!")
+                    st.experimental_rerun()  # Atualiza e redireciona para o painel
                 else:
-                    st.session_state["nome_time"] = "Sem Nome"
-
-                st.success("✅ Login realizado com sucesso!")
-                st.switch_page("pages/3_Home.py")  # ajuste se o nome da sua home for outro
-            else:
-                st.error("❌ Usuário ou senha inválidos.")
-        except Exception as e:
-            st.error(f"Erro no login: {e}")
+                    st.error("❌ Usuário ou senha inválidos.")
+            except Exception as e:
+                st.error(f"Erro no login: {e}")
     else:
         st.warning("⚠️ Preencha todos os campos.")
