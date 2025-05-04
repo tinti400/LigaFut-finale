@@ -121,5 +121,15 @@ for i, (time_id, dados) in enumerate(classificacao, 1):
 # Criar DataFrame
 df_classificacao = pd.DataFrame(dados_classificacao)
 
-# Exibir a tabela no Streamlit
-st.dataframe(df_classificacao)
+# Exibir a tabela no Streamlit com um visual mais bonito
+st.markdown("### Classificação Atual:")
+st.dataframe(df_classificacao.style.format({
+    'Pontos': '{:,.0f}', 
+    'Jogos': '{:,.0f}', 
+    'Vitórias': '{:,.0f}', 
+    'Empates': '{:,.0f}', 
+    'Derrotas': '{:,.0f}', 
+    'Gols Marcados': '{:,.0f}', 
+    'Gols Sofridos': '{:,.0f}', 
+    'Saldo de Gols': '{:,.0f}'
+}).background_gradient(axis=None, gmap={1:'green', -1:'red'}, subset=['Pontos']))
