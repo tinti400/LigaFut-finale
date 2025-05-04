@@ -92,7 +92,7 @@ if st.session_state.get("mostrar_elenco", False):
                         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
                         st.success(f"✅ {jogador['nome']} vendido! Você recebeu R$ {valor_recebido:,.0f}".replace(",", "."))
-                        st.rerun()
+                        st.experimental_rerun()  # Atualiza a página para refletir a mudança
                     except Exception as e:
                         st.error(f"Erro ao vender jogador: {e}")
 
@@ -102,32 +102,53 @@ with col1:
     if st.button("👥 Ver Elenco", key="ver_elenco"):
         st.session_state["mostrar_elenco"] = not st.session_state.get("mostrar_elenco", False)
 
-# 📜 Definir Formação Tática
-st.markdown("### 📜 Definir Formação Tática")
-formacao_tatica = st.text_input("Defina sua formação tática (ex: 4-4-2)")
+# 📜 Definir Formação Tática Livre
+st.markdown("### 📜 Definir Formação Tática Livre")
+st.markdown("Defina a sua formação tática inserindo os jogadores nas posições desejadas.")
 
-if formacao_tatica:
-    st.markdown(f"**Formação atual: {formacao_tatica}**")
+# Crie um campo tático customizável (sem limite de posição)
+campo_tatico = {}
 
-# ⚽ Escalação dos jogadores
-st.markdown("### ⚽ Escale seus jogadores")
-col1, col2 = st.columns(2)
+# Configuração do campo tático
+posicoes = ["Posição 1", "Posição 2", "Posição 3", "Posição 4", "Posição 5", "Posição 6", "Posição 7", "Posição 8", "Posição 9", "Posição 10", "Posição 11"]
 
-with col1:
-    goleiros = [j for j in elenco if j["posicao"] == "GL"]
-    if goleiros:
-        goleiro_escalado = st.selectbox("Goleiro", options=[g["nome"] for g in goleiros], key="goleiro")
-    else:
-        st.warning("Nenhum goleiro disponível no elenco.")
+for posicao in posicoes:
+    jogador_escalado = st.selectbox(f"Selecione um jogador para {posicao}", options=[j["nome"] for j in elenco], key=posicao)
+    campo_tatico[posicao] = jogador_escalado
 
-with col2:
-    defensores = [j for j in elenco if j["posicao"] in ["LD", "ZAG", "LE"]]
-    if defensores:
-        defesa_escalada = st.selectbox("Defensores", options=[d["nome"] for d in defensores], key="defesa")
-    else:
-        st.warning("Nenhum defensor disponível no elenco.")
-
-# Salvar escalação
-if st.button("💾 Salvar Escalação"):
+# ⚽ Salvar Escalação Tática
+if st.button("💾 Salvar Escalação Tática"):
     # Aqui você pode salvar a formação tática e escalação no banco de dados
-    st.success(f"Formação tática {formacao_tatica} e escalação salva com sucesso!")
+    st.success("Formação tática e escalação salva com sucesso!")
+
+# ⚡ Adicionar Jogador (Somente Administrador)
+if "admin" in st.session_state.get("usuario", "").lower():  # Verifica se é administrador
+    st.markdown("### ⚡ Adicionar Jogador ao Elenco")
+
+    with st.form(key="add_player_form"):
+        nome_jogador = st.text_input("Nome do Jogador")
+        posicao_jogador = st.selectbox("Posição", ["GL", "LD", "ZAG", "LE", "VOL", "MC", "MD", "ME", "PD", "PE", "SA", "CA"])
+        overall_jogador = st.number_input("Overall", min_value=1, max_value=100)
+        valor_jogador = st.number_input("Valor (R$)", min_value=0)
+
+        submit_button = st.form_submit_button("Adicionar Jogador")
+
+        if submit_button:
+            if nome_jogador and posicao_jogador and overall_jogador and valor_jogador:
+                try:
+                    novo_jogador = {
+                        "nome": nome_jogador,
+                        "posicao": posicao_jogador,
+                        "overall": overall_jogador,
+                        "valor": valor_jogador,
+                        "id_time": id_time
+                    }
+                    supabase.table("elenco").insert(novo_jogador).execute()
+                    st.success(f"Jogador {nome_jogador} adicionado com sucesso ao elenco!")
+                    st.experimental_rerun()  # Atualiza a página para refletir a mudança
+                except Exception as e:
+                    st.error(f"Erro ao adicionar jogador: {e}")
+            else:
+                st.warning("⚠️ Preencha todos os campos.")
+else:
+    st.info("🔒 Apenas administradores podem adicionar jogadores ao elenco.")
