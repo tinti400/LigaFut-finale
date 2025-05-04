@@ -93,3 +93,30 @@ if botao:
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
+
+# 📋 Listagem de jogadores no mercado
+st.markdown("---")
+st.subheader("📋 Jogadores no Mercado")
+
+try:
+    # Carregar todos os jogadores do mercado
+    jogadores_mercado_ref = supabase.table("mercado_transferencias").select("*").execute()
+    jogadores_mercado = jogadores_mercado_ref.data
+    if jogadores_mercado:
+        jogadores_df = pd.DataFrame(jogadores_mercado)
+        st.dataframe(jogadores_df)
+
+        # Excluir jogadores do mercado
+        for jogador in jogadores_mercado:
+            if st.button(f"❌ Excluir {jogador['nome']}", key=f"excluir_{jogador['id']}"):
+                try:
+                    # Excluir jogador do mercado
+                    supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+                    st.success(f"✅ Jogador {jogador['nome']} removido do mercado!")
+                    st.experimental_rerun()  # Atualiza a página para refletir a mudança
+                except Exception as e:
+                    st.error(f"Erro ao excluir jogador: {e}")
+    else:
+        st.info("📭 Nenhum jogador no mercado.")
+except Exception as e:
+    st.error(f"Erro ao carregar jogadores do mercado: {e}")
