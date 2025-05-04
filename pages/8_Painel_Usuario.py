@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from PIL import Image
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -130,7 +131,7 @@ if st.button("💾 Salvar Escalação Tática"):
 
     # Carregar e exibir a imagem do campo tático
     try:
-        imagem_campo = Image.open("/mnt/data/A_Streamlit-generated_user_interface_for_'Painel_d.png")
+        imagem_campo = Image.open("/mnt/data/c72b32fa-b8ff-4ea6-8129-07f7b0c875b5.png")
         st.image(imagem_campo, caption="Campo Tático - Escalação", use_column_width=True)
     except Exception as e:
         st.error(f"Erro ao carregar a imagem do campo tático: {e}")
