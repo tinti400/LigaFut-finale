@@ -62,6 +62,31 @@ def calcular_classificacao(rodadas, times_map):
             gm = int(gm)
             gv = int(gv)
 
+            # Garantir que ambos os times (mandante e visitante) existam na tabela
+            if mandante not in tabela:
+                tabela[mandante] = {
+                    "nome": times_map.get(mandante, "Desconhecido"),
+                    "pontos": 0,
+                    "v": 0,
+                    "e": 0,
+                    "d": 0,
+                    "gp": 0,
+                    "gc": 0,
+                    "sg": 0
+                }
+
+            if visitante not in tabela:
+                tabela[visitante] = {
+                    "nome": times_map.get(visitante, "Desconhecido"),
+                    "pontos": 0,
+                    "v": 0,
+                    "e": 0,
+                    "d": 0,
+                    "gp": 0,
+                    "gc": 0,
+                    "sg": 0
+                }
+
             # Atualizando gols, saldo de gols
             tabela[mandante]["gp"] += gm
             tabela[mandante]["gc"] += gv
@@ -121,15 +146,6 @@ for i, (time_id, dados) in enumerate(classificacao, 1):
 # Criar DataFrame
 df_classificacao = pd.DataFrame(dados_classificacao)
 
-# Exibir a tabela no Streamlit com um visual mais bonito
-st.markdown("### Classificação Atual:")
-st.dataframe(df_classificacao.style.format({
-    'Pontos': '{:,.0f}', 
-    'Jogos': '{:,.0f}', 
-    'Vitórias': '{:,.0f}', 
-    'Empates': '{:,.0f}', 
-    'Derrotas': '{:,.0f}', 
-    'Gols Marcados': '{:,.0f}', 
-    'Gols Sofridos': '{:,.0f}', 
-    'Saldo de Gols': '{:,.0f}'
-}).background_gradient(axis=None, gmap={1:'green', -1:'red'}, subset=['Pontos']))
+# Exibir a tabela no Streamlit
+st.dataframe(df_classificacao)
+
