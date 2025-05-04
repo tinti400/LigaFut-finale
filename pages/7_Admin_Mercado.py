@@ -70,12 +70,14 @@ with st.form("form_mercado"):
     posicao = st.selectbox("Posição", [
         "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
         "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
-        "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
+        "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)",
+        "Meia (MEI)"  # Adicionando a posição "Meia (MEI)"
     ])
     overall = st.number_input("Overall", min_value=1, max_value=99, step=1)
     valor = st.number_input("Valor (R$)", min_value=100_000, step=50_000)
     time_origem = st.text_input("Time de Origem").strip()
     nacionalidade = st.text_input("Nacionalidade").strip()
+    imagem_url = st.text_input("URL da Imagem do Jogador")  # Novo campo para a URL da imagem
     botao = st.form_submit_button("Adicionar ao Mercado")
 
 if botao:
@@ -83,6 +85,9 @@ if botao:
         st.warning("Digite o nome do jogador.")
     else:
         try:
+            # Se a URL estiver vazia, podemos não salvar nada ou usar uma imagem padrão
+            imagem_url = imagem_url if imagem_url else "https://www.exemplo.com/imagem_padrao.jpg"  # Coloque a URL de uma imagem padrão
+
             # Adicionar jogador ao mercado no Supabase
             supabase.table("mercado_transferencias").insert({
                 "nome": nome,
@@ -90,7 +95,8 @@ if botao:
                 "overall": overall,
                 "valor": valor,
                 "time_origem": time_origem if time_origem else "N/A",
-                "nacionalidade": nacionalidade if nacionalidade else "N/A"
+                "nacionalidade": nacionalidade if nacionalidade else "N/A",
+                "imagem": imagem_url  # Salvando a URL da imagem
             }).execute()
             st.success(f"✅ {nome} foi adicionado ao mercado!")
         except Exception as e:
