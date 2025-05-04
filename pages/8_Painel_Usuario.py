@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -102,7 +103,11 @@ with col1:
         st.session_state["mostrar_elenco"] = not st.session_state.get("mostrar_elenco", False)
 
 # ⚡ Adicionar Jogador (Somente Administrador)
-if "admin" in st.session_state.get("usuario", "").lower():  # Verifica se é administrador
+# Verifica se o usuário é um administrador
+usuario_email = st.session_state.get("usuario", "")
+administradores = ["palmeiras@ligafut.com", "thiago@ligafut.com", "driko@ligafut.com", "jamerson@ligafut.com"]
+
+if usuario_email in administradores:
     st.markdown("### ⚡ Adicionar Jogador ao Elenco")
 
     with st.form(key="add_player_form"):
