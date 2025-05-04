@@ -21,8 +21,14 @@ nome_time = st.session_state["nome_time"]
 st.title("🚨 Evento de Multa - LigaFut")
 
 # Verifica se é admin
-admin_ref = supabase.table("admins").select("email").eq("email", st.session_state["usuario"]).execute()
-eh_admin = admin_ref.data
+email_usuario = st.session_state["usuario"]
+try:
+    # Verifica o campo 'administrador' na tabela 'usuarios'
+    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+    eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
+    st.stop()
 
 # ID fixo da configuração de multa
 id_config = "evento_multa"

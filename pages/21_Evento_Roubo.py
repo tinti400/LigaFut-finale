@@ -25,9 +25,9 @@ st.title("🚨 Evento de Roubo - LigaFut")
 # ID fixo da configuração do evento
 ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"
 
-# Verifica se é admin
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-eh_admin = len(admin_ref.data) > 0
+# Verifica se é admin usando o campo 'administrador' da tabela 'usuarios'
+admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
 
 # 🔄 Busca configuração do evento
 res = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute()
