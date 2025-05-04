@@ -39,22 +39,25 @@ st.markdown(f"### 🛒 Status atual do mercado: **{'Aberto' if mercado_aberto el
 col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     if st.button("🟢 Abrir Mercado"):
-        supabase.table("configuracoes").update({"aberto": True}).eq("id", 1).execute()
-        st.success("✅ Mercado aberto com sucesso!")
-        st.rerun()
+        try:
+            supabase.table("configuracoes").update({"aberto": True}).eq("id", 1).execute()
+            st.success("✅ Mercado aberto com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao abrir mercado: {e}")
 
 with col2:
     if st.button("🔴 Fechar Mercado"):
-        supabase.table("configuracoes").update({"aberto": False}).eq("id", 1).execute()
-        st.success("✅ Mercado fechado com sucesso!")
-        st.rerun()
+        try:
+            supabase.table("configuracoes").update({"aberto": False}).eq("id", 1).execute()
+            st.success("✅ Mercado fechado com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao fechar mercado: {e}")
 
 with col3:
     if st.button("🧹 Limpar Mercado"):
         try:
             supabase.table("mercado_transferencias").delete().execute()
             st.success("🧹 Todos os jogadores foram removidos do mercado!")
-            st.rerun()
         except Exception as e:
             st.error(f"Erro ao limpar mercado: {e}")
 
@@ -90,7 +93,6 @@ if botao:
                 "nacionalidade": nacionalidade if nacionalidade else "N/A"
             }).execute()
             st.success(f"✅ {nome} foi adicionado ao mercado!")
-            st.rerun()
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
 
@@ -113,7 +115,8 @@ try:
                     # Excluir jogador do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                     st.success(f"✅ Jogador {jogador['nome']} removido do mercado!")
-                    st.experimental_rerun()  # Atualiza a página para refletir a mudança
+                    # Atualiza a tabela sem usar st.rerun()
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao excluir jogador: {e}")
     else:
