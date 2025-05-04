@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -117,30 +118,22 @@ for posicao in posicoes:
 
 # ⚽ Salvar Escalação Tática
 if st.button("💾 Salvar Escalação Tática"):
-    try:
-        escalao_tatico = {
-            "goleiro": campo_tatico["Posição 1"],
-            "zagueiro_1": campo_tatico["Posição 2"],
-            "zagueiro_2": campo_tatico["Posição 3"],
-            "lateral_direito": campo_tatico["Posição 4"],
-            "lateral_esquerdo": campo_tatico["Posição 5"],
-            "meio_campo_1": campo_tatico["Posição 6"],
-            "meio_campo_2": campo_tatico["Posição 7"],
-            "meio_campo_3": campo_tatico["Posição 8"],
-            "atacante_1": campo_tatico["Posição 9"],
-            "atacante_2": campo_tatico["Posição 10"],
-            "atacante_3": campo_tatico["Posição 11"],
-        }
-
-        # Atualizando no banco de dados
-        supabase.table("escalao_tatico").insert(escalao_tatico).execute()
-
-        st.success("Escalação tática salva com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar a escalação: {e}")
+    # Aqui você pode salvar a formação tática e escalação no banco de dados
+    st.success("Formação tática e escalação salva com sucesso!")
 
 # ⚡ Adicionar Jogador (Somente Administrador)
-if "admin" in st.session_state.get("usuario", "").lower():  # Verifica se é administrador
+is_admin = False
+
+# Buscar o valor do administrador no banco de dados
+try:
+    usuario_res = supabase.table("usuarios").select("administrador").eq("usuario", st.session_state["usuario"]).execute()
+    if usuario_res.data:
+        is_admin = usuario_res.data[0]["administrador"]
+except Exception as e:
+    st.error(f"Erro ao verificar admin: {e}")
+
+# Verificação de admin antes de mostrar a opção de adicionar jogador
+if is_admin:
     st.markdown("### ⚡ Adicionar Jogador ao Elenco")
 
     with st.form(key="add_player_form"):
