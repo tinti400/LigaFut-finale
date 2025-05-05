@@ -46,17 +46,23 @@ for time_id, time_nome in times.items():
                 "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
                 "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
             ])
+            overall_jogador = st.number_input(f"Overall do Jogador para o time {time_nome}", min_value=1, max_value=99, step=1)
+            nacionalidade_jogador = st.text_input(f"Nacionalidade do Jogador para o time {time_nome}")
             valor_jogador = st.number_input(f"Valor do Jogador para o time {time_nome}", min_value=0, step=100_000)
+            time_origem_jogador = st.text_input(f"Time de Origem do Jogador para o time {time_nome}")
 
             if st.button(f"Adicionar {nome_jogador} ao Elenco de {time_nome}", key=f"adicionar_{time_id}"):
 
-                if nome_jogador and posicao_jogador and valor_jogador > 0:
+                if nome_jogador and posicao_jogador and overall_jogador and nacionalidade_jogador and valor_jogador > 0 and time_origem_jogador:
                     try:
                         jogador_data = {
                             "id_time": time_id,
                             "nome": nome_jogador,
                             "posicao": posicao_jogador,
-                            "valor": valor_jogador
+                            "overall": overall_jogador,
+                            "nacionalidade": nacionalidade_jogador,
+                            "valor": valor_jogador,
+                            "time_origem": time_origem_jogador
                         }
 
                         # Inserindo o jogador no elenco
@@ -124,3 +130,4 @@ for time_id, time_nome in times.items():
                                 st.error("Erro ao enviar a proposta: Sem dados na resposta.")
                         except Exception as e:
                             st.error(f"Erro ao enviar a proposta: {e}")
+
