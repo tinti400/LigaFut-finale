@@ -85,22 +85,34 @@ for time_id, time_nome in times.items():
             for jogador in elenco_adversario:
                 nome = jogador.get("nome", "Sem nome")
                 valor = jogador.get("valor", 0)
+                overall = jogador.get("overall", "N/A")
+                nacionalidade = jogador.get("nacionalidade", "N/A")
+                time_origem = jogador.get("time_origem", "N/A")
 
                 st.markdown("---")
-                col1, col2, col3 = st.columns([3, 2, 1])  # Ajustando a coluna para o botão
+                col1, col2 = st.columns([3, 2])
                 with col1:
                     st.markdown(f"**🎯 Jogador alvo:** {nome}")
                 with col2:
                     st.markdown(f"**Valor:** R$ {valor:,.0f}")
-                with col3:
-                    # Botão de comprar (icônico de carrinho de supermercado)
-                    if st.button("🛒", key=f"comprar_{jogador['id']}", help="Comprar este jogador"):
-                        valor_adicional = st.number_input(
-                            "💰 Valor em dinheiro (R$)",
-                            step=500_000,
-                            value=valor,
-                            key=f"valor_dinheiro_{jogador.get('id')}"
-                        )
+
+                # Informações complementares
+                st.markdown(f"**Overall:** {overall}")
+                st.markdown(f"**Nacionalidade:** {nacionalidade}")
+                st.markdown(f"**Time de Origem:** {time_origem}")
+
+                # Somente Dinheiro
+                valor_adicional = st.number_input(
+                    "💰 Valor em dinheiro (R$)",
+                    step=500_000,
+                    value=valor,
+                    key=f"valor_dinheiro_{jogador.get('id')}"
+                )
+
+                col_confirmar = st.columns(5)[2]
+                with col_confirmar:
+                    if st.button(f"🛒 Comprar {nome}", key=f"confirmar_{jogador.get('id')}"):
+
                         # Definindo os dados da proposta
                         proposta_data = {
                             "id_time_origem": id_time,
