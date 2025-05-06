@@ -45,7 +45,8 @@ if arquivo:
             "time_origem": "time_origem"
         }
 
-        df.columns = [colunas_esperadas.get(col.lower(), col.lower()) for col in df.columns]
+        # Renomeando colunas de forma mais robusta
+        df = df.rename(columns={col.lower(): colunas_esperadas.get(col.lower(), col) for col in df.columns})
 
         obrigatorias = ["nome", "posicao", "overall", "valor", "nacionalidade", "time_origem"]
         if not all(col in df.columns for col in obrigatorias):
@@ -59,6 +60,12 @@ if arquivo:
             count = 0
             for _, row in df.iterrows():
                 try:
+                    # Verificar se o jogador já está no mercado
+                    existing_player = supabase.table("mercado_transferencias").select("id").eq("nome", row["nome"]).execute().data
+                    if existing_player:
+                        st.warning(f"⚠️ O jogador {row['nome']} já está no mercado.")
+                        continue
+
                     # Adicionando jogador no mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": str(row["nome"]),
@@ -69,6 +76,7 @@ if arquivo:
                         "time_origem": str(row["time_origem"]),
                         "foto": str(row["foto"]) if "foto" in row and pd.notna(row["foto"]) else ""
                     }).execute()
+
                     count += 1
                 except Exception as e:
                     st.error(f"Erro ao adicionar jogador: {e}")
