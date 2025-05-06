@@ -87,24 +87,20 @@ for time_id, time_nome in times.items():
                 valor = jogador.get("valor", 0)
 
                 st.markdown("---")
-                col1, col2 = st.columns([3, 2])
+                col1, col2, col3 = st.columns([3, 2, 1])  # Ajustando a coluna para o botão
                 with col1:
                     st.markdown(f"**🎯 Jogador alvo:** {nome}")
                 with col2:
                     st.markdown(f"**Valor:** R$ {valor:,.0f}")
-                
-                # Somente Dinheiro
-                valor_adicional = st.number_input(
-                    "💰 Valor em dinheiro (R$)",
-                    step=500_000,
-                    value=valor,
-                    key=f"valor_dinheiro_{jogador.get('id')}"
-                )
-
-                col_confirmar = st.columns(5)[2]
-                with col_confirmar:
-                    if st.button(f"📨 Enviar Proposta por {nome}", key=f"confirmar_{jogador.get('id')}"):
-
+                with col3:
+                    # Botão de comprar (icônico de carrinho de supermercado)
+                    if st.button("🛒", key=f"comprar_{jogador['id']}", help="Comprar este jogador"):
+                        valor_adicional = st.number_input(
+                            "💰 Valor em dinheiro (R$)",
+                            step=500_000,
+                            value=valor,
+                            key=f"valor_dinheiro_{jogador.get('id')}"
+                        )
                         # Definindo os dados da proposta
                         proposta_data = {
                             "id_time_origem": id_time,
@@ -130,4 +126,3 @@ for time_id, time_nome in times.items():
                                 st.error("Erro ao enviar a proposta: Sem dados na resposta.")
                         except Exception as e:
                             st.error(f"Erro ao enviar a proposta: {e}")
-
