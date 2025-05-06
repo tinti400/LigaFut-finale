@@ -15,8 +15,11 @@ if not email_usuario or "/" in email_usuario:
     st.error("⚠️ E-mail inválido para verificação de admin.")
     st.stop()
 
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-eh_admin = admin_ref.data
+# Verifica se o usuário é administrador no caminho correto (tabela 'usuarios', campo 'administrador')
+admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+
+# Checa se o usuário é um administrador
+eh_admin = admin_ref.data and admin_ref.data[0]["administrador"] is True  # Verifica se é True
 
 if not eh_admin:
     st.warning("🔒 Acesso permitido apenas para administradores.")
