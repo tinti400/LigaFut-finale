@@ -141,12 +141,13 @@ else:
 
         # **Botão de Excluir Jogador do Mercado**
         if st.button(f"❌ Excluir {jogador['nome']} do Mercado", key=f"excluir_{jogador['id']}"):
-            try:
-                # Confirmação para excluir jogador do mercado
-                confirm = st.confirm("Tem certeza que deseja excluir esse jogador do mercado?")
-                if confirm:
+            # Confirmar exclusão
+            confirm = st.radio(f"Tem certeza que deseja excluir {jogador['nome']} do mercado?", ["Não", "Sim"])
+
+            if confirm == "Sim":
+                try:
                     # Exclui o jogador do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                     st.success(f"Jogador {jogador['nome']} foi excluído com sucesso do mercado!")
-            except Exception as e:
-                st.error(f"Erro ao excluir jogador do mercado: {e}")
+                except Exception as e:
+                    st.error(f"Erro ao excluir jogador do mercado: {e}")
