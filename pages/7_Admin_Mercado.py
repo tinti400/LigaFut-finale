@@ -68,14 +68,16 @@ with col2:
 
 with col3:
     if st.button("🧹 Limpar Mercado"):
-        confirm = st.confirm("Tem certeza de que deseja limpar todos os jogadores do mercado?")
-        if confirm:
+        # Exibir um botão de confirmação
+        if st.button("Confirmar Limpeza do Mercado"):
             try:
                 # Exclui todos os jogadores do mercado
                 supabase.table("mercado_transferencias").delete().execute()
                 st.success("🧹 Todos os jogadores foram removidos do mercado!")
             except Exception as e:
                 st.error(f"Erro ao limpar mercado: {e}")
+        else:
+            st.warning("Clique em 'Confirmar Limpeza do Mercado' para confirmar a exclusão de todos os jogadores.")
 
 # 📝 Cadastro de jogador no mercado
 st.markdown("---")
