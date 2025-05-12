@@ -34,8 +34,25 @@ def outras_funcionalidades():
     
     st.write("Mais opções de funcionalidades para o seu campeonato virão logo!")
 
+# Função para a página "Painel do Técnico"
+def painel_tec():
+    st.title("Painel do Técnico")
+    st.markdown("Aqui você pode gerenciar o seu time e acompanhar as rodadas da liga.")
+    # Conteúdo adicional sobre o painel do técnico pode ser adicionado aqui
+    st.write("Mais funcionalidades estão em desenvolvimento...")
+
+# Função para a página "Elenco"
+def elenco():
+    st.title("Elenco")
+    st.markdown("Aqui você pode visualizar e gerenciar os jogadores do seu time.")
+    # Aqui poderia ser exibido o elenco do time, como foi descrito antes
+    st.write("Em breve, você poderá ver seu elenco e realizar transferências!")
+
 # Definindo a navegação entre as páginas
-page = st.sidebar.selectbox("Escolha uma página", ["Home", "Gerenciar Rodadas", "Outras Funcionalidades"])
+page = st.sidebar.selectbox(
+    "Escolha uma página",
+    ["Home", "Gerenciar Rodadas", "Outras Funcionalidades", "Painel do Técnico", "Elenco"]
+)
 
 # Verificando qual página foi escolhida e chamando a função correspondente
 if page == "Home":
@@ -46,3 +63,9 @@ elif page == "Gerenciar Rodadas":
 
 elif page == "Outras Funcionalidades":
     outras_funcionalidades()
+
+elif page == "Painel do Técnico":
+    painel_tec()
+
+elif page == "Elenco":
+    elenco()
