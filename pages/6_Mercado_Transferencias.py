@@ -103,7 +103,7 @@ else:
             else:
                 st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
         with col2:
-            st.markdown(f"**👤 Nome:** {jogador.get('nome', 'Desconhecido')}")
+            st.markdown(f"**🎯 Jogador alvo:** {jogador.get('nome', 'Desconhecido')}")
             st.markdown(f"**📌 Posição:** {jogador.get('posicao', 'Desconhecida')}")
             st.markdown(f"**⭐ Overall:** {jogador.get('overall', 'N/A')}")
             st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', 'Desconhecida')}")
