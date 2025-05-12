@@ -82,7 +82,8 @@ if st.session_state.get("mostrar_elenco", False):
                             "nome": jogador["nome"],
                             "posicao": jogador["posicao"],
                             "overall": jogador["overall"],
-                            "valor": jogador["valor"]
+                            "valor": jogador["valor"],
+                            "time_origem": jogador.get("time_origem", "N/A")
                         }
                         supabase.table("mercado_transferencias").insert(jogador_mercado).execute()
 
