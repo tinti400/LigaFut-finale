@@ -2,6 +2,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 
+# Configuração da página
 st.set_page_config(page_title="Admin - Mercado", layout="wide")
 
 # 🔐 Conexão com Supabase
@@ -39,7 +40,7 @@ except Exception as e:
 st.markdown("<h1 style='text-align: center;'>⚙️ Admin - Mercado de Transferências</h1><hr>", unsafe_allow_html=True)
 
 # 🔓 Status do mercado
-mercado_cfg_ref = supabase.table("configuracoes").select("aberto").eq("id", 1).execute()
+mercado_cfg_ref = supabase.table("configuracoes").select("aberto").eq("id", "mercado_sistema").execute()
 mercado_aberto = mercado_cfg_ref.data[0].get("aberto", False) if mercado_cfg_ref.data else False
 
 st.markdown(f"### 🛒 Status atual do mercado: **{'Aberto' if mercado_aberto else 'Fechado'}**")
@@ -50,8 +51,9 @@ with col1:
     if st.button("🟢 Abrir Mercado"):
         try:
             # Atualizar o status do mercado para aberto
-            supabase.table("configuracoes").update({"aberto": True}).eq("id", 1).execute()
+            supabase.table("configuracoes").update({"aberto": True}).eq("id", "mercado_sistema").execute()
             st.success("✅ Mercado aberto com sucesso!")
+            st.experimental_rerun()  # Atualiza a interface
         except Exception as e:
             st.error(f"Erro ao abrir mercado: {e}")
 
@@ -59,8 +61,9 @@ with col2:
     if st.button("🔴 Fechar Mercado"):
         try:
             # Atualizar o status do mercado para fechado
-            supabase.table("configuracoes").update({"aberto": False}).eq("id", 1).execute()
+            supabase.table("configuracoes").update({"aberto": False}).eq("id", "mercado_sistema").execute()
             st.success("✅ Mercado fechado com sucesso!")
+            st.experimental_rerun()  # Atualiza a interface
         except Exception as e:
             st.error(f"Erro ao fechar mercado: {e}")
 
@@ -129,3 +132,4 @@ try:
         st.info("📭 Nenhum jogador no mercado.")
 except Exception as e:
     st.error(f"Erro ao carregar jogadores do mercado: {e}")
+
