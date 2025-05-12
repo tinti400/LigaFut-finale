@@ -2,7 +2,6 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 
-# Configuração da página
 st.set_page_config(page_title="Admin - Mercado", layout="wide")
 
 # 🔐 Conexão com Supabase
@@ -69,12 +68,14 @@ with col2:
 
 with col3:
     if st.button("🧹 Limpar Mercado"):
-        try:
-            # Exclui todos os jogadores do mercado
-            supabase.table("mercado_transferencias").delete().execute()
-            st.success("🧹 Todos os jogadores foram removidos do mercado!")
-        except Exception as e:
-            st.error(f"Erro ao limpar mercado: {e}")
+        confirm = st.confirm("Tem certeza de que deseja limpar todos os jogadores do mercado?")
+        if confirm:
+            try:
+                # Exclui todos os jogadores do mercado
+                supabase.table("mercado_transferencias").delete().execute()
+                st.success("🧹 Todos os jogadores foram removidos do mercado!")
+            except Exception as e:
+                st.error(f"Erro ao limpar mercado: {e}")
 
 # 📝 Cadastro de jogador no mercado
 st.markdown("---")
@@ -132,4 +133,3 @@ try:
         st.info("📭 Nenhum jogador no mercado.")
 except Exception as e:
     st.error(f"Erro ao carregar jogadores do mercado: {e}")
-
