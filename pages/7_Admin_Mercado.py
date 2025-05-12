@@ -49,6 +49,7 @@ col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     if st.button("🟢 Abrir Mercado"):
         try:
+            # Atualizar o status do mercado para aberto
             supabase.table("configuracoes").update({"aberto": True}).eq("id", 1).execute()
             st.success("✅ Mercado aberto com sucesso!")
         except Exception as e:
@@ -57,6 +58,7 @@ with col1:
 with col2:
     if st.button("🔴 Fechar Mercado"):
         try:
+            # Atualizar o status do mercado para fechado
             supabase.table("configuracoes").update({"aberto": False}).eq("id", 1).execute()
             st.success("✅ Mercado fechado com sucesso!")
         except Exception as e:
@@ -65,8 +67,8 @@ with col2:
 with col3:
     if st.button("🧹 Limpar Mercado"):
         try:
-            # Usando uma condição para garantir que todos os registros serão deletados
-            supabase.table("mercado_transferencias").delete().neq("id", "").execute()
+            # Exclui todos os jogadores do mercado
+            supabase.table("mercado_transferencias").delete().execute()
             st.success("🧹 Todos os jogadores foram removidos do mercado!")
         except Exception as e:
             st.error(f"Erro ao limpar mercado: {e}")
