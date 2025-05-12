@@ -14,10 +14,6 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# Inicializar variáveis de estado
-if "mostrar_elenco" not in st.session_state:
-    st.session_state["mostrar_elenco"] = False
-
 # 📥 Dados do time logado
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -46,7 +42,7 @@ st.markdown("### 🔍 Ações rápidas")
 col1, col2 = st.columns(2)
 
 # 👥 Exibe o elenco se ativado
-if st.session_state["mostrar_elenco"]:
+if st.session_state.get("mostrar_elenco", False):
     st.markdown("### 👥 Seu Elenco")
 
     try:
@@ -95,7 +91,9 @@ if st.session_state["mostrar_elenco"]:
                         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
                         st.success(f"✅ {jogador['nome']} vendido! Você recebeu R$ {valor_recebido:,.0f}".replace(",", "."))
-                        st.experimental_rerun()  # Atualiza a página para refletir a mudança
+                        # Não usar st.experimental_rerun() aqui para evitar o fechamento da aba
+                        st.session_state["mostrar_elenco"] = False  # Força a exibição de novo para atualizar
+                        st.session_state["mostrar_elenco"] = True  # Força a exibição do elenco novamente
                     except Exception as e:
                         st.error(f"Erro ao vender jogador: {e}")
 
@@ -103,7 +101,7 @@ if st.session_state["mostrar_elenco"]:
 
 with col1:
     if st.button("👥 Ver Elenco", key="ver_elenco"):
-        st.session_state["mostrar_elenco"] = not st.session_state["mostrar_elenco"]
+        st.session_state["mostrar_elenco"] = not st.session_state.get("mostrar_elenco", False)
 
 # ⚡ Adicionar Jogador (Somente Administrador)
 # Verifica se o usuário é um administrador
@@ -133,7 +131,8 @@ if usuario_email in administradores:
                     }
                     supabase.table("elenco").insert(novo_jogador).execute()
                     st.success(f"Jogador {nome_jogador} adicionado com sucesso ao elenco!")
-                    st.experimental_rerun()  # Atualiza a página para refletir a mudança
+                    st.session_state["mostrar_elenco"] = False  # Para garantir a atualização
+                    st.session_state["mostrar_elenco"] = True  # Força a exibição do elenco novamente
                 except Exception as e:
                     st.error(f"Erro ao adicionar jogador: {e}")
             else:
