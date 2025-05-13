@@ -101,3 +101,46 @@ with col2:
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao desativar leilão: {e}")
+
+# 🔄 Atualização de lances no leilão
+st.markdown("---")
+st.markdown("### 🏆 Últimos Lances")
+
+# 🔍 Obtém os detalhes do leilão ativo
+leilao_ref = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
+leilao_data = leilao_ref.data[0] if leilao_ref.data else None
+
+if leilao_data and leilao_data["ativo"]:
+    st.markdown(f"**Jogador:** {leilao_data['jogador']['nome']}")  
+    st.markdown(f"**Posição:** {leilao_data['jogador']['posicao']}")
+    st.markdown(f"**Valor Atual:** R$ {leilao_data['valor_atual']:,.0f}".replace(",", "."))
+
+    # 🎯 Atualizar o valor do lance
+    valor_lance = leilao_data["valor_atual"] + 2000000  # Aumento de 2 milhões
+
+    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance, step=2000000)
+
+    if st.button(f"💸 Dar Lance de R$ {lance_input:,.0f}"):
+        try:
+            if lance_input > leilao_data["valor_atual"]:
+                # Atualiza o valor atual do lance
+                supabase.table("configuracoes").update({
+                    "valor_atual": lance_input,
+                    "ultimo_lance": datetime.utcnow().isoformat()
+                }).eq("id", "leilao_sistema").execute()
+
+                # Atualiza o time vencedor (presumindo que o time logado faça o lance)
+                id_time_vencedor = st.session_state.get("id_time")
+                supabase.table("configuracoes").update({
+                    "id_time_atual": id_time_vencedor,
+                    "time_vencedor": f"Time {id_time_vencedor}"
+                }).eq("id", "leilao_sistema").execute()
+
+                st.success(f"✅ Lance de R$ {lance_input:,.0f} realizado com sucesso!")
+                st.balloons()
+            else:
+                st.error("❌ O lance deve ser maior que o valor atual!")
+        except Exception as e:
+            st.error(f"Erro ao dar lance: {e}")
+else:
+    st.info("🔒 O leilão não está ativo.")
