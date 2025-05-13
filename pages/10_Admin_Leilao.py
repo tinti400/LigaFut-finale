@@ -118,9 +118,11 @@ if leilao_data and leilao_data["ativo"]:
     # 🎯 Atualizar o valor do lance
     valor_lance = leilao_data["valor_atual"] + 2000000  # Aumento de 2 milhões
 
-    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance, step=2000000)
+    # Remover a opção de incremento e deixar apenas a digitação do valor
+    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance)
 
     if st.button(f"💸 Dar Lance de R$ {lance_input:,.0f}"):
+
         try:
             if lance_input > leilao_data["valor_atual"]:
                 # Atualiza o valor atual do lance
