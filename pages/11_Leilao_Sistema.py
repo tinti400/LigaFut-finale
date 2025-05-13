@@ -122,7 +122,7 @@ if tempo_restante == 0:
 
 # 🛎️ Sistema de lances
 if tempo_restante > 0:
-    novo_lance = valor_atual + 3000000  # Aumento fixo de 3 milhões
+    novo_lance = valor_atual + 5000000  # Aumento fixo de 5 milhões
 
     st.metric("💸 Lance Mínimo", f"R$ {novo_lance:,.0f}".replace(",", "."))
 
@@ -151,6 +151,8 @@ if tempo_restante > 0:
                 st.experimental_rerun()  # Força a atualização da página
         except Exception as e:
             st.error(f"Erro ao registrar lance: {e}")
+else:
+    st.info("⏱️ O tempo do leilão acabou.")
 
 # 🛎️ Botão de Atualização
 if st.button("🔄 Atualizar"):
