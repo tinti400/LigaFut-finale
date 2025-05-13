@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from dateutil.parser import parse
 
 st.set_page_config(page_title="Leilões Finalizados - LigaFut", layout="wide")
 
@@ -27,14 +28,16 @@ try:
         for leilao in leiloes:
             jogador = leilao.get("jogador", {})
             nome_jogador = jogador.get("nome", "Desconhecido")
-            posicao = jogador.get("posição", "-")
+            posicao = jogador.get("posicao", "-")  # Corrigido de 'posição' para 'posicao'
             overall = jogador.get("overall", "N/A")
             valor = leilao.get("valor_atual", 0)
             time_vencedor = leilao.get("time_vencedor", "Sem vencedor")
             fim = leilao.get("fim")
 
-            if isinstance(fim, datetime):
-                fim_str = fim.strftime("%d/%m/%Y %H:%M")
+            # Verificar e formatar a data de fim corretamente
+            if isinstance(fim, str):
+                fim_dt = parse(fim)  # Usando parse para garantir a conversão para datetime
+                fim_str = fim_dt.strftime("%d/%m/%Y %H:%M")
             else:
                 fim_str = "Data desconhecida"
 
