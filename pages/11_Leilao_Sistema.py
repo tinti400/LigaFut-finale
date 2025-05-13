@@ -26,9 +26,19 @@ else:
     st.warning("O nome do time não foi encontrado. Por favor, faça o login novamente.")
     st.stop()
 
+# 🔍 Buscar time na tabela 'times' com o nome fornecido
+res = supabase.table("times").select("*").eq("nome", nome_time_usuario).execute()
+
+if not res.data:
+    st.warning(f"Nenhum time encontrado com o nome '{nome_time_usuario}'.")
+    st.stop()
+
+# Obter o id_time do time encontrado
+id_time_usuario = res.data[0]["id"]
+
 # 🔍 Buscar leilão ativo
-res = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
-leilao = res.data[0] if res.data else None
+leilao_res = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
+leilao = leilao_res.data[0] if leilao_res.data else None
 
 if not leilao or not leilao.get("ativo", False):
     st.warning("⚠️ Nenhum leilão ativo no momento.")
