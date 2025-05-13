@@ -18,7 +18,13 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.stop()
 
 id_time_usuario = st.session_state["id_time"]
-nome_time_usuario = st.session_state["nome_time"]
+
+# Verifique se a chave 'nome_time' existe no session_state
+if "nome_time" in st.session_state:
+    nome_time_usuario = st.session_state["nome_time"]
+else:
+    st.warning("O nome do time não foi encontrado. Por favor, faça o login novamente.")
+    st.stop()
 
 # 🔍 Buscar leilão ativo
 res = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
@@ -122,7 +128,7 @@ if tempo_restante == 0:
 
 # 🛎️ Sistema de lances
 if tempo_restante > 0:
-    novo_lance = valor_atual + 5000000  # Aumento fixo de 3 milhões
+    novo_lance = valor_atual + 5000000  # Aumento fixo de 5 milhões
 
     st.metric("💸 Lance Mínimo", f"R$ {novo_lance:,.0f}".replace(",", "."))
 
@@ -148,7 +154,7 @@ if tempo_restante > 0:
                 }).eq("id", "leilao_sistema").execute()
 
                 st.success(f"✅ Lance de R$ {novo_lance:,.0f} enviado!")
-                st.rerun()
+                st.experimental_rerun()  # Força a atualização da página
         except Exception as e:
             st.error(f"Erro ao registrar lance: {e}")
 else:
