@@ -113,28 +113,33 @@ for time_id, time_nome in times.items():
                 with col_confirmar:
                     if st.button(f"🛒 Comprar {nome}", key=f"confirmar_{jogador.get('id')}"):
 
-                        # Definindo os dados da proposta
-                        proposta_data = {
-                            "id_time_origem": id_time,
-                            "id_time_destino": time_id,
-                            "jogador_desejado": nome,
-                            "id_jogador": jogador.get("id"),  # ID do jogador desejado
-                            "jogador_oferecido": [],  # Não há jogadores oferecidos, pois é "Somente Dinheiro"
-                            "valor_oferecido": valor_adicional,
-                            "tipo_negociacao": "Somente Dinheiro",
-                            "status": "pendente",
-                            "data": datetime.utcnow().isoformat()  # Data da proposta
-                        }
+                        # Verifica se o valor é maior ou igual ao valor do jogador
+                        if valor_adicional >= valor:
+                            # Definindo os dados da proposta
+                            proposta_data = {
+                                "id_time_origem": id_time,
+                                "id_time_destino": time_id,
+                                "jogador_desejado": nome,
+                                "id_jogador": jogador.get("id"),  # ID do jogador desejado
+                                "jogador_oferecido": [],  # Não há jogadores oferecidos, pois é "Somente Dinheiro"
+                                "valor_oferecido": valor_adicional,
+                                "tipo_negociacao": "Somente Dinheiro",
+                                "status": "pendente",
+                                "data": datetime.utcnow().isoformat()  # Data da proposta
+                            }
 
-                        try:
-                            # Inserindo proposta na tabela de negociações
-                            response = supabase.table("negociacoes").insert(proposta_data).execute()
+                            try:
+                                # Inserindo proposta na tabela de negociações
+                                response = supabase.table("negociacoes").insert(proposta_data).execute()
 
-                            # Verifica se a resposta tem dados
-                            if response and response.data:
-                                st.success("Proposta enviada com sucesso!")
-                                st.rerun()
-                            else:
-                                st.error("Erro ao enviar a proposta: Sem dados na resposta.")
-                        except Exception as e:
-                            st.error(f"Erro ao enviar a proposta: {e}")
+                                # Verifica se a resposta tem dados
+                                if response and response.data:
+                                    st.success("Proposta enviada com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao enviar a proposta: Sem dados na resposta.")
+                            except Exception as e:
+                                st.error(f"Erro ao enviar a proposta: {e}")
+                        else:
+                            st.warning(f"❌ O valor da proposta deve ser maior ou igual ao valor do jogador (R$ {valor:,.0f}).")
+
