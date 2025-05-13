@@ -116,7 +116,7 @@ if leilao_data and leilao_data["ativo"]:
     st.markdown(f"**Valor Atual:** R$ {leilao_data['valor_atual']:,.0f}".replace(",", "."))
 
     # 🎯 Atualizar o valor do lance
-    valor_lance = leilao_data["valor_atual"] + 3000000  # Aumento de 3 milhões (alterado de 2 milhões para 3 milhões)
+    valor_lance = leilao_data["valor_atual"] + 3000000  # Aumento de 3 milhões
 
     # Remover a opção de incremento e deixar apenas a digitação do valor
     lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance)
@@ -124,7 +124,8 @@ if leilao_data and leilao_data["ativo"]:
     if st.button(f"💸 Dar Lance de R$ {lance_input:,.0f}"):
 
         try:
-            if lance_input > leilao_data["valor_atual"]:
+            # Verifica se o lance é maior que o valor atual e maior que o valor de incremento
+            if lance_input >= valor_lance:
                 # Atualiza o valor atual do lance
                 supabase.table("configuracoes").update({
                     "valor_atual": lance_input,
@@ -141,7 +142,7 @@ if leilao_data and leilao_data["ativo"]:
                 st.success(f"✅ Lance de R$ {lance_input:,.0f} realizado com sucesso!")
                 st.balloons()
             else:
-                st.error("❌ O lance deve ser maior que o valor atual!")
+                st.error(f"❌ O lance deve ser **maior ou igual** a R$ {valor_lance:,.0f}!")
         except Exception as e:
             st.error(f"Erro ao dar lance: {e}")
 else:
