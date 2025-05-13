@@ -116,7 +116,7 @@ if leilao_data and leilao_data["ativo"]:
     st.markdown(f"**Valor Atual:** R$ {leilao_data['valor_atual']:,.0f}".replace(",", "."))
 
     # 🎯 Atualizar o valor do lance
-    valor_lance = leilao_data["valor_atual"] + 2000000  # Aumento de 2 milhões
+    valor_lance = leilao_data["valor_atual"] + 3000000  # Aumento de 3 milhões (alterado de 2 milhões para 3 milhões)
 
     # Remover a opção de incremento e deixar apenas a digitação do valor
     lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance)
