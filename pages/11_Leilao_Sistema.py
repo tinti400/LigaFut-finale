@@ -117,7 +117,7 @@ if tempo_restante == 0:
 
 # 🛎️ Sistema de lances
 if tempo_restante > 0:
-    novo_lance = st.number_input("💸 Seu lance (mínimo: R$100.000 acima)", min_value=valor_atual + 100_000, step=100_000)
+    novo_lance = st.number_input("💸 Seu lance (mínimo: R$100.000 acima)", min_value=valor_atual + 3000_000, step=3000_000)
 
     if st.button("💥 Fazer Lance"):
         try:
