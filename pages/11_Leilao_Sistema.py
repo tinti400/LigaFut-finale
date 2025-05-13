@@ -105,6 +105,7 @@ if tempo_restante == 0:
                         valor=valor_atual
                     )
 
+                    # Exibe mensagem confirmando que o time levou o jogador
                     st.success(f"✅ O time {nome_time_vencedor} levou o jogador {jogador['nome']} por R$ {valor_atual:,.0f}.")
                 else:
                     st.warning("❌ Erro: saldo insuficiente no time vencedor.")
