@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-from datetime import datetime, timedelta
-from dateutil.parser import parse
+# -*- coding: utf-8 -*- 
+import streamlit as st 
+from supabase import create_client 
+from datetime import datetime, timedelta 
+from dateutil.parser import parse 
 from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Leilão - LigaFut", layout="wide")
@@ -75,37 +75,39 @@ st.markdown("---")
 if tempo_restante == 0:
     try:
         if id_time_vencedor:
-            jogador.pop("id", None)
-            jogador.pop("id_time", None)
-            jogador["valor"] = valor_atual
-            jogador["id_time"] = id_time_vencedor
+            # Evita que o jogador seja transferido novamente
+            if leilao.get("ativo", False):
+                jogador.pop("id", None)
+                jogador.pop("id_time", None)
+                jogador["valor"] = valor_atual
+                jogador["id_time"] = id_time_vencedor
 
-            # Adiciona jogador ao elenco
-            supabase.table("elenco").insert(jogador).execute()
+                # Adiciona jogador ao elenco
+                supabase.table("elenco").insert(jogador).execute()
 
-            # Atualiza saldo do time vencedor
-            saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
-            saldo_atual = saldo_ref.data[0].get("saldo", 0)
+                # Atualiza saldo do time vencedor
+                saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
+                saldo_atual = saldo_ref.data[0].get("saldo", 0)
 
-            if isinstance(saldo_atual, (int, float)) and saldo_atual >= valor_atual:
-                novo_saldo = saldo_atual - valor_atual
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
+                if isinstance(saldo_atual, (int, float)) and saldo_atual >= valor_atual:
+                    novo_saldo = saldo_atual - valor_atual
+                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
 
-                # Registrar movimentação
-                registrar_movimentacao(
-                    supabase=supabase,
-                    id_time=id_time_vencedor,
-                    jogador=jogador["nome"],
-                    categoria="Leilão",
-                    tipo="Compra",
-                    valor=valor_atual
-                )
+                    # Registrar movimentação
+                    registrar_movimentacao(
+                        supabase=supabase,
+                        id_time=id_time_vencedor,
+                        jogador=jogador["nome"],
+                        categoria="Leilão",
+                        tipo="Compra",
+                        valor=valor_atual
+                    )
 
-                st.success("✅ Leilão encerrado! Jogador transferido com sucesso.")
+                    st.success("✅ Leilão encerrado! Jogador transferido com sucesso.")
+                else:
+                    st.warning("❌ Erro: saldo insuficiente no time vencedor.")
             else:
-                st.warning("❌ Erro: saldo inválido no time vencedor.")
-        else:
-            st.info("⏱️ Leilão encerrado sem lances. Jogador será descartado.")
+                st.info("⏱️ Leilão encerrado sem lances. Jogador será descartado.")
         
         # Encerrar o leilão
         supabase.table("configuracoes").update({"ativo": False}).eq("id", "leilao_sistema").execute()
@@ -117,9 +119,11 @@ if tempo_restante == 0:
 
 # 🛎️ Sistema de lances
 if tempo_restante > 0:
-    novo_lance = st.number_input("💸 Seu lance (mínimo: R$100.000 acima)", min_value=valor_atual + 3000_000, step=3000_000)
+    novo_lance = valor_atual + 3000000  # Aumento fixo de 3 milhões
 
-    if st.button("💥 Fazer Lance"):
+    st.metric("💸 Lance Mínimo", f"R$ {novo_lance:,.0f}".replace(",", "."))
+
+    if st.button(f"💥 Fazer Lance de R$ {novo_lance:,.0f}"):
         try:
             saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
             saldo = saldo_ref.data[0].get("saldo")
@@ -140,9 +144,10 @@ if tempo_restante > 0:
                     "fim": novo_fim.isoformat()
                 }).eq("id", "leilao_sistema").execute()
 
-                st.success(f"✅ Lance de R$ {novo_lance:,.0f} enviado!".replace(",", "."))
+                st.success(f"✅ Lance de R$ {novo_lance:,.0f} enviado!")
                 st.rerun()
         except Exception as e:
             st.error(f"Erro ao registrar lance: {e}")
 else:
     st.info("⏱️ O tempo do leilão acabou.")
+

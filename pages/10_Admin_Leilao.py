@@ -41,7 +41,7 @@ with st.form("form_leilao"):
         "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
     ])
     overall = st.number_input("Overall", min_value=1, max_value=99, step=1)
-    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=3000000, step=50000)
+    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100000, step=50000)
     duracao = st.slider("Duração do Leilão (minutos)", min_value=1, max_value=10, value=2)
     botao_criar = st.form_submit_button("Criar Leilão")
 
