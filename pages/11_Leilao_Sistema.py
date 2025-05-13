@@ -75,8 +75,10 @@ st.markdown("---")
 if tempo_restante == 0:
     try:
         if id_time_vencedor:
-            # Evita que o jogador seja transferido novamente
-            if leilao.get("ativo", False):
+            # Verifica se o jogador já foi adicionado ao elenco do time vencedor
+            elenco_ref = supabase.table("elenco").select("id_time").eq("id_time", id_time_vencedor).eq("nome", jogador["nome"]).execute()
+
+            if len(elenco_ref.data) == 0:  # Se o jogador não estiver no elenco, adiciona
                 jogador.pop("id", None)
                 jogador.pop("id_time", None)
                 jogador["valor"] = valor_atual
@@ -103,12 +105,12 @@ if tempo_restante == 0:
                         valor=valor_atual
                     )
 
-                    st.success("✅ Leilão encerrado! Jogador transferido com sucesso.")
+                    st.success(f"✅ O time {nome_time_vencedor} levou o jogador {jogador['nome']} por R$ {valor_atual:,.0f}.")
                 else:
                     st.warning("❌ Erro: saldo insuficiente no time vencedor.")
             else:
-                st.info("⏱️ Leilão encerrado sem lances. Jogador será descartado.")
-        
+                st.info("⏱️ Jogador já foi transferido para o time vencedor.")
+
         # Encerrar o leilão
         supabase.table("configuracoes").update({"ativo": False}).eq("id", "leilao_sistema").execute()
         st.stop()
