@@ -138,7 +138,7 @@ if tempo_restante == 0:
 
 # 🛎️ Sistema de lances
 if tempo_restante > 0:
-    novo_lance = valor_atual + 1500000  # Aumento fixo de 5 milhões
+    novo_lance = valor_atual + 3500000  # Aumento fixo de 5 milhões
 
     st.metric("💸 Lance Mínimo", f"R$ {novo_lance:,.0f}".replace(",", "."))
 
