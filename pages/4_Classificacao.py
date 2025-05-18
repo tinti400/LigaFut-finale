@@ -1,151 +1,130 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 from supabase import create_client
 from datetime import datetime
 
-# 🔐 Conexão Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Classificação", page_icon="📊", layout="centered")
-st.title("📊 Tabela de Classificação")
+st.markdown("## 🏆 Tabela de Classificação")
+st.markdown(f"🗕️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
 # 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 🎯 Dados da sessão
-divisao = st.session_state.get("divisao", "Divisão 1")
+# 🔹 Seletor de divisão
+divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 📥 Obter os resultados das rodadas
+# 📅 Buscar resultados das rodadas
 def buscar_resultados():
-    return supabase.table(nome_tabela_rodadas).select("*").execute().data
+    try:
+        res = supabase.table(nome_tabela_rodadas).select("*").execute()
+        return res.data if res.data else []
+    except Exception as e:
+        st.error(f"Erro ao buscar rodadas: {e}")
+        return []
 
-# 📥 Obter os nomes dos times
+# 👥 Buscar nomes dos times
 def obter_nomes_times():
-    res_nomes = supabase.table("times").select("id", "nome").execute()
-    return {t["id"]: t["nome"] for t in res_nomes.data}
+    try:
+        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
+        time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
+        if not time_ids:
+            return {}
+        res = supabase.table("times").select("id", "nome").in_("id", time_ids).execute()
+        return {t["id"]: t["nome"] for t in res.data}
+    except Exception as e:
+        st.error(f"Erro ao buscar nomes dos times: {e}")
+        return {}
 
-# 🧠 Função para calcular a classificação com validação dos resultados
+# 🧠 Calcular classificação
 def calcular_classificacao(rodadas, times_map):
-    tabela = {}
-
-    for time_id in times_map:
-        tabela[time_id] = {
-            "nome": times_map.get(time_id, "Desconhecido"),
-            "pontos": 0,
-            "v": 0,
-            "e": 0,
-            "d": 0,
-            "gp": 0,
-            "gc": 0,
-            "sg": 0
-        }
+    tabela = {tid: {"nome": nome, "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0}
+              for tid, nome in times_map.items()}
 
     for rodada in rodadas:
-        for jogo in rodada["jogos"]:
-            mandante = jogo["mandante"]
-            visitante = jogo["visitante"]
-            # Se o valor dos gols estiver vazio, desconsidera essa rodada
+        for jogo in rodada.get("jogos", []):
+            m = jogo.get("mandante")
+            v = jogo.get("visitante")
             gm = jogo.get("gols_mandante")
             gv = jogo.get("gols_visitante")
+            if None in [m, v, gm, gv]:
+                continue
+            try:
+                gm, gv = int(gm), int(gv)
+            except:
+                continue
 
-            # Se algum dos gols estiver vazio, desconsidera o jogo
-            if gm is None or gv is None:
-                continue  # Ignora esse jogo e passa para o próximo
+            for t in (m, v):
+                if t not in tabela:
+                    tabela[t] = {"nome": times_map.get(t, "Desconhecido"), "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0}
 
-            # Agora podemos somar os valores dos gols, pois ambos são válidos
-            gm = int(gm)
-            gv = int(gv)
+            tabela[m]["gp"] += gm
+            tabela[m]["gc"] += gv
+            tabela[m]["sg"] += gm - gv
+            tabela[v]["gp"] += gv
+            tabela[v]["gc"] += gm
+            tabela[v]["sg"] += gv - gm
 
-            # Garantir que ambos os times (mandante e visitante) existam na tabela
-            if mandante not in tabela:
-                tabela[mandante] = {
-                    "nome": times_map.get(mandante, "Desconhecido"),
-                    "pontos": 0,
-                    "v": 0,
-                    "e": 0,
-                    "d": 0,
-                    "gp": 0,
-                    "gc": 0,
-                    "sg": 0
-                }
-
-            if visitante not in tabela:
-                tabela[visitante] = {
-                    "nome": times_map.get(visitante, "Desconhecido"),
-                    "pontos": 0,
-                    "v": 0,
-                    "e": 0,
-                    "d": 0,
-                    "gp": 0,
-                    "gc": 0,
-                    "sg": 0
-                }
-
-            # Atualizando gols, saldo de gols
-            tabela[mandante]["gp"] += gm
-            tabela[mandante]["gc"] += gv
-            tabela[mandante]["sg"] += gm - gv
-
-            tabela[visitante]["gp"] += gv
-            tabela[visitante]["gc"] += gm
-            tabela[visitante]["sg"] += gv - gm
-
-            # Atualizando pontos e vitórias/derrotas/empates
             if gm > gv:
-                tabela[mandante]["pontos"] += 3
-                tabela[mandante]["v"] += 1
-                tabela[visitante]["d"] += 1
+                tabela[m]["pontos"] += 3
+                tabela[m]["v"] += 1
+                tabela[v]["d"] += 1
             elif gm < gv:
-                tabela[visitante]["pontos"] += 3
-                tabela[visitante]["v"] += 1
-                tabela[mandante]["d"] += 1
+                tabela[v]["pontos"] += 3
+                tabela[v]["v"] += 1
+                tabela[m]["d"] += 1
             else:
-                tabela[mandante]["pontos"] += 1
-                tabela[visitante]["pontos"] += 1
-                tabela[mandante]["e"] += 1
-                tabela[visitante]["e"] += 1
+                tabela[m]["pontos"] += 1
+                tabela[v]["pontos"] += 1
+                tabela[m]["e"] += 1
+                tabela[v]["e"] += 1
 
-    # Ordenar por pontos, saldo de gols e gols marcados
-    classificacao = sorted(
-        tabela.items(),
-        key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]),
-        reverse=True
-    )
+    return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-    return classificacao
-
-# 🚨 Exibir tabela de classificação
-rodadas_existentes = buscar_resultados()
+# 🔄 Carregar dados
+rodadas = buscar_resultados()
 times_map = obter_nomes_times()
+classificacao = calcular_classificacao(rodadas, times_map)
 
-# Calcular a classificação com base nas rodadas
-classificacao = calcular_classificacao(rodadas_existentes, times_map)
-
-# Organizar em DataFrame
-dados_classificacao = []
-for i, (time_id, dados) in enumerate(classificacao, 1):
-    dados_classificacao.append({
+# 📊 Montar DataFrame
+dados = []
+for i, (tid, t) in enumerate(classificacao, start=1):
+    dados.append({
         "Posição": i,
-        "Time": dados["nome"],
-        "Pontos": dados["pontos"],
-        "Jogos": dados["v"] + dados["e"] + dados["d"],
-        "Vitórias": dados["v"],
-        "Empates": dados["e"],
-        "Derrotas": dados["d"],
-        "Gols Marcados": dados["gp"],
-        "Gols Sofridos": dados["gc"],
-        "Saldo de Gols": dados["sg"]
+        "Time": t["nome"],
+        "Pontos": t["pontos"],
+        "Jogos": t["v"] + t["e"] + t["d"],
+        "Vitórias": t["v"],
+        "Empates": t["e"],
+        "Derrotas": t["d"],
+        "Gols Pró": t["gp"],
+        "Gols Contra": t["gc"],
+        "Saldo de Gols": t["sg"]
     })
 
-# Criar DataFrame
-df_classificacao = pd.DataFrame(dados_classificacao)
+# 🖌️ Estilo visual por posição
+def destacar_linha(row):
+    total = len(df_classificacao)
+    if row["Posição"] <= 4:
+        return ['background-color: #d4edda'] * len(row)  # G4
+    elif row["Posição"] > total - 2:
+        return ['background-color: #f8d7da'] * len(row)  # Z2
+    else:
+        return [''] * len(row)
 
-# Exibir a tabela no Streamlit
-st.dataframe(df_classificacao)
-
+# 📋 Exibir tabela
+if dados:
+    df_classificacao = pd.DataFrame(dados)
+    df_formatada = df_classificacao.style.apply(destacar_linha, axis=1)
+    st.dataframe(df_formatada, use_container_width=True)
+else:
+    st.info("Sem dados suficientes para exibir a tabela de classificação.")
