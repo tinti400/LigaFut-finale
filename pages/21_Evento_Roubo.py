@@ -43,13 +43,12 @@ bloqueios = evento.get("bloqueios", {})
 ja_perderam = evento.get("ja_perderam", {})
 roubos = evento.get("roubos", {})
 inicio_evento = evento.get("inicio")
-limite_bloqueios = evento.get("limite_bloqueios", 4)  # NOVO
+limite_bloqueios = evento.get("limite_bloqueios", 4)
 
 # ---------------------- ADMIN ----------------------
 if eh_admin:
     st.markdown("### 👑 Painel do Administrador")
     if not ativo:
-        # NOVO: Definir limite de bloqueios
         limite = st.number_input("🔒 Quantos jogadores cada time poderá bloquear?", min_value=1, max_value=11, value=4, step=1)
         if st.button("🚀 Iniciar Evento de Roubo"):
             try:
@@ -67,10 +66,10 @@ if eh_admin:
                     "ja_perderam": {},
                     "roubos": {},
                     "finalizado": False,
-                    "limite_bloqueios": limite  # NOVO
+                    "limite_bloqueios": limite
                 }).eq("id", ID_CONFIG).execute()
                 st.success("Evento iniciado com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao iniciar evento: {e}")
     else:
@@ -80,7 +79,7 @@ if eh_admin:
                 "finalizado": True
             }).eq("id", ID_CONFIG).execute()
             st.success("Evento encerrado.")
-            st.rerun()
+            st.experimental_rerun()
 
 # ---------------------- STATUS ----------------------
 st.markdown("---")
@@ -101,12 +100,10 @@ if ativo:
         if vez < len(ordem):
             id_vez = ordem[vez]
             if id_time == id_vez:
-
-                # NOVO: Verificar tempo do time
                 if inicio_evento:
                     inicio = datetime.fromisoformat(inicio_evento)
                     tempo_total = (datetime.utcnow() - inicio).total_seconds()
-                    tempo_limite_por_time = 3 * 60  # 3 minutos
+                    tempo_limite_por_time = 3 * 60
                     tempo_esperado = tempo_limite_por_time * (vez + 1)
 
                     if tempo_total > tempo_esperado:
@@ -117,7 +114,7 @@ if ativo:
                                 "concluidos": concluidos,
                                 "vez": vez + 1
                             }).eq("id", ID_CONFIG).execute()
-                            st.rerun()
+                            st.experimental_rerun()
                         st.stop()
 
                 st.success("É sua vez! Escolha jogadores para roubar (pagando 50% do valor).")
@@ -183,7 +180,7 @@ if ativo:
                                     }).eq("id", ID_CONFIG).execute()
 
                                     st.success(f"{nome_j} selecionado para roubo!")
-                                    st.rerun()
+                                    st.experimental_rerun()
 
                 if len(roubos.get(id_time, [])) >= 5:
                     st.info("Você já selecionou os 5 jogadores permitidos.")
@@ -197,14 +194,14 @@ if ativo:
                             "concluidos": concluidos,
                             "vez": vez + 1
                         }).eq("id", ID_CONFIG).execute()
-                        st.rerun()
+                        st.experimental_rerun()
 
             elif eh_admin:
                 if st.button("⏭️ Pular vez atual"):
                     supabase.table("configuracoes").update({
                         "vez": vez + 1
                     }).eq("id", ID_CONFIG).execute()
-                    st.rerun()
+                    st.experimental_rerun()
 
     if evento.get("finalizado"):
         st.success("✅ Evento finalizado. Veja o resumo:")
