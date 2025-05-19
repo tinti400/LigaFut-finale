@@ -46,7 +46,7 @@ roubos = evento.get("roubos", {})
 inicio_vez = evento.get("inicio_vez")
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
-# 🔒 Alerta fixo para admin
+# 🔒 Admin pode encerrar o evento a qualquer momento
 if eh_admin and ativo:
     st.info("👑 Você é administrador. Use o botão abaixo para encerrar o evento a qualquer momento.")
     if st.button("🛑 Encerrar Evento"):
@@ -55,8 +55,9 @@ if eh_admin and ativo:
             "finalizado": True
         }).eq("id", ID_CONFIG).execute()
         st.success("Evento encerrado.")
-        st.experimental_rerun()
+        st.rerun()
 
+# 🎯 Ação dos times
 if ativo and fase == "acao":
     try:
         nome_vez = supabase.table("times").select("nome").eq("id", ordem[vez]).execute().data[0]["nome"]
@@ -80,6 +81,7 @@ if ativo and fase == "acao":
         if id_time == ordem[vez]:
             st.subheader("🔍 Escolha os jogadores para roubar")
             times = supabase.table("times").select("id", "nome").execute().data
+
             for time in times:
                 if time["id"] == id_time or ja_perderam.get(time["id"], 0) >= 4:
                     continue
@@ -95,9 +97,9 @@ if ativo and fase == "acao":
                         valor = jogador["valor"]
 
                         ja_roubado = any(
-                            nome_j == r.get("nome") and r.get("de") == time["id"]
-                            for acoes in roubos.values()
-                            for r in acoes
+                            r.get("nome") == nome_j and r.get("de") == time["id"]
+                            for lista in roubos.values()
+                            for r in lista
                         )
                         bloqueado = nome_j in bloqueados
 
@@ -107,21 +109,38 @@ if ativo and fase == "acao":
                             st.markdown(f"❌ {nome_j} - já roubado")
                         else:
                             if st.button(f"Roubar {nome_j} (R$ {valor/2:,.0f})", key=f"{time['id']}_{nome_j}"):
-                                novo = roubos.get(id_time, [])
-                                novo.append({
-                                    "nome": nome_j,
-                                    "posicao": posicao,
-                                    "valor": valor,
-                                    "de": time["id"]
-                                })
-                                roubos[id_time] = novo
-                                ja_perderam[time["id"]] = ja_perderam.get(time["id"], 0) + 1
+                                try:
+                                    # Registrar roubo
+                                    novo = roubos.get(id_time, [])
+                                    novo.append({
+                                        "nome": nome_j,
+                                        "posicao": posicao,
+                                        "valor": valor,
+                                        "de": time["id"]
+                                    })
+                                    roubos[id_time] = novo
+                                    ja_perderam[time["id"]] = ja_perderam.get(time["id"], 0) + 1
 
-                                supabase.table("configuracoes").update({
-                                    "roubos": roubos,
-                                    "ja_perderam": ja_perderam
-                                }).eq("id", ID_CONFIG).execute()
-                                st.experimental_rerun()
+                                    # Atualizar saldos
+                                    saldo_r = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
+                                    saldo_p = supabase.table("times").select("saldo").eq("id", time["id"]).execute().data[0]["saldo"]
+                                    supabase.table("times").update({"saldo": saldo_r - valor / 2}).eq("id", id_time).execute()
+                                    supabase.table("times").update({"saldo": saldo_p + valor / 2}).eq("id", time["id"]).execute()
+
+                                    # Registro
+                                    registrar_movimentacao(id_time, nome_j, "Roubo", "Compra", valor / 2)
+
+                                    # Atualizar config
+                                    supabase.table("configuracoes").update({
+                                        "roubos": roubos,
+                                        "ja_perderam": ja_perderam
+                                    }).eq("id", ID_CONFIG).execute()
+
+                                    st.success(f"✅ {nome_j} foi roubado com sucesso.")
+                                    st.rerun()
+
+                                except Exception as erro:
+                                    st.error(f"Erro ao roubar {nome_j}: {erro}")
 
             if len(roubos.get(id_time, [])) >= 5:
                 st.info("✅ Você já escolheu os 5 jogadores permitidos.")
@@ -133,7 +152,7 @@ if ativo and fase == "acao":
                     "vez": vez + 1,
                     "inicio_vez": str(datetime.utcnow())
                 }).eq("id", ID_CONFIG).execute()
-                st.experimental_rerun()
+                st.rerun()
 
         if eh_admin:
             if st.button("⏭️ Pular para o próximo time"):
@@ -142,12 +161,12 @@ if ativo and fase == "acao":
                     "inicio_vez": str(datetime.utcnow())
                 }).eq("id", ID_CONFIG).execute()
                 st.success("Avançando para o próximo time.")
-                st.experimental_rerun()
+                st.rerun()
 
     except Exception as e:
         st.warning("Erro ao buscar nome do time da vez ou calcular o tempo.")
 
-# ⬇️ Aqui começa o bloco finalizado sem erro
+# 🔚 Finalização automática do evento
 if evento.get("finalizado"):
     st.success("✅ Evento finalizado. Transferindo jogadores...")
 
@@ -156,44 +175,41 @@ if evento.get("finalizado"):
             for j in acoes:
                 try:
                     supabase.table("elenco").delete().eq("id_time", j["de"]).eq("nome", j["nome"]).execute()
-                    saldo_v = supabase.table("times").select("saldo").eq("id", j["de"]).execute().data[0]["saldo"]
-                    supabase.table("times").update({"saldo": saldo_v + j["valor"]/2}).eq("id", j["de"]).execute()
-
                     novo = j.copy()
                     novo["id_time"] = tid
                     supabase.table("elenco").insert(novo).execute()
-
-                    saldo_c = supabase.table("times").select("saldo").eq("id", tid).execute().data[0]["saldo"]
-                    supabase.table("times").update({"saldo": saldo_c - j["valor"]/2}).eq("id", tid).execute()
-
-                    registrar_movimentacao(tid, j["nome"], "Roubo", "Compra", j["valor"] / 2)
-
                 except Exception as err:
                     st.error(f"Erro ao transferir {j['nome']}: {err}")
     else:
         st.info("ℹ️ Nenhuma movimentação de roubo foi registrada neste evento.")
 
-    if eh_admin:
-        st.markdown("---")
-        st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
-        if st.button("✅ Finalizar e sair do evento"):
-            supabase.table("configuracoes").update({
-                "ativo": False,
-                "finalizado": False,
-                "fase": "sorteio",
-                "vez": 0,
-                "ordem": [],
-                "concluidos": [],
-                "bloqueios": {},
-                "ultimos_bloqueios": {},
-                "ja_perderam": {},
-                "roubos": {},
-                "inicio_vez": None
-            }).eq("id", ID_CONFIG).execute()
-            st.success("Evento resetado com sucesso! Você pode criar um novo agora.")
-            st.experimental_rerun()
+    try:
+        # Reiniciar automaticamente o evento
+        times_ref = supabase.table("times").select("id").execute()
+        nova_ordem = [doc["id"] for doc in times_ref.data]
+        random.shuffle(nova_ordem)
 
-# 🔁 Exibir botão para iniciar um novo evento se estiver inativo
+        supabase.table("configuracoes").update({
+            "ativo": True,
+            "finalizado": False,
+            "fase": "bloqueio",
+            "vez": 0,
+            "ordem": nova_ordem,
+            "concluidos": [],
+            "bloqueios": {},
+            "ultimos_bloqueios": bloqueios,
+            "ja_perderam": {},
+            "roubos": {},
+            "inicio_vez": None
+        }).eq("id", ID_CONFIG).execute()
+
+        st.success("🔁 Evento reiniciado com nova ordem. Pronto para começar bloqueios novamente.")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Erro ao resetar evento automaticamente: {e}")
+
+# 🔁 Se evento estiver inativo
 def exibir_botao_iniciar():
     st.markdown("### 🚦 Evento inativo")
     if eh_admin:
@@ -219,9 +235,10 @@ def exibir_botao_iniciar():
                     "limite_bloqueios": limite
                 }).eq("id", ID_CONFIG).execute()
                 st.success("Evento iniciado com sucesso!")
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao iniciar evento: {e}")
 
 if not ativo:
     exibir_botao_iniciar()
+
