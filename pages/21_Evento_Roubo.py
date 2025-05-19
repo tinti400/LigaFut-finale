@@ -177,8 +177,18 @@ if evento.get("finalizado"):
         st.markdown("---")
         st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
         if st.button("✅ Finalizar e sair do evento"):
-            supabase.table("configuracoes").update({"ativo": False}).eq("id", ID_CONFIG).execute()
-            st.success("Evento marcado como encerrado.")
+            supabase.table("configuracoes").update({
+                "ativo": False,
+                "finalizado": False,
+                "fase": "sorteio",
+                "vez": 0,
+                "ordem": [],
+                "concluidos": [],
+                "bloqueios": {},
+                "ultimos_bloqueios": {},
+                "ja_perderam": {},
+                "roubos": {},
+                "inicio_vez": None
+            }).eq("id", ID_CONFIG).execute()
+            st.success("Evento resetado com sucesso! Você pode criar um novo agora.")
             st.experimental_rerun()
-
-    ...
