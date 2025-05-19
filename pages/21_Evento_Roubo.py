@@ -171,8 +171,10 @@ if evento.get("finalizado"):
 # ✅ Botão final de encerramento completo após finalização
 if evento.get("finalizado") and eh_admin:
     st.markdown("---")
+   if eh_admin:
+    st.markdown("---")
     st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
     if st.button("✅ Finalizar e sair do evento"):
         supabase.table("configuracoes").update({"ativo": False}).eq("id", ID_CONFIG).execute()
-        st.success("Evento marcado como encerrado.")
-        st.experimental_rerun()
+        st.success("✅ Evento encerrado com sucesso. Você pode criar um novo agora.")
+        st.rerun()
