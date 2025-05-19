@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from utils import verificar_login, registrar_movimentacao
 
@@ -133,3 +133,25 @@ if ativo:
             supabase.table("configuracoes").update({"fase": "acao"}).eq("id", ID_CONFIG).execute()
             st.success("Todos os times bloquearam. Iniciando fase de roubo...")
             st.experimental_rerun()
+
+    elif fase == "acao":
+        try:
+            nome_vez = supabase.table("times").select("nome").eq("id", ordem[vez]).execute().data[0]["nome"]
+            st.markdown(f"🟡 **Vez do time:** {nome_vez}")
+
+            # Cronômetro regressivo de 3 minutos
+            tempo_inicial = datetime.fromisoformat(inicio_evento)
+            tempo_vez = tempo_inicial + timedelta(minutes=3 * vez)
+            tempo_restante = tempo_vez + timedelta(minutes=3) - datetime.utcnow()
+
+            segundos = int(tempo_restante.total_seconds())
+
+            if segundos > 0:
+                minutos_restantes = segundos // 60
+                segundos_restantes = segundos % 60
+                st.info(f"⏳ Tempo restante: {minutos_restantes:02d}:{segundos_restantes:02d}")
+            else:
+                st.warning("⏱️ Tempo esgotado para este time.")
+
+        except:
+            st.warning("Erro ao buscar nome do time da vez ou calcular o tempo.")
