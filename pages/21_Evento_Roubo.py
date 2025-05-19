@@ -7,7 +7,6 @@ import random
 st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
 from utils import verificar_login, registrar_movimentacao
 
-st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
 
 
 # -*- coding: utf-8 -*-
@@ -17,7 +16,6 @@ from datetime import datetime, timedelta
 import random
 from utils import verificar_login, registrar_movimentacao
 
-st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
