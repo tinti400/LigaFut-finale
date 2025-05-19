@@ -165,7 +165,7 @@ if ativo and fase == "acao":
                                     novo.append({
                                         "nome": nome_j,
                                         "posicao": posicao,
-                                        "valor": int(valor),
+                                        "valor": int(float(valor)),
                                         "de": time["id"]
                                     })
                                     roubos[id_time] = novo
@@ -223,6 +223,7 @@ if evento.get("finalizado"):
                     supabase.table("elenco").delete().eq("id_time", j["de"]).eq("nome", j["nome"]).execute()
                     novo = j.copy()
                     novo["id_time"] = tid
+                    novo["valor"] = int(float(novo["valor"]))
                     supabase.table("elenco").insert(novo).execute()
                 except Exception as err:
                     st.error(f"Erro ao transferir {j['nome']}: {err}")
