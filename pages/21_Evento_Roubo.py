@@ -55,7 +55,8 @@ if eh_admin and ativo:
             "finalizado": True
         }).eq("id", ID_CONFIG).execute()
         st.success("Evento encerrado.")
-        st.rerun()
+        st.experimental_rerun()   # ✅ CERTO
+        
 
 # 🎯 Ação dos times
 if ativo and fase == "acao":
