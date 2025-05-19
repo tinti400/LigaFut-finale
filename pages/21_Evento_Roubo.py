@@ -172,6 +172,7 @@ if evento.get("finalizado"):
 if evento.get("finalizado") and eh_admin:
     st.markdown("---")
    if eh_admin:
+    if eh_admin:
     st.markdown("---")
     st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
     if st.button("✅ Finalizar e sair do evento"):
