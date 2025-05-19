@@ -203,44 +203,25 @@ if evento.get("finalizado"):
     except Exception as e:
         st.error(f"Erro ao resetar evento automaticamente: {e}")
 
-# 🔁 Botão manual para iniciar novo evento
-def exibir_botao_iniciar():
-    st.markdown("### 🚦 Evento inativo")
-    if eh_admin:
-        st.info("Clique abaixo para iniciar um novo evento de roubo.")
-        limite = st.number_input("🔒 Quantos jogadores cada time poderá bloquear?", min_value=1, max_value=11, value=4, step=1)
-        if st.button("🚀 Iniciar Evento de Roubo"):
-            try:
-                times_ref = supabase.table("times").select("id").execute()
-                ordem = [doc["id"] for doc in times_ref.data]
-                random.shuffle(ordem)
-                supabase.table("configuracoes").update({
-                    "ativo": True,
-                    "inicio": str(datetime.utcnow()),
-                    "fase": "bloqueio",
-                    "ordem": ordem,
-                    "vez": "0",
-                    "concluidos": [],
-                    "bloqueios": {},
-                    "ultimos_bloqueios": ultimos_bloqueios,
-                    "ja_perderam": {},
-                    "roubos": {},
-                    "inicio_vez": None,
-                    "limite_bloqueios": limite
-                }).eq("id", ID_CONFIG).execute()
-                st.success("Evento iniciado com sucesso!")
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao iniciar evento: {e}")
+# 👉 Botão admin para iniciar fase de ação (após bloqueio)
+if ativo and fase == "bloqueio" and eh_admin:
+    st.markdown("---")
+    st.subheader("🚨 Iniciar Fase de Ação (Roubo)")
+    if st.button("👉 Iniciar Fase de Ação"):
+        supabase.table("configuracoes").update({
+            "fase": "acao",
+            "vez": "0",
+            "inicio_vez": None,
+            "concluidos": []
+        }).eq("id", ID_CONFIG).execute()
+        st.success("✅ Fase de ação iniciada com sucesso!")
+        st.experimental_rerun()
 
-if not ativo:
-    exibir_botao_iniciar()
-
-# 🔁 Botão adicional para admins embaralharem ordem a qualquer momento
+# 🔁 Botão admin: reiniciar evento com nova ordem embaralhada
 if eh_admin:
     st.markdown("---")
-    st.subheader("🔁 Gerar Nova Ordem de Times (Admin)")
-    if st.button("🔀 Embaralhar e Atualizar Ordem"):
+    st.subheader("🔁 Reiniciar Evento com Nova Ordem (Admin)")
+    if st.button("🔀 Embaralhar e Reiniciar Evento"):
         try:
             res = supabase.table("times").select("id").execute()
             if res.data:
@@ -248,13 +229,23 @@ if eh_admin:
                 random.shuffle(nova_ordem)
 
                 supabase.table("configuracoes").update({
+                    "ativo": True,
+                    "finalizado": False,
+                    "fase": "bloqueio",
                     "ordem": nova_ordem,
+                    "vez": "0",
+                    "inicio_vez": None,
+                    "roubos": {},
+                    "bloqueios": {},
+                    "ultimos_bloqueios": bloqueios,
+                    "ja_perderam": {},
+                    "concluidos": [],
                     "inicio": str(datetime.utcnow())
                 }).eq("id", ID_CONFIG).execute()
 
-                st.success("✅ Ordem embaralhada e salva com sucesso!")
+                st.success("✅ Evento resetado com nova ordem e pronto para bloqueio!")
                 st.experimental_rerun()
             else:
-                st.error("❌ Nenhum time encontrado para gerar ordem.")
+                st.error("❌ Nenhum time encontrado para gerar nova ordem.")
         except Exception as e:
-            st.error(f"Erro ao atualizar ordem: {e}")
+            st.error(f"Erro ao reiniciar evento: {e}")
