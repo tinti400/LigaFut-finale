@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import random
 from utils import verificar_login, registrar_movimentacao
 
+# ✅ Precisa ser a PRIMEIRA instrução do Streamlit
 st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
-
 
 # -*- coding: utf-8 -*-
 import streamlit as st
