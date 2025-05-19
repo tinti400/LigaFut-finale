@@ -1,3 +1,4 @@
+# -*-
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -7,15 +8,12 @@ from utils import verificar_login, registrar_movimentacao
 
 st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
 
-# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
 verificar_login()
 
-# Dados do usuário logado
 id_usuario = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -150,20 +148,30 @@ if ativo and fase == "acao":
             if vez + 1 >= len(ordem):
                 if st.button("🏁 Encerrar Evento e Transferir Jogadores"):
                     supabase.table("configuracoes").update({"finalizado": True, "ativo": False}).eq("id", ID_CONFIG).execute()
-                    for tid, acoes in roubos.items():
-                        for j in acoes:
-                            try:
-                                supabase.table("elenco").delete().eq("id_time", j["de"]).eq("nome", j["nome"]).execute()
-                                novo = j.copy()
-                                novo["id_time"] = tid
-                                supabase.table("elenco").insert(novo).execute()
-                            except Exception as err:
-                                st.error(f"Erro ao transferir {j['nome']}: {err}")
-                    st.success("✅ Jogadores transferidos com sucesso.")
-                    st.info("🏁 O evento foi encerrado. Você pode reiniciar manualmente se quiser.")
-                    st.stop()
+                    st.experimental_rerun()
     except:
         st.warning("Erro ao buscar nome do time da vez.")
+
+if evento.get("finalizado"):
+    st.success("✅ Evento encerrado. Iniciando transferências...")
+    try:
+        for id_destino, lista_roubos in roubos.items():
+            for jogador in lista_roubos:
+                id_origem = jogador["de"]
+                nome = jogador["nome"]
+                supabase.table("elenco").delete().eq("id_time", id_origem).eq("nome", nome).execute()
+                novo_jogador = {
+                    "id_time": id_destino,
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "valor": jogador["valor"]
+                }
+                supabase.table("elenco").insert(novo_jogador).execute()
+        st.success("✅ Todos os jogadores foram transferidos com sucesso.")
+    except Exception as e:
+        st.error(f"❌ Erro ao transferir jogadores: {e}")
+
+    st.info("O evento foi finalizado. Para começar um novo, use o botão de reinício no topo da tela (Admin).")
 
 
 
