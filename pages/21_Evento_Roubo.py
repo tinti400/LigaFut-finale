@@ -142,36 +142,28 @@ if ativo and fase == "acao":
                 st.success("Avançando para o próximo time.")
                 st.experimental_rerun()
 
-    if evento.get("finalizado"):
-    st.success("✅ Evento finalizado. Transferindo jogadores...")
+       if st.button("✅ Finalizar minha participação"):
+        concluidos.append(id_time)
+        supabase.table("configuracoes").update({
+            "concluidos": concluidos,
+            "vez": vez + 1,
+            "inicio_vez": str(datetime.utcnow())
+        }).eq("id", ID_CONFIG).execute()
+        st.experimental_rerun()
 
-    if roubos:
-        for tid, acoes in roubos.items():
-            for j in acoes:
-                try:
-                    supabase.table("elenco").delete().eq("id_time", j["de"]).eq("nome", j["nome"]).execute()
-                    saldo_v = supabase.table("times").select("saldo").eq("id", j["de"]).execute().data[0]["saldo"]
-                    supabase.table("times").update({"saldo": saldo_v + j["valor"]/2}).eq("id", j["de"]).execute()
-
-                    novo = j.copy()
-                    novo["id_time"] = tid
-                    supabase.table("elenco").insert(novo).execute()
-
-                    saldo_c = supabase.table("times").select("saldo").eq("id", tid).execute().data[0]["saldo"]
-                    supabase.table("times").update({"saldo": saldo_c - j["valor"]/2}).eq("id", tid).execute()
-
-                    registrar_movimentacao(tid, j["nome"], "Roubo", "Compra", j["valor"] / 2)
-
-                except Exception as err:
-                    st.error(f"Erro ao transferir {j['nome']}: {err}")
-    else:
-        st.info("ℹ️ Nenhuma movimentação de roubo foi registrada neste evento.")
-
-    # ✅ Aqui está a indentação correta
     if eh_admin:
-        st.markdown("---")
-        st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
-        if st.button("✅ Finalizar e sair do evento"):
-            supabase.table("configuracoes").update({"ativo": False}).eq("id", ID_CONFIG).execute()
-            st.success("Evento marcado como encerrado.")
+        if st.button("⏭️ Pular para o próximo time"):
+            supabase.table("configuracoes").update({
+                "vez": vez + 1,
+                "inicio_vez": str(datetime.utcnow())
+            }).eq("id", ID_CONFIG).execute()
+            st.success("Avançando para o próximo time.")
             st.experimental_rerun()
+
+except Exception as e:
+    st.warning("Erro ao buscar nome do time da vez ou calcular o tempo.")  # ✅ necessário!
+
+# ⬇️ Aqui começa o bloco finalizado sem erro
+if evento.get("finalizado"):
+    st.success("✅ Evento finalizado. Transferindo jogadores...")
+    ...
