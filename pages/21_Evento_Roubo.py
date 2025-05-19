@@ -77,7 +77,8 @@ if eh_admin:
             st.success("✅ Evento sorteado! Veja abaixo a ordem dos times:")
             for i, time in enumerate(nova_ordem):
                 st.markdown(f"{i+1}️⃣ {time['nome']}")
-            st.rerun()
+            st.experimental_rerun()
+
         else:
             st.error("❌ Nenhum time encontrado para sortear.")
 
@@ -88,7 +89,8 @@ if ativo and fase == "sorteio" and eh_admin:
     if st.button("➡️ Começar Bloqueios"):
         atualizar_configuracao({"fase": "bloqueio"})
         st.success("Fase de bloqueio iniciada!")
-        st.rerun()
+        st.experimental_rerun()
+
 
 # 👉 Admin - iniciar fase de ação
 if ativo and fase == "bloqueio" and eh_admin:
@@ -102,7 +104,8 @@ if ativo and fase == "bloqueio" and eh_admin:
             "concluidos": []
         })
         st.success("✅ Fase de ação iniciada com sucesso!")
-        st.rerun()
+        st.experimental_rerun()
+
 
 # 🎯 Fase de Ação
 if ativo and fase == "acao":
@@ -174,7 +177,8 @@ if ativo and fase == "acao":
                             supabase.table("times").update({"saldo": saldo_p + valor // 2}).eq("id", time["id"]).execute()
                             registrar_movimentacao(id_time, nome_j, "Roubo", "Compra", valor // 2)
                             st.success(f"✅ {nome_j} foi roubado com sucesso.")
-                            st.rerun()
+                            st.experimental_rerun()
+
 
             if len(roubos.get(id_time, [])) >= 5:
                 st.info("✅ Você já escolheu os 5 jogadores permitidos.")
@@ -186,7 +190,8 @@ if ativo and fase == "acao":
                     "vez": str(vez + 1),
                     "inicio_vez": str(datetime.utcnow())
                 })
-                st.rerun()
+                st.experimental_rerun()
+
 
         if eh_admin:
             if st.button("⏭️ Pular para o próximo time"):
@@ -194,7 +199,8 @@ if ativo and fase == "acao":
                     "vez": str(vez + 1),
                     "inicio_vez": str(datetime.utcnow())
                 })
-                st.rerun()
+                st.experimental_rerun()
+
 
     except Exception as e:
         st.warning("Erro ao buscar nome do time da vez ou calcular o tempo.")
@@ -224,7 +230,8 @@ if ativo and fase == "bloqueio":
                 bloqueios[id_time] = bloqueios_atual
                 atualizar_configuracao({"bloqueios": bloqueios})
                 st.success(f"✅ {jogador_obj['nome']} protegido com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
+
     else:
         st.info(f"✅ Você já protegeu {limite_bloqueios} jogadores.")
         for j in bloqueios_atual:
