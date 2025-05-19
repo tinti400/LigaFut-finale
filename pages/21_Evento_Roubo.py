@@ -168,3 +168,11 @@ if evento.get("finalizado"):
                     st.error(f"Erro ao transferir {j['nome']}: {err}")
     else:
         st.info("ℹ️ Nenhuma movimentação de roubo foi registrada neste evento.")
+# ✅ Botão final de encerramento completo após finalização
+if evento.get("finalizado") and eh_admin:
+    st.markdown("---")
+    st.info("👑 Você é administrador. Deseja encerrar totalmente este evento?")
+    if st.button("✅ Finalizar e sair do evento"):
+        supabase.table("configuracoes").update({"ativo": False}).eq("id", ID_CONFIG).execute()
+        st.success("Evento marcado como encerrado.")
+        st.experimental_rerun()
