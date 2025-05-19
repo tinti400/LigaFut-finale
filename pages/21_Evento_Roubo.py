@@ -165,7 +165,7 @@ if ativo and fase == "acao":
                                     novo.append({
                                         "nome": nome_j,
                                         "posicao": posicao,
-                                        "valor": valor,
+                                        "valor": int(valor),
                                         "de": time["id"]
                                     })
                                     roubos[id_time] = novo
@@ -253,3 +253,37 @@ if evento.get("finalizado"):
 
     except Exception as e:
         st.error(f"Erro ao resetar evento automaticamente: {e}")
+
+# 🔐 Painel de bloqueio de jogadores (fase de bloqueio)
+if ativo and fase == "bloqueio":
+    st.markdown("---")
+    st.subheader("🔐 Proteja seus jogadores")
+
+    bloqueios_atual = bloqueios.get(id_time, [])
+    elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
+    elenco = elenco_ref.data if elenco_ref.data else []
+
+    nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
+
+    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados]
+    max_bloqueios = limite_bloqueios
+
+    if len(nomes_bloqueados) < max_bloqueios:
+        opcoes = [j for j in jogadores_disponiveis if j not in nomes_bloqueados]
+        selecionado = st.selectbox("Selecione um jogador para proteger:", [""] + opcoes)
+
+        if selecionado and st.button("🔒 Proteger jogador"):
+            jogador_obj = next((j for j in elenco if j["nome"] == selecionado), None)
+            if jogador_obj:
+                bloqueios_atual.append({
+                    "nome": jogador_obj["nome"],
+                    "posicao": jogador_obj["posicao"]
+                })
+                bloqueios[id_time] = bloqueios_atual
+                supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
+                st.success(f"✅ {jogador_obj['nome']} protegido com sucesso!")
+                st.experimental_rerun()
+    else:
+        st.info(f"✅ Você já protegeu {max_bloqueios} jogadores.")
+        for j in bloqueios_atual:
+            st.markdown(f"- 🔐 {j['nome']} ({j['posicao']})")
