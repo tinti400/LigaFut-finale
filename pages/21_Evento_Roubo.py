@@ -192,3 +192,36 @@ if evento.get("finalizado"):
             }).eq("id", ID_CONFIG).execute()
             st.success("Evento resetado com sucesso! Você pode criar um novo agora.")
             st.experimental_rerun()
+
+# 🔁 Exibir botão para iniciar um novo evento se estiver inativo
+def exibir_botao_iniciar():
+    st.markdown("### 🚦 Evento inativo")
+    if eh_admin:
+        st.info("Clique abaixo para iniciar um novo evento de roubo.")
+        limite = st.number_input("🔒 Quantos jogadores cada time poderá bloquear?", min_value=1, max_value=11, value=4, step=1)
+        if st.button("🚀 Iniciar Evento de Roubo"):
+            try:
+                times_ref = supabase.table("times").select("id").execute()
+                ordem = [doc["id"] for doc in times_ref.data]
+                random.shuffle(ordem)
+                supabase.table("configuracoes").update({
+                    "ativo": True,
+                    "inicio": str(datetime.utcnow()),
+                    "fase": "bloqueio",
+                    "ordem": ordem,
+                    "vez": 0,
+                    "concluidos": [],
+                    "bloqueios": {},
+                    "ultimos_bloqueios": ultimos_bloqueios,
+                    "ja_perderam": {},
+                    "roubos": {},
+                    "inicio_vez": None,
+                    "limite_bloqueios": limite
+                }).eq("id", ID_CONFIG).execute()
+                st.success("Evento iniciado com sucesso!")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao iniciar evento: {e}")
+
+if not ativo:
+    exibir_botao_iniciar()
