@@ -35,7 +35,7 @@ res = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute()
 evento = res.data[0] if res.data else {}
 
 ativo = evento.get("ativo", False)
-fase = evento.get("fase", "acao")
+fase = evento.get("fase", "sorteio")
 ordem = evento.get("ordem", [])
 vez = int(evento.get("vez", 0))
 concluidos = evento.get("concluidos", [])
@@ -50,29 +50,25 @@ if eh_admin:
     st.markdown("### 👑 Painel do Administrador")
     if not ativo:
         limite = st.number_input("🔒 Quantos jogadores cada time poderá bloquear?", min_value=1, max_value=11, value=4, step=1)
-        if st.button("🚀 Iniciar Evento de Roubo"):
-            try:
-                times_ref = supabase.table("times").select("id").execute()
-                ordem = [doc["id"] for doc in times_ref.data]
-                random.shuffle(ordem)
-                supabase.table("configuracoes").update({
-                    "ativo": True,
-                    "inicio": str(datetime.utcnow()),
-                    "fase": "bloqueio",
-                    "ordem": ordem,
-                    "vez": 0,
-                    "concluidos": [],
-                    "bloqueios": {},
-                    "ja_perderam": {},
-                    "roubos": {},
-                    "finalizado": False,
-                    "limite_bloqueios": limite
-                }).eq("id", ID_CONFIG).execute()
-                st.success("Evento iniciado na fase de bloqueio!")
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao iniciar evento: {e}")
-        
+        if st.button("🎲 Realizar Sorteio da Ordem"):
+            times_ref = supabase.table("times").select("id", "nome").execute()
+            ordem = [doc["id"] for doc in times_ref.data]
+            random.shuffle(ordem)
+            supabase.table("configuracoes").update({
+                "ativo": True,
+                "inicio": str(datetime.utcnow()),
+                "fase": "bloqueio",
+                "ordem": ordem,
+                "vez": 0,
+                "concluidos": [],
+                "bloqueios": {},
+                "ja_perderam": {},
+                "roubos": {},
+                "finalizado": False,
+                "limite_bloqueios": limite
+            }).eq("id", ID_CONFIG).execute()
+            st.success("Sorteio realizado! Ordem definida e evento iniciado na fase de bloqueio.")
+            st.experimental_rerun()
     else:
         if st.button("🛑 Encerrar Evento"):
             supabase.table("configuracoes").update({
@@ -86,6 +82,12 @@ if eh_admin:
 st.markdown("---")
 if ativo:
     st.success(f"Evento ativo - Fase: {fase.upper()}")
+
+    if ordem:
+        st.markdown("### 🗳️ Ordem dos times no evento:")
+        for i, tid in enumerate(ordem):
+            nome = supabase.table("times").select("nome").eq("id", tid).execute().data[0]["nome"]
+            st.markdown(f"{i+1}º - {nome}")
 
     if fase == "bloqueio":
         st.subheader("🔒 Fase de Bloqueio de Jogadores")
@@ -103,11 +105,7 @@ if ativo:
         elif st.button("🔐 Confirmar bloqueios"):
             novos_bloqueios = [j for j in elenco if j['nome'] in selecionados]
             bloqueios[id_time] = novos_bloqueios
-
-            supabase.table("configuracoes").update({
-                "bloqueios": bloqueios
-            }).eq("id", ID_CONFIG).execute()
-
+            supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
             st.success("Bloqueios salvos com sucesso!")
 
         if eh_admin:
@@ -121,11 +119,7 @@ if ativo:
             elif st.button("✔️ OK - Finalizar bloqueios"):
                 novos_bloqueios = [j for j in elenco if j['nome'] in selecionados]
                 bloqueios[id_time] = novos_bloqueios
-
-                supabase.table("configuracoes").update({
-                    "bloqueios": bloqueios
-                }).eq("id", ID_CONFIG).execute()
-
+                supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
                 st.success("Bloqueios confirmados. Aguarde o início da fase de ação.")
                 st.experimental_rerun()
 
@@ -139,11 +133,9 @@ if ativo:
             nome_vez = supabase.table("times").select("nome").eq("id", ordem[vez]).execute().data[0]["nome"]
             st.markdown(f"🟡 **Vez do time:** {nome_vez}")
 
-            # Cronômetro regressivo de 3 minutos
             tempo_inicial = datetime.fromisoformat(inicio_evento)
             tempo_vez = tempo_inicial + timedelta(minutes=3 * vez)
             tempo_restante = tempo_vez + timedelta(minutes=3) - datetime.utcnow()
-
             segundos = int(tempo_restante.total_seconds())
 
             if segundos > 0:
@@ -152,6 +144,17 @@ if ativo:
                 st.info(f"⏳ Tempo restante: {minutos_restantes:02d}:{segundos_restantes:02d}")
             else:
                 st.warning("⏱️ Tempo esgotado para este time.")
+
+            if id_time == ordem[vez]:
+                if st.button("✅ Finalizar minha participação"):
+                    concluidos.append(id_time)
+                    supabase.table("configuracoes").update({"concluidos": concluidos, "vez": vez + 1}).eq("id", ID_CONFIG).execute()
+                    st.experimental_rerun()
+            elif eh_admin:
+                if st.button("⏭️ Pular para o próximo time"):
+                    supabase.table("configuracoes").update({"vez": vez + 1}).eq("id", ID_CONFIG).execute()
+                    st.success("Avançando para o próximo time.")
+                    st.experimental_rerun()
 
         except:
             st.warning("Erro ao buscar nome do time da vez ou calcular o tempo.")
