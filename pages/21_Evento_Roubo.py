@@ -111,7 +111,6 @@ if ativo:
                 opcoes.append(nome)
 
         selecionados = st.multiselect("Selecione os jogadores para bloquear", opcoes)
-
         nomes_validos = [n for n in selecionados if "(proibido" not in n]
 
         if len(nomes_validos) > limite_bloqueios:
@@ -127,3 +126,28 @@ if ativo:
             }).eq("id", ID_CONFIG).execute()
 
             st.success("Bloqueios salvos com sucesso!")
+
+        if eh_admin:
+            st.info("✅ Todos os bloqueios prontos? Avance para a próxima fase quando desejar.")
+            if st.button("✅ Avançar para fase de ação"):
+                supabase.table("configuracoes").update({"fase": "acao"}).eq("id", ID_CONFIG).execute()
+                st.success("Fase de ação iniciada manualmente pelo administrador.")
+                st.experimental_rerun()
+
+        elif id_time in bloqueios:
+            st.info("✅ Você já confirmou seus bloqueios.")
+        elif st.button("✔️ OK - Finalizar bloqueios"):
+            novos_bloqueios = [j for j in elenco if j['nome'] in nomes_validos]
+            bloqueios[id_time] = novos_bloqueios
+            ultimos_bloqueios[id_time] = novos_bloqueios
+            supabase.table("configuracoes").update({
+                "bloqueios": bloqueios,
+                "ultimos_bloqueios": ultimos_bloqueios
+            }).eq("id", ID_CONFIG).execute()
+            st.success("Bloqueios confirmados. Aguarde o início da fase de ação.")
+            st.experimental_rerun()
+
+        if all(t in bloqueios for t in ordem):
+            supabase.table("configuracoes").update({"fase": "acao"}).eq("id", ID_CONFIG).execute()
+            st.success("Todos os times bloquearam. Iniciando fase de roubo...")
+            st.experimental_rerun()
