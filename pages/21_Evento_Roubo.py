@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -46,15 +47,65 @@ roubos = evento.get("roubos", {})
 inicio_vez = evento.get("inicio_vez")
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
-# 🔒 Admin pode encerrar o evento a qualquer momento
-if eh_admin and ativo:
-    st.info("👑 Você é administrador. Use o botão abaixo para encerrar o evento a qualquer momento.")
-    if st.button("🛑 Encerrar Evento"):
+# 🔁 Botão admin: reiniciar evento com nova ordem embaralhada
+if eh_admin:
+    st.markdown("---")
+    st.subheader("🔁 Reiniciar Evento com Nova Ordem (Admin)")
+    if st.button("🔀 Embaralhar e Reiniciar Evento"):
+        try:
+            res = supabase.table("times").select("id", "nome").execute()
+            if res.data:
+                nova_ordem = res.data
+                random.shuffle(nova_ordem)
+                nova_ordem_ids = [t["id"] for t in nova_ordem]
+
+                supabase.table("configuracoes").update({
+                    "ativo": True,
+                    "finalizado": False,
+                    "fase": "sorteio",
+                    "ordem": nova_ordem_ids,
+                    "vez": "0",
+                    "inicio_vez": None,
+                    "roubos": {},
+                    "bloqueios": {},
+                    "ultimos_bloqueios": bloqueios,
+                    "ja_perderam": {},
+                    "concluidos": [],
+                    "inicio": str(datetime.utcnow())
+                }).eq("id", ID_CONFIG).execute()
+
+                st.success("✅ Evento sorteado! Veja abaixo a ordem dos times:")
+                for i, time in enumerate(nova_ordem):
+                    st.markdown(f"{i+1}️⃣ {time['nome']}")
+                st.experimental_rerun()
+            else:
+                st.error("❌ Nenhum time encontrado para sortear.")
+        except Exception as e:
+            st.error(f"Erro ao sortear evento: {e}")
+
+# 🛡️ Botão para iniciar fase de bloqueio após sorteio
+if ativo and fase == "sorteio" and eh_admin:
+    st.markdown("---")
+    st.subheader("🛡️ Iniciar Fase de Bloqueio")
+    if st.button("➡️ Começar Bloqueios"):
         supabase.table("configuracoes").update({
-            "ativo": False,
-            "finalizado": True
+            "fase": "bloqueio"
         }).eq("id", ID_CONFIG).execute()
-        st.success("Evento encerrado.")
+        st.success("Fase de bloqueio iniciada!")
+        st.experimental_rerun()
+
+# 👉 Botão admin para iniciar fase de ação (após bloqueio)
+if ativo and fase == "bloqueio" and eh_admin:
+    st.markdown("---")
+    st.subheader("🚨 Iniciar Fase de Ação (Roubo)")
+    if st.button("👉 Iniciar Fase de Ação"):
+        supabase.table("configuracoes").update({
+            "fase": "acao",
+            "vez": "0",
+            "inicio_vez": None,
+            "concluidos": []
+        }).eq("id", ID_CONFIG).execute()
+        st.success("✅ Fase de ação iniciada com sucesso!")
         st.experimental_rerun()
 
 # 🎯 Fase de ação (roubos)
@@ -202,50 +253,3 @@ if evento.get("finalizado"):
 
     except Exception as e:
         st.error(f"Erro ao resetar evento automaticamente: {e}")
-
-# 👉 Botão admin para iniciar fase de ação (após bloqueio)
-if ativo and fase == "bloqueio" and eh_admin:
-    st.markdown("---")
-    st.subheader("🚨 Iniciar Fase de Ação (Roubo)")
-    if st.button("👉 Iniciar Fase de Ação"):
-        supabase.table("configuracoes").update({
-            "fase": "acao",
-            "vez": "0",
-            "inicio_vez": None,
-            "concluidos": []
-        }).eq("id", ID_CONFIG).execute()
-        st.success("✅ Fase de ação iniciada com sucesso!")
-        st.experimental_rerun()
-
-# 🔁 Botão admin: reiniciar evento com nova ordem embaralhada
-if eh_admin:
-    st.markdown("---")
-    st.subheader("🔁 Reiniciar Evento com Nova Ordem (Admin)")
-    if st.button("🔀 Embaralhar e Reiniciar Evento"):
-        try:
-            res = supabase.table("times").select("id").execute()
-            if res.data:
-                nova_ordem = [time["id"] for time in res.data]
-                random.shuffle(nova_ordem)
-
-                supabase.table("configuracoes").update({
-                    "ativo": True,
-                    "finalizado": False,
-                    "fase": "bloqueio",
-                    "ordem": nova_ordem,
-                    "vez": "0",
-                    "inicio_vez": None,
-                    "roubos": {},
-                    "bloqueios": {},
-                    "ultimos_bloqueios": bloqueios,
-                    "ja_perderam": {},
-                    "concluidos": [],
-                    "inicio": str(datetime.utcnow())
-                }).eq("id", ID_CONFIG).execute()
-
-                st.success("✅ Evento resetado com nova ordem e pronto para bloqueio!")
-                st.experimental_rerun()
-            else:
-                st.error("❌ Nenhum time encontrado para gerar nova ordem.")
-        except Exception as e:
-            st.error(f"Erro ao reiniciar evento: {e}")
