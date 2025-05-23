@@ -39,9 +39,12 @@ st.markdown("---")
 
 # ⚡ Ações rápidas
 st.markdown("### 🔍 Ações rápidas")
-col1, col2 = st.columns(2)
 
+col1, col2 = st.columns(2)
 with col1:
-    if st.button("👥 Ver Elenco", key="ver_elenco"):
-        st.session_state["pagina"] = "elenco"  # Navegar para o Elenco
-        st.experimental_rerun()
+    st.page_link("pages/8_1_Elenco.py", label="👥 Ver Elenco", icon="👥")
+    st.page_link("pages/12_Negociacoes.py", label="🤝 Negociações", icon="🤝")
+    st.page_link("pages/13_Propostas_Recebidas.py", label="📩 Propostas Recebidas", icon="📩")
+with col2:
+    st.page_link("pages/16_Propostas_Enviadas.py", label="📤 Propostas Enviadas", icon="📤")
+    st.page_link("pages/11_Leilao_Sistema.py", label="🏆 Leilão do Sistema", icon="🏆")
