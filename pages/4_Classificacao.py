@@ -11,7 +11,7 @@ supabase = create_client(url, key)
 
 st.set_page_config(page_title="Classificação", page_icon="📊", layout="centered")
 st.markdown("## 🏆 Tabela de Classificação")
-st.markdown(f"🗕️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
+st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
 # 🔒 Verifica login
 if "usuario" not in st.session_state:
@@ -32,7 +32,7 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes dos times (coluna correta: 'Divisão')
+# 👥 Buscar nomes dos times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -125,7 +125,8 @@ def destacar_linha(row):
 if dados:
     df_classificacao = pd.DataFrame(dados)
     df_formatada = df_classificacao.style.apply(destacar_linha, axis=1)
-    st.write(df_formatada)
+    st.dataframe(df_formatada, use_container_width=True)
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
+
 
