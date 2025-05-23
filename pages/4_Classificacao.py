@@ -125,7 +125,7 @@ def destacar_linha(row):
 if dados:
     df_classificacao = pd.DataFrame(dados)
     df_formatada = df_classificacao.style.apply(destacar_linha, axis=1)
-    st.dataframe(df_formatada, use_container_width=True)
+    st.write(df_formatada)  # << CORREÇÃO: usa write para estilo funcionar
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
 
