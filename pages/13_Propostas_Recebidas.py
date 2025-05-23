@@ -86,13 +86,20 @@ for proposta in propostas:
         if status == "pendente":
             if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
                 try:
-                    # Atualiza o dono do jogador desejado
+                    # 1️⃣ Transfere o jogador desejado para o time proponente
                     supabase.table("elenco").update({
                         "id_time": time_origem_id,
                         "valor": valor
                     }).eq("id", jogador_id).execute()
 
-                    # Atualiza o status da proposta
+                    # 2️⃣ Transfere os jogadores oferecidos (se houver) para o time que recebeu a proposta
+                    for id_j in jogadores_oferecidos_ids:
+                        if isinstance(id_j, str) and id_j.strip() != "":
+                            supabase.table("elenco").update({
+                                "id_time": id_time_logado
+                            }).eq("id", id_j).execute()
+
+                    # 3️⃣ Atualiza o status da proposta
                     supabase.table("negociacoes").update({
                         "status": "aceita",
                         "valor_aceito": valor
