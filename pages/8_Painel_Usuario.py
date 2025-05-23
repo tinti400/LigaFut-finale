@@ -38,9 +38,22 @@ with col2:
 st.markdown("---")
 st.markdown("### 🔍 Ações rápidas")
 
-# ✅ Links nativos multipage
-st.page_link("pages/4_Elenco.py", label="👥 Ver Elenco")
-st.page_link("pages/11_Negociacoes.py", label="🔄 Negociações")
-st.page_link("pages/12_Propostas_Recebidas.py", label="📨 Propostas Recebidas")
-st.page_link("pages/13_Propostas_Enviadas.py", label="📤 Propostas Enviadas")
-st.page_link("pages/10_Leilao_Sistema.py", label="🎯 Leilão do Sistema")
+# 🔗 Função para criar botão-link
+def botao_link(nome, destino):
+    st.markdown(
+        f"""
+        <a href="/{destino}" target="_self">
+            <button style='width: 100%; padding: 0.6em; font-size: 16px; margin-bottom: 0.5em;'>{nome}</button>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+col1, col2 = st.columns(2)
+with col1:
+    botao_link("👥 Ver Elenco", "4_Elenco")
+    botao_link("🔄 Negociações", "11_Negociacoes")
+    botao_link("🎯 Leilão do Sistema", "10_Leilao_Sistema")
+with col2:
+    botao_link("📨 Propostas Recebidas", "12_Propostas_Recebidas")
+    botao_link("📤 Propostas Enviadas", "13_Propostas_Enviadas")
