@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 
-st.set_page_config(page_title="Histórico de Transferências", layout="wide")
+st.set_page_config(page_title="BID da LigaFut", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -14,13 +14,15 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-id_time = st.session_state["id_time"]
+st.title("📜 BID da LigaFut – Últimas 100 Transferências")
 
-st.title("📜 Histórico de Transferências")
-
-# 🔄 Recupera movimentações da tabela 'movimentacoes'
+# 🔄 Recupera últimas 100 movimentações da liga
 try:
-    mov_ref = supabase.table("movimentacoes").select("*").eq("id_time", id_time).order("data", desc=True).execute()
+    mov_ref = supabase.table("movimentacoes") \
+        .select("*") \
+        .order("data", desc=True) \
+        .limit(100) \
+        .execute()
     movimentacoes = mov_ref.data
 except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
@@ -32,10 +34,11 @@ if not movimentacoes:
 else:
     for mov in movimentacoes:
         jogador = mov.get("jogador", "Desconhecido")
-        categoria = mov.get("categoria", "N/A")  # Ex: "Roubo", "Proposta", "Leilão"
+        categoria = mov.get("categoria", "N/A")  # Ex: "Proposta", "Leilão", "Venda mercado", "Multa"
         tipo = mov.get("tipo", "N/A")            # Ex: "Compra", "Venda"
         valor = mov.get("valor", 0)
         data = mov.get("data", None)
+        time = mov.get("time", "Desconhecido")
 
         # 🔁 Formata data
         if data:
@@ -59,3 +62,4 @@ else:
         st.markdown(f"**💬 Tipo:** {tipo}")
         st.markdown(f"**💰 Valor:** {valor_str}")
         st.markdown(f"**📅 Data:** {data_str}")
+        st.markdown(f"**🏷️ Time:** {time}")
