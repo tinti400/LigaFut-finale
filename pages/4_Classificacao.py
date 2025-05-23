@@ -32,10 +32,10 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes dos times
+# 👥 Buscar nomes dos times (coluna correta: 'Divisão')
 def obter_nomes_times():
     try:
-        usuarios = supabase.table("usuarios").select("time_id").eq("divisao", divisao).execute().data
+        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
         time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
         if not time_ids:
             return {}
@@ -115,9 +115,9 @@ for i, (tid, t) in enumerate(classificacao, start=1):
 def destacar_linha(row):
     total = len(df_classificacao)
     if row["Posição"] <= 4:
-        return ['background-color: #d4edda'] * len(row)  # G4 (verde)
+        return ['background-color: #d4edda'] * len(row)  # G4
     elif row["Posição"] > total - 2:
-        return ['background-color: #f8d7da'] * len(row)  # Z2 (vermelho)
+        return ['background-color: #f8d7da'] * len(row)  # Z2
     else:
         return [''] * len(row)
 
@@ -128,3 +128,4 @@ if dados:
     st.write(df_formatada)
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
+
