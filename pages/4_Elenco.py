@@ -26,6 +26,8 @@ arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, pos
 if arquivo:
     try:
         df = pd.read_excel(arquivo)
+        df.columns = [c.lower() for c in df.columns]  # corrige nomes
+        df = df.rename(columns={"overal": "overall"})  # corrige erro comum
         jogadores_adicionados = 0
 
         for _, row in df.iterrows():
@@ -51,6 +53,19 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar elenco: {e}")
     elenco = []
+
+# 📊 Estatísticas
+if elenco:
+    total_jogadores = len(elenco)
+    valor_total = sum(j.get("valor", 0) for j in elenco)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**👥 Total de jogadores no elenco:** `{total_jogadores}`")
+    with col2:
+        st.markdown(f"**💰 Valor total do elenco:** `R$ {valor_total:,.0f}`".replace(",", "."))
+
+    st.markdown("---")
 
 if not elenco:
     st.info("📭 Seu elenco está vazio.")
@@ -89,7 +104,8 @@ else:
                 except Exception as e:
                     st.error(f"Erro ao vender jogador: {e}")
 
-# ⚡ Botão de voltar ao painel do técnico
+# 🔙 Voltar ao painel
 if st.button("🔙 Voltar ao Painel"):
     st.session_state["pagina"] = "usuario"
     st.experimental_rerun()
+
