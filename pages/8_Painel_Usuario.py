@@ -36,23 +36,36 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-st.markdown("### ⚡ Ações rápidas")
 
-col1, col2 = st.columns(2)
+# 🔀 Navegação entre seções internas
+st.markdown("### 🔍 Ações rápidas")
 
-with col1:
-    if st.button("👥 Ver Elenco"):
-        st.switch_page("pages/8_1_Elenco.py")
+aba = st.radio("Escolha uma seção:", [
+    "🔙 Voltar para o Painel",
+    "👥 Elenco",
+    "🤝 Negociações",
+    "📥 Propostas Recebidas",
+    "📤 Propostas Enviadas",
+    "🔨 Leilão do Sistema"
+], index=0, horizontal=True)
 
-    if st.button("📨 Propostas Recebidas"):
-        st.switch_page("pages/13_Propostas_Recebidas.py")
+st.markdown("---")
 
-    if st.button("🧾 Propostas Enviadas"):
-        st.switch_page("pages/16_Propostas_Enviadas.py")
-
-with col2:
-    if st.button("🔁 Negociações"):
-        st.switch_page("pages/12_Negociacoes.py")
-
-    if st.button("📣 Leilão do Sistema"):
-        st.switch_page("pages/11_Leilao_Sistema.py")
+# 🔁 Redireciona visualmente sem recarregar o app
+if aba == "👥 Elenco":
+    with st.spinner("Carregando Elenco..."):
+        exec(open("pages/4_Elenco.py").read())
+elif aba == "🤝 Negociações":
+    with st.spinner("Carregando Negociações..."):
+        exec(open("pages/12_Negociacoes.py").read())
+elif aba == "📥 Propostas Recebidas":
+    with st.spinner("Carregando Propostas Recebidas..."):
+        exec(open("pages/13_Propostas_Recebidas.py").read())
+elif aba == "📤 Propostas Enviadas":
+    with st.spinner("Carregando Propostas Enviadas..."):
+        exec(open("pages/16_Propostas_Enviadas.py").read())
+elif aba == "🔨 Leilão do Sistema":
+    with st.spinner("Carregando Leilão..."):
+        exec(open("pages/11_Leilao_Sistema.py").read())
+else:
+    st.success("Use os botões acima para navegar pelas seções do seu time.")
