@@ -28,94 +28,88 @@ times = {t["id"]: t["nome"] for t in res_times.data}
 
 # 📋 Buscar elenco do time logado
 res_elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
-meu_elenco = res_elenco.data
-
-# 🔐 Verifica se é admin
-res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
-eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+meu_elenco = res_elenco.data or []
 
 # 🔁 Exibir todos os outros times
 for id_time_adv, nome_adv in times.items():
     with st.expander(f"⚽ {nome_adv}"):
-        # 👑 Painel do Admin para adicionar jogador
-        if eh_admin:
-            with st.form(f"form_adicionar_{id_time_adv}"):
-                st.subheader("📥 Adicionar Jogador ao Elenco")
 
-                col1, col2 = st.columns(2)
-                nome = col1.text_input("Nome do Jogador")
-                posicao = col2.selectbox("Posição", [
-                    "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
-                    "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
-                    "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
-                ])
-
-                col3, col4 = st.columns(2)
-                overall = col3.number_input("Overall", min_value=1, max_value=99, step=1)
-                nacionalidade = col4.text_input("Nacionalidade")
-
-                col5, col6 = st.columns(2)
-                valor = col5.number_input("Valor (R$)", min_value=0, step=100_000)
-                origem = col6.text_input("Time de Origem")
-
-                if st.form_submit_button("➕ Adicionar Jogador"):
-                    if all([nome, posicao, overall, nacionalidade, valor > 0, origem]):
-                        try:
-                            supabase.table("elenco").insert({
-                                "id_time": id_time_adv,
-                                "nome": nome,
-                                "posicao": posicao,
-                                "overall": overall,
-                                "nacionalidade": nacionalidade,
-                                "valor": valor,
-                                "time_origem": origem
-                            }).execute()
-                            st.success(f"✅ {nome} adicionado ao elenco do {nome_adv}.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao adicionar jogador: {e}")
-                    else:
-                        st.warning("Preencha todos os campos corretamente.")
-
-        # 🎯 Exibir elenco do time adversário
-        elenco_adv = supabase.table("elenco").select("*").eq("id_time", id_time_adv).execute().data
+        elenco_adv = supabase.table("elenco").select("*").eq("id_time", id_time_adv).execute().data or []
 
         if not elenco_adv:
             st.info("Nenhum jogador disponível neste time.")
         else:
             for jogador in elenco_adv:
                 st.markdown("---")
-                col1, col2 = st.columns([3, 2])
-                with col1:
-                    st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
-                    st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")
-                    st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")
-                    st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")
-                with col2:
-                    valor_jogador = jogador.get("valor", 0)
-                    st.markdown(f"**💰 Valor:** R$ {valor_jogador:,.0f}")
+                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
+                st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")
+                st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")
+                st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")
+                valor_jogador = jogador.get("valor", 0)
+                st.markdown(f"**💰 Valor:** R$ {valor_jogador:,.0f}")
 
-                    proposta_valor = st.number_input(
-                        "💸 Proposta (R$)",
+                tipo = st.radio(
+                    f"Tipo de negociação para {jogador['nome']}",
+                    ["Somente Dinheiro", "Troca Simples", "Troca Composta"],
+                    horizontal=True,
+                    key=f"tipo_{jogador['id']}"
+                )
+
+                jogador_oferecido = []
+                valor_proposta = 0
+
+                if tipo == "Somente Dinheiro":
+                    valor_proposta = st.number_input(
+                        "💵 Valor da Proposta (R$)",
                         min_value=valor_jogador,
                         step=500_000,
                         value=valor_jogador,
-                        key=f"input_valor_{jogador['id']}"
+                        key=f"valor_dinheiro_{jogador['id']}"
                     )
 
-                    if st.button("📩 Enviar Proposta", key=f"btn_proposta_{jogador['id']}"):
+                elif tipo == "Troca Simples":
+                    opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
+                    selecao = st.selectbox(
+                        "🔁 Escolha um jogador do seu elenco",
+                        opcoes,
+                        key=f"troca_simples_{jogador['id']}"
+                    )
+                    jogador_oferecido = [meu_elenco[opcoes.index(selecao)]["id"]]
+                    valor_proposta = 0
+
+                elif tipo == "Troca Composta":
+                    opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
+                    selecao = st.multiselect(
+                        "🔁 Escolha um ou mais jogadores do seu elenco",
+                        opcoes,
+                        key=f"troca_composta_{jogador['id']}"
+                    )
+                    jogador_oferecido = [meu_elenco[opcoes.index(s)]["id"] for s in selecao]
+                    valor_proposta = st.number_input(
+                        "💰 Valor adicional em dinheiro (R$)",
+                        min_value=0,
+                        step=500_000,
+                        key=f"valor_composta_{jogador['id']}"
+                    )
+
+                if st.button("📩 Enviar Proposta", key=f"btn_proposta_{jogador['id']}"):
+                    if tipo != "Somente Dinheiro" and not jogador_oferecido:
+                        st.warning("Selecione ao menos um jogador do seu elenco para a troca.")
+                    elif tipo == "Somente Dinheiro" and valor_proposta < valor_jogador:
+                        st.warning(f"O valor deve ser igual ou superior a R$ {valor_jogador:,.0f}")
+                    else:
+                        proposta = {
+                            "id_time_origem": id_time,
+                            "id_time_destino": id_time_adv,
+                            "jogador_desejado": jogador["nome"],
+                            "id_jogador": jogador["id"],
+                            "jogador_oferecido": jogador_oferecido,
+                            "valor_oferecido": valor_proposta,
+                            "tipo_negociacao": tipo,
+                            "status": "pendente",
+                            "data": datetime.utcnow().isoformat()
+                        }
                         try:
-                            proposta = {
-                                "id_time_origem": id_time,
-                                "id_time_destino": id_time_adv,
-                                "jogador_desejado": jogador["nome"],
-                                "id_jogador": jogador["id"],
-                                "jogador_oferecido": [],
-                                "valor_oferecido": proposta_valor,
-                                "tipo_negociacao": "Somente Dinheiro",
-                                "status": "pendente",
-                                "data": datetime.utcnow().isoformat()
-                            }
                             resp = supabase.table("negociacoes").insert(proposta).execute()
                             if resp and resp.data:
                                 st.success("✅ Proposta enviada com sucesso!")
