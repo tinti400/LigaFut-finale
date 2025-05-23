@@ -4,7 +4,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
-# 🔐 Conexão com Supabase
+# 🔐 Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -18,7 +18,7 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🔢 Buscar saldo
+# 🔢 Saldo
 try:
     saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
     saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
@@ -36,10 +36,9 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-
-# ⚡ Ações rápidas com links
 st.markdown("### 🔍 Ações rápidas")
 
+# ✅ Links nativos multipage
 st.page_link("pages/4_Elenco.py", label="👥 Ver Elenco")
 st.page_link("pages/11_Negociacoes.py", label="🔄 Negociações")
 st.page_link("pages/12_Propostas_Recebidas.py", label="📨 Propostas Recebidas")
