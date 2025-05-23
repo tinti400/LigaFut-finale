@@ -37,24 +37,11 @@ with col2:
 
 st.markdown("---")
 
-# ⚡ Ações rápidas
+# ⚡ Ações rápidas com links
 st.markdown("### 🔍 Ações rápidas")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("👥 Ver Elenco"):
-        st.switch_page("4_Elenco")
-with col2:
-    if st.button("🔄 Negociações"):
-        st.switch_page("11_Negociacoes")
-with col3:
-    if st.button("🎯 Leilão do Sistema"):
-        st.switch_page("10_Leilao_Sistema")
-
-col4, col5 = st.columns(2)
-with col4:
-    if st.button("📨 Propostas Recebidas"):
-        st.switch_page("12_Propostas_Recebidas")
-with col5:
-    if st.button("📤 Propostas Enviadas"):
-        st.switch_page("13_Propostas_Enviadas")
+st.page_link("pages/4_Elenco.py", label="👥 Ver Elenco")
+st.page_link("pages/11_Negociacoes.py", label="🔄 Negociações")
+st.page_link("pages/12_Propostas_Recebidas.py", label="📨 Propostas Recebidas")
+st.page_link("pages/13_Propostas_Enviadas.py", label="📤 Propostas Enviadas")
+st.page_link("pages/10_Leilao_Sistema.py", label="🎯 Leilão do Sistema")
