@@ -18,6 +18,11 @@ if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
+# 📧 Email do usuário e verificação de admin
+email_usuario = st.session_state.get("usuario", "")
+res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+
 # 🔹 Seletor de divisão
 divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
@@ -125,8 +130,22 @@ def destacar_linha(row):
 if dados:
     df_classificacao = pd.DataFrame(dados)
     df_formatada = df_classificacao.style.apply(destacar_linha, axis=1)
-    st.write(df_formatada)  # << CORREÇÃO: usa write para estilo funcionar
+    st.write(df_formatada)
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
+
+# 🧹 Botão de reset para admin
+if eh_admin:
+    st.markdown("---")
+    st.subheader("🔧 Ações administrativas")
+    if st.button("🧹 Resetar Tabela de Classificação (apagar rodadas)"):
+        try:
+            res = supabase.table(nome_tabela_rodadas).select("id").execute()
+            for doc in res.data:
+                supabase.table(nome_tabela_rodadas).delete().eq("id", doc["id"]).execute()
+            st.success("✅ Rodadas da divisão apagadas com sucesso.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao resetar rodadas: {e}")
 
 
