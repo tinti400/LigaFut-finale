@@ -1,10 +1,13 @@
 [server]
 headless = true
-enableCORS = false  # Permite o uso de CORS, pode ser necessário para algumas integrações
-port = 8501  # O Streamlit por padrão usa a porta 8501
+enableCORS = false
+port = 8501
 
 [theme]
-primaryColor = "#009688"  # Cor do tema
-backgroundColor = "#F0F0F0"  # Cor de fundo
-secondaryBackgroundColor = "#E0E0E0"  # Cor do segundo plano
-textColor = "#000000"  # Cor do texto
+primaryColor = "#009688"
+backgroundColor = "#F0F0F0"
+secondaryBackgroundColor = "#E0E0E0"
+textColor = "#000000"
+
+[client]
+menuItems.pagesOrder = "pages.toml"
