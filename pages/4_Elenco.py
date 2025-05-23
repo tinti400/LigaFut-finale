@@ -26,20 +26,24 @@ arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, pos
 if arquivo:
     try:
         df = pd.read_excel(arquivo)
-        df.columns = [c.lower() for c in df.columns]  # corrige nomes
-        df = df.rename(columns={"overal": "overall"})  # corrige erro comum
         jogadores_adicionados = 0
+
+        # 🔄 Carrega jogadores já existentes do elenco
+        elenco_existente = supabase.table("elenco").select("nome", "posicao").eq("id_time", id_time).execute().data
+        nomes_posicoes_existentes = {(j["nome"], j["posicao"]) for j in elenco_existente}
 
         for _, row in df.iterrows():
             if all(c in row for c in ["nome", "posicao", "overall", "valor"]):
-                supabase.table("elenco").insert({
-                    "id_time": id_time,
-                    "nome": row["nome"],
-                    "posicao": row["posicao"],
-                    "overall": int(row["overall"]),
-                    "valor": int(row["valor"])
-                }).execute()
-                jogadores_adicionados += 1
+                chave = (row["nome"], row["posicao"])
+                if chave not in nomes_posicoes_existentes:
+                    supabase.table("elenco").insert({
+                        "id_time": id_time,
+                        "nome": row["nome"],
+                        "posicao": row["posicao"],
+                        "overall": int(row["overall"]),
+                        "valor": int(row["valor"])
+                    }).execute()
+                    jogadores_adicionados += 1
 
         st.success(f"✅ {jogadores_adicionados} jogadores adicionados ao elenco com sucesso!")
         st.experimental_rerun()
@@ -54,22 +58,13 @@ except Exception as e:
     st.error(f"Erro ao carregar elenco: {e}")
     elenco = []
 
-# 📊 Estatísticas
-if elenco:
-    total_jogadores = len(elenco)
-    valor_total = sum(j.get("valor", 0) for j in elenco)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**👥 Total de jogadores no elenco:** `{total_jogadores}`")
-    with col2:
-        st.markdown(f"**💰 Valor total do elenco:** `R$ {valor_total:,.0f}`".replace(",", "."))
-
-    st.markdown("---")
-
 if not elenco:
     st.info("📭 Seu elenco está vazio.")
 else:
+    total_valor = sum(j.get("valor", 0) for j in elenco)
+    st.markdown(f"**👥 Total de Jogadores:** `{len(elenco)}`")
+    st.markdown(f"**💰 Valor Total do Elenco:** `R$ {total_valor:,.0f}`".replace(",", "."))
+
     for jogador in elenco:
         col1, col2, col3, col4, col5 = st.columns([2.5, 2.5, 1.5, 1.5, 2])
         with col1:
@@ -85,7 +80,6 @@ else:
                 try:
                     valor_jogador = jogador.get("valor", 0)
                     valor_recebido = round(valor_jogador * 0.7)
-
                     supabase.table("elenco").delete().eq("id_time", id_time).eq("id", jogador["id"]).execute()
                     supabase.table("mercado_transferencias").insert({
                         "nome": jogador["nome"],
@@ -93,18 +87,16 @@ else:
                         "overall": jogador["overall"],
                         "valor": jogador["valor"]
                     }).execute()
-
                     saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
                     saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
                     novo_saldo = saldo + valor_recebido
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
                     st.success(f"✅ {jogador['nome']} vendido! Você recebeu R$ {valor_recebido:,.0f}".replace(",", "."))
                     st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao vender jogador: {e}")
 
-# 🔙 Voltar ao painel
+# ⚡ Botão de voltar ao painel do técnico
 if st.button("🔙 Voltar ao Painel"):
     st.session_state["pagina"] = "usuario"
     st.experimental_rerun()
