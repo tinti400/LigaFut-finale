@@ -3,6 +3,7 @@ from supabase import create_client
 from datetime import datetime
 
 st.set_page_config(page_title="BID da LigaFut", layout="wide")
+st.title("📋 BID da LigaFut")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -14,52 +15,54 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-st.title("📜 BID da LigaFut – Últimas 100 Transferências")
-
-# 🔄 Recupera últimas 100 movimentações da liga
+# 🔄 Recupera últimas 100 movimentações (qualquer time)
 try:
-    mov_ref = supabase.table("movimentacoes") \
-        .select("*") \
-        .order("data", desc=True) \
-        .limit(100) \
-        .execute()
+    mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).limit(100).execute()
     movimentacoes = mov_ref.data
 except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
     movimentacoes = []
 
+# 🔁 Mapeia os IDs dos times para nomes
+try:
+    times_res = supabase.table("times").select("id", "nome").execute()
+    times_map = {t["id"]: t["nome"] for t in times_res.data}
+except Exception as e:
+    st.error(f"Erro ao buscar nomes dos times: {e}")
+    times_map = {}
+
 # 📋 Exibe histórico
 if not movimentacoes:
-    st.info("Nenhuma movimentação registrada.")
+    st.info("Nenhuma movimentação registrada ainda.")
 else:
     for mov in movimentacoes:
         jogador = mov.get("jogador", "Desconhecido")
-        categoria = mov.get("categoria", "N/A")  # Ex: "Proposta", "Leilão", "Venda mercado", "Multa"
+        categoria = mov.get("categoria", "N/A")  # Ex: "Roubo", "Proposta", "Leilão", "Multa"
         tipo = mov.get("tipo", "N/A")            # Ex: "Compra", "Venda"
         valor = mov.get("valor", 0)
-        data = mov.get("data", None)
-        time = mov.get("time", "Desconhecido")
+        data = mov.get("data", "")
+        id_time = mov.get("id_time", "")
+        nome_time = times_map.get(id_time, "Desconhecido")
 
-        # 🔁 Formata data
-        if data:
-            try:
-                data = datetime.fromisoformat(data)
-                data_str = data.strftime('%d/%m/%Y %H:%M')
-            except:
-                data_str = "Data inválida"
-        else:
-            data_str = "Data não disponível"
+        # Formata data
+        try:
+            data_formatada = datetime.fromisoformat(data).strftime('%d/%m/%Y %H:%M')
+        except:
+            data_formatada = "Data inválida"
 
-        # 💵 Trata valor
-        if isinstance(valor, (int, float)):
-            valor_str = f"R$ {valor:,.0f}".replace(",", ".")
-        else:
-            valor_str = "Valor indisponível"
+        # Formata valor
+        valor_str = f"R$ {valor:,.0f}".replace(",", ".")
 
-        st.markdown("---")
+        # Exibição
+        st.markdown("###")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"📅 **Data:** {data_formatada}")
+        with col2:
+            st.markdown(f"🏷️ **Time:** {nome_time}")
+
         st.markdown(f"**👤 Jogador:** {jogador}")
         st.markdown(f"**📂 Categoria:** {categoria}")
         st.markdown(f"**💬 Tipo:** {tipo}")
         st.markdown(f"**💰 Valor:** {valor_str}")
-        st.markdown(f"**📅 Data:** {data_str}")
-        st.markdown(f"**🏷️ Time:** {time}")
+        st.markdown("---")
