@@ -23,13 +23,13 @@ numero_divisao = divisao_selecionada.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
 # 🔁 Função para obter os nomes dos times
-@st.cache_data(ttl=120)
+@st.cache(ttl=120)
 def obter_nomes_times():
     res = supabase.table("times").select("id", "nome").execute()
     return {t["id"]: t["nome"] for t in res.data}
 
 # 📅 Função para buscar rodadas
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def buscar_rodadas():
     return supabase.table(nome_tabela_rodadas).select("*").order("numero").execute().data
 
