@@ -8,74 +8,76 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🔧 Configuração da página
 st.set_page_config(page_title="Editar Resultados", page_icon="📋", layout="centered")
 st.title("📋 Editar Resultados das Rodadas")
 
-# 🔒 Verifica login
+# 🔒 Verifica se o usuário está logado
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 🔹 Divisão selecionada
-divisao = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
-numero_divisao = divisao.split()[-1]
+# 🔽 Seleção da divisão
+divisao_selecionada = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
+numero_divisao = divisao_selecionada.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 📌 Obter nomes dos times
+# 🔁 Função para obter os nomes dos times
 @st.cache_data(ttl=120)
 def obter_nomes_times():
     res = supabase.table("times").select("id", "nome").execute()
     return {t["id"]: t["nome"] for t in res.data}
 
-# 📅 Buscar rodadas
+# 📅 Função para buscar rodadas
 @st.cache_data(ttl=60)
 def buscar_rodadas():
     return supabase.table(nome_tabela_rodadas).select("*").order("numero").execute().data
 
-# Carregar dados
+# 🔄 Carrega rodadas e nomes
 rodadas_existentes = buscar_rodadas()
-times_map = obter_nomes_times()
+mapa_nomes = obter_nomes_times()
 
-# ✅ Edição por jogo
+# 🎯 Edição rodada a rodada
 if rodadas_existentes:
     st.subheader("📝 Escolha a Rodada para Editar")
-    rodada_ids = [r["numero"] for r in rodadas_existentes]
-    rodada_escolhida = st.selectbox("Rodada", rodada_ids)
+    rodada_numeros = [r["numero"] for r in rodadas_existentes]
+    rodada_escolhida = st.selectbox("Rodada", rodada_numeros)
     rodada = next(r for r in rodadas_existentes if r["numero"] == rodada_escolhida)
 
     for jogo in rodada["jogos"]:
-        mandante = jogo["mandante"]
-        visitante = jogo["visitante"]
-        nome_m = times_map.get(mandante, "FOLGA" if mandante == "FOLGA" else "?")
-        nome_v = times_map.get(visitante, "FOLGA" if visitante == "FOLGA" else "?")
+        mandante_id = jogo.get("mandante")
+        visitante_id = jogo.get("visitante")
         gols_mandante = jogo.get("gols_mandante") or 0
         gols_visitante = jogo.get("gols_visitante") or 0
 
-        with st.container():
-            st.markdown(f"### ⚔️ {nome_m} vs {nome_v}")
+        nome_mandante = mapa_nomes.get(mandante_id, "FOLGA" if mandante_id == "FOLGA" else "?")
+        nome_visitante = mapa_nomes.get(visitante_id, "FOLGA" if visitante_id == "FOLGA" else "?")
 
-            if "FOLGA" in [mandante, visitante]:
-                st.markdown("🚫 Este time folgou nesta rodada.")
+        with st.container():
+            st.markdown(f"### ⚔️ {nome_mandante} vs {nome_visitante}")
+
+            if "FOLGA" in [mandante_id, visitante_id]:
+                st.info("🚫 Este time folgou nesta rodada.")
                 continue
 
             col1, col2, col3 = st.columns([4, 1, 4])
             with col1:
-                gm = st.number_input("Gols Mandante", min_value=0, value=gols_mandante, key=f"gm_{mandante}_{visitante}")
+                novo_gm = st.number_input("Gols Mandante", min_value=0, value=gols_mandante, key=f"gm_{mandante_id}_{visitante_id}")
             with col2:
                 st.markdown("**x**")
             with col3:
-                gv = st.number_input("Gols Visitante", min_value=0, value=gols_visitante, key=f"gv_{mandante}_{visitante}")
+                novo_gv = st.number_input("Gols Visitante", min_value=0, value=gols_visitante, key=f"gv_{mandante_id}_{visitante_id}")
 
-            if st.button("💾 Salvar resultado", key=f"salvar_{mandante}_{visitante}"):
+            if st.button("💾 Salvar resultado", key=f"salvar_{mandante_id}_{visitante_id}"):
                 novos_jogos = []
                 for j in rodada["jogos"]:
-                    if j["mandante"] == mandante and j["visitante"] == visitante:
-                        j["gols_mandante"] = gm
-                        j["gols_visitante"] = gv
+                    if j["mandante"] == mandante_id and j["visitante"] == visitante_id:
+                        j["gols_mandante"] = novo_gm
+                        j["gols_visitante"] = novo_gv
                     novos_jogos.append(j)
 
                 supabase.table(nome_tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_escolhida).execute()
-                st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
+                st.success(f"✅ Resultado salvo: {nome_mandante} {novo_gm} x {novo_gv} {nome_visitante}")
                 st.rerun()
 else:
     st.info("⚠️ Nenhuma rodada encontrada para esta divisão.")
