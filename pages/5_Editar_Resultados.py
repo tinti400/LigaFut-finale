@@ -1,9 +1,47 @@
+# -*- coding: utf-8 -*-
+import streamlit as st
+from supabase import create_client
+from datetime import datetime
+
+# 🔐 Conexão com Supabase
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
+
+st.set_page_config(page_title="Editar Resultados", page_icon="📋", layout="centered")
+st.title("📋 Editar Resultados das Rodadas")
+
+# 🔒 Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado.")
+    st.stop()
+
+# 🔹 Divisão selecionada
+divisao = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
+numero_divisao = divisao.split()[-1]
+nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
+
+# 📌 Obter nomes dos times
+@st.cache_data(ttl=120)
+def obter_nomes_times():
+    res = supabase.table("times").select("id", "nome").execute()
+    return {t["id"]: t["nome"] for t in res.data}
+
+# 📅 Buscar rodadas
+@st.cache_data(ttl=60)
+def buscar_rodadas():
+    return supabase.table(nome_tabela_rodadas).select("*").order("numero").execute().data
+
+# Carregar dados
+rodadas_existentes = buscar_rodadas()
+times_map = obter_nomes_times()
+
+# ✅ Edição por jogo
 if rodadas_existentes:
-    st.subheader("📝 Editar Resultados das Rodadas")
-    lista_numeros = [r["numero"] for r in rodadas_existentes]
-    rodada_escolhida = st.selectbox("Rodada", lista_numeros)
+    st.subheader("📝 Escolha a Rodada para Editar")
+    rodada_ids = [r["numero"] for r in rodadas_existentes]
+    rodada_escolhida = st.selectbox("Rodada", rodada_ids)
     rodada = next(r for r in rodadas_existentes if r["numero"] == rodada_escolhida)
-    times_map = obter_nomes_times()
 
     for jogo in rodada["jogos"]:
         mandante = jogo["mandante"]
@@ -39,4 +77,5 @@ if rodadas_existentes:
                 supabase.table(nome_tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_escolhida).execute()
                 st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
                 st.rerun()
-
+else:
+    st.info("⚠️ Nenhuma rodada encontrada para esta divisão.")
