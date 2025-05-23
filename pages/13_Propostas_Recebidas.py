@@ -55,9 +55,17 @@ for proposta in propostas:
             st.markdown("**👥 Jogadores Oferecidos:**")
             nomes = []
             for id_j in jogadores_oferecidos_ids:
-                res_jog = supabase.table("elenco").select("nome").eq("id", id_j).execute()
-                if res_jog.data:
-                    nomes.append(res_jog.data[0]["nome"])
+                if isinstance(id_j, str) and id_j.strip() != "":
+                    try:
+                        res_jog = supabase.table("elenco").select("nome").eq("id", id_j).execute()
+                        if res_jog.data:
+                            nomes.append(res_jog.data[0]["nome"])
+                        else:
+                            nomes.append(f"(Jogador não encontrado: {id_j})")
+                    except Exception:
+                        nomes.append(f"(Erro ao buscar jogador: {id_j})")
+                else:
+                    nomes.append(f"(ID inválido: {id_j})")
             for nome in nomes:
                 st.markdown(f"- {nome}")
 
