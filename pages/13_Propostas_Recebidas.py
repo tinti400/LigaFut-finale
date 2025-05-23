@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import json
 
 st.set_page_config(page_title="📨 Propostas Recebidas - LigaFut", layout="wide")
 
@@ -36,7 +37,17 @@ for proposta in propostas:
     status = proposta.get("status", "pendente")
     valor = proposta.get("valor_oferecido", 0)
     time_origem_id = proposta.get("id_time_origem")
-    jogadores_oferecidos_ids = proposta.get("jogador_oferecido", [])
+
+    # 🔄 Conversão segura do campo jogador_oferecido
+    jogadores_oferecidos_ids = []
+    try:
+        brutos = proposta.get("jogador_oferecido", [])
+        if isinstance(brutos, str):
+            jogadores_oferecidos_ids = json.loads(brutos)
+        elif isinstance(brutos, list):
+            jogadores_oferecidos_ids = brutos
+    except Exception:
+        jogadores_oferecidos_ids = []
 
     # Buscar nome do time de origem
     nome_time_origem = "Desconhecido"
