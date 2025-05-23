@@ -4,7 +4,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -18,7 +18,7 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🔢 Saldo
+# 🔢 Buscar saldo
 try:
     saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
     saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
@@ -36,24 +36,23 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-st.markdown("### 🔍 Ações rápidas")
-
-# 🔗 Função para criar botão-link
-def botao_link(nome, destino):
-    st.markdown(
-        f"""
-        <a href="/{destino}" target="_self">
-            <button style='width: 100%; padding: 0.6em; font-size: 16px; margin-bottom: 0.5em;'>{nome}</button>
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
+st.markdown("### ⚡ Ações rápidas")
 
 col1, col2 = st.columns(2)
+
 with col1:
-    botao_link("👥 Ver Elenco", "4_Elenco")
-    botao_link("🔄 Negociações", "11_Negociacoes")
-    botao_link("🎯 Leilão do Sistema", "10_Leilao_Sistema")
+    if st.button("👥 Ver Elenco"):
+        st.switch_page("pages/8_1_Elenco.py")
+
+    if st.button("📨 Propostas Recebidas"):
+        st.switch_page("pages/13_Propostas_Recebidas.py")
+
+    if st.button("🧾 Propostas Enviadas"):
+        st.switch_page("pages/16_Propostas_Enviadas.py")
+
 with col2:
-    botao_link("📨 Propostas Recebidas", "12_Propostas_Recebidas")
-    botao_link("📤 Propostas Enviadas", "13_Propostas_Enviadas")
+    if st.button("🔁 Negociações"):
+        st.switch_page("pages/12_Negociacoes.py")
+
+    if st.button("📣 Leilão do Sistema"):
+        st.switch_page("pages/11_Leilao_Sistema.py")
