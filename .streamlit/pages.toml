@@ -1,3 +1,72 @@
-[supabase]
-url = "https://hceqyuvryhtihhbvacyo.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZXF5dXZyeWh0aWhoYnZhY3lvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTQ0NDgwNCwiZXhwIjoyMDYxMDIwODA0fQ.zzQs8YobpxZeFdWJhSyh34I_tzW_tUciEAsTat8setg"
+# 🟢 Páginas principais visíveis para todos os usuários
+
+[["0_Home.py"]]
+title = "🏠 Início"
+
+[["1_Login.py"]]
+title = "🔐 Login"
+
+[["2_Cadastro.py"]]
+title = "📝 Cadastro"
+
+[["3_Home.py"]]
+title = "⚽ Painel Inicial"
+
+[["4_Elenco.py"]]
+title = "🧑‍💼 Meu Elenco"
+
+[["5_Mercado_Transferencias.py"]]
+title = "💰 Mercado de Transferências"
+
+[["6_Mercado_Times.py"]]
+title = "🏪 Mercado por Time"  # caso exista
+
+[["10_Leilao_Sistema.py"]]
+title = "🎯 Leilão do Sistema"
+
+[["11_Negociacoes.py"]]
+title = "🔄 Negociações"
+
+[["12_Propostas_Recebidas.py"]]
+title = "📨 Propostas Recebidas"
+
+[["13_Propostas_Enviadas.py"]]
+title = "📤 Propostas Enviadas"
+
+[["14_Transferencias_Historicas.py"]]
+title = "📚 Histórico de Transferências"
+
+[["15_Evento_Multa.py"]]
+title = "🚨 Evento de Multa"
+
+[["16_Evento_Roubo.py"]]
+title = "🕵️ Evento de Roubo"
+
+[["17_Leiloar_Jogador.py"]]
+title = "🏷️ Leiloar Jogador"
+
+# 🔒 Páginas administrativas (visíveis apenas se você tratar via código)
+
+[["7_Admin_Mercado.py"]]
+title = "🛠️ Admin - Mercado"
+
+[["9_Admin_Leilao.py"]]
+title = "🛠️ Admin - Leilão"
+
+[["18_Leiloes_Finalizados.py"]]
+title = "📁 Leilões Finalizados"
+
+[["19_Validar_Saldo.py"]]
+title = "✔️ Validar Saldo"
+
+[["20_Importar_Mercado.py"]]
+title = "📥 Importar Mercado"
+
+[["21_Horarios_Administracao.py"]]
+title = "🗓️ Horários de Administração"
+
+[["22_Administradores_Usuarios.py"]]
+title = "👑 Administradores"
+
+[["8_Painel_Usuario.py"]]
+title = "👤 Painel do Técnico"  # movido para admin se necessário
