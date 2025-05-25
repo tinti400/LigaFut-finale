@@ -19,8 +19,20 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
+# 🚫 Verificar status do mercado
+try:
+    status_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = status_ref.data[0]["mercado_aberto"] if status_ref.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
+
 st.title("🤝 Negociações entre Clubes")
 st.markdown(f"### Seu Time: **{nome_time}**")
+
+if not mercado_aberto:
+    st.warning("🚫 O mercado está fechado no momento. As negociações entre clubes estão desativadas.")
+    st.stop()
 
 # 🔍 Buscar outros times
 res_times = supabase.table("times").select("id", "nome").neq("id", id_time).execute()
