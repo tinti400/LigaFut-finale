@@ -1,15 +1,15 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# ✅ Primeira linha obrigatória
+# ✅ Configuração da página
 st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo visual
+# 🎨 Estilo com fundo do Ronaldinho + contraste ajustado + texto branco
 st.markdown("""
     <style>
     .stApp {
@@ -20,7 +20,7 @@ st.markdown("""
         background-attachment: fixed;
     }
     .login-card {
-        background-color: rgba(0, 0, 0, 0.8);
+        background-color: rgba(0, 0, 0, 0.85);
         padding: 2rem;
         border-radius: 16px;
         max-width: 420px;
@@ -30,14 +30,14 @@ st.markdown("""
     .login-card input {
         color: black !important;
     }
-    h2, p {
+    h2, p, label {
         color: white !important;
         text-align: center;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 🌐 Query params
+# 🌐 Login via query string
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -61,12 +61,12 @@ if "usuario" in st.session_state:
         for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao"]:
             st.session_state.pop(key, None)
         st.experimental_set_query_params()
-        st.success("Sessão encerrada.")
+        st.success("Sessão encerrada. Recarregue ou faça login.")
         st.stop()
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🔐 Login centralizado
+# 🖼️ Login visual
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<h2>🏟️ LigaFut</h2>", unsafe_allow_html=True)
@@ -101,7 +101,7 @@ with st.container():
             st.warning("⚠️ Preencha todos os campos.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 🔁 Trocar senha
+# 🔁 Troca de senha
 with st.expander("🔒 Trocar Senha"):
     email_confirm = st.text_input("Confirme seu e-mail")
     senha_atual = st.text_input("Senha atual", type="password")
