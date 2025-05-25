@@ -19,37 +19,6 @@ nome_time = st.session_state["nome_time"]
 # 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>👥 Elenco do Técnico</h1><hr>", unsafe_allow_html=True)
 
-# 📤 Upload de planilha para importar elenco
-st.subheader("📥 Importar jogadores via planilha Excel")
-arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, posicao, overall, valor", type="xlsx")
-
-if arquivo:
-    try:
-        df = pd.read_excel(arquivo)
-        jogadores_adicionados = 0
-
-        # 🔄 Carrega jogadores já existentes do elenco
-        elenco_existente = supabase.table("elenco").select("nome", "posicao").eq("id_time", id_time).execute().data
-        nomes_posicoes_existentes = {(j["nome"], j["posicao"]) for j in elenco_existente}
-
-        for _, row in df.iterrows():
-            if all(c in row for c in ["nome", "posicao", "overall", "valor"]):
-                chave = (row["nome"], row["posicao"])
-                if chave not in nomes_posicoes_existentes:
-                    supabase.table("elenco").insert({
-                        "id_time": id_time,
-                        "nome": row["nome"],
-                        "posicao": row["posicao"],
-                        "overall": int(row["overall"]),
-                        "valor": int(row["valor"])
-                    }).execute()
-                    jogadores_adicionados += 1
-
-        st.success(f"✅ {jogadores_adicionados} jogadores adicionados ao elenco com sucesso!")
-        st.experimental_rerun()
-    except Exception as e:
-        st.error(f"Erro ao importar jogadores: {e}")
-
 # 🔢 Buscar elenco
 try:
     elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
@@ -100,4 +69,3 @@ else:
 if st.button("🔙 Voltar ao Painel"):
     st.session_state["pagina"] = "usuario"
     st.experimental_rerun()
-
