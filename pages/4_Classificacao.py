@@ -37,23 +37,29 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes dos times
+# 👥 Buscar nomes e logos dos times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
         time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
         if not time_ids:
             return {}
-        res = supabase.table("times").select("id", "nome").in_("id", time_ids).execute()
-        return {t["id"]: t["nome"] for t in res.data}
+        res = supabase.table("times").select("id", "nome", "logo").in_("id", time_ids).execute()
+        return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in res.data}
     except Exception as e:
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
 # 🧠 Calcular classificação
 def calcular_classificacao(rodadas, times_map):
-    tabela = {tid: {"nome": nome, "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0}
-              for tid, nome in times_map.items()}
+    tabela = {
+        tid: {
+            "nome": times_map[tid]["nome"],
+            "logo": times_map[tid]["logo"],
+            "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
+        }
+        for tid in times_map
+    }
 
     for rodada in rodadas:
         for jogo in rodada.get("jogos", []):
@@ -70,7 +76,11 @@ def calcular_classificacao(rodadas, times_map):
 
             for t in (m, v):
                 if t not in tabela:
-                    tabela[t] = {"nome": times_map.get(t, "Desconhecido"), "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0}
+                    tabela[t] = {
+                        "nome": times_map.get(t, {}).get("nome", "Desconhecido"),
+                        "logo": times_map.get(t, {}).get("logo", ""),
+                        "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
+                    }
 
             tabela[m]["gp"] += gm
             tabela[m]["gc"] += gv
@@ -104,7 +114,7 @@ classificacao = calcular_classificacao(rodadas, times_map)
 dados = []
 for i, (tid, t) in enumerate(classificacao, start=1):
     dados.append({
-        "Posição": i,
+        "Escudo": f"<img src='{t['logo']}' width='30'>" if t.get("logo") else "",
         "Time": t["nome"],
         "Pontos": t["pontos"],
         "Jogos": t["v"] + t["e"] + t["d"],
@@ -116,21 +126,13 @@ for i, (tid, t) in enumerate(classificacao, start=1):
         "Saldo de Gols": t["sg"]
     })
 
-# 🖌️ Estilo visual por posição
-def destacar_linha(row):
-    total = len(df_classificacao)
-    if row["Posição"] <= 4:
-        return ['background-color: #d4edda'] * len(row)  # G4
-    elif row["Posição"] > total - 2:
-        return ['background-color: #f8d7da'] * len(row)  # Z2
-    else:
-        return [''] * len(row)
-
 # 📋 Exibir tabela
 if dados:
     df_classificacao = pd.DataFrame(dados)
-    df_formatada = df_classificacao.style.apply(destacar_linha, axis=1)
-    st.write(df_formatada)
+    # Reordena colunas com escudo à esquerda
+    colunas = ["Escudo", "Time", "Pontos", "Jogos", "Vitórias", "Empates", "Derrotas", "Gols Pró", "Gols Contra", "Saldo de Gols"]
+    df_classificacao = df_classificacao[colunas]
+    st.write(df_classificacao.to_html(escape=False, index=False), unsafe_allow_html=True)
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
 
@@ -147,5 +149,3 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao resetar rodadas: {e}")
-
-
