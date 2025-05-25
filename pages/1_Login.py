@@ -9,16 +9,18 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com fundo e card escuro
+# 🎨 Estilo com novo fundo e card escuro
 st.markdown("""
     <style>
     .stApp {
-        background-image: url("https://i.imgur.com/futlYOl.jpeg");
+        background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+                          url("https://hceqyuvrythihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinho.png");
         background-size: cover;
         background-position: center;
+        background-attachment: fixed;
     }
     .login-card {
-        background-color: rgba(0, 0, 0, 0.75);
+        background-color: rgba(0, 0, 0, 0.8);
         padding: 2rem;
         border-radius: 16px;
         max-width: 400px;
