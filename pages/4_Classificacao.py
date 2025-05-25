@@ -18,7 +18,7 @@ if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 📧 Email do usuário e verificação de admin
+# 📧 Verifica se é admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
@@ -28,7 +28,7 @@ divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 📅 Buscar resultados das rodadas
+# 📅 Buscar resultados
 def buscar_resultados():
     try:
         res = supabase.table(nome_tabela_rodadas).select("*").execute()
@@ -37,7 +37,7 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes e logos dos times
+# 👥 Buscar nomes e logos
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -110,12 +110,16 @@ rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Montar DataFrame
+# 📊 Montar tabela
 dados = []
 for i, (tid, t) in enumerate(classificacao, start=1):
+    nome_formatado = t["nome"].strip().capitalize()
+    escudo_html = f"<img src='{t['logo']}' width='25' style='margin-right:6px; vertical-align:middle;'>"
+    time_com_escudo = f"{escudo_html}{nome_formatado}"
+
     dados.append({
-        "Escudo": f"<img src='{t['logo']}' width='30'>" if t.get("logo") else "",
-        "Time": t["nome"],
+        "Posição": i,
+        "Time": time_com_escudo,
         "Pontos": t["pontos"],
         "Jogos": t["v"] + t["e"] + t["d"],
         "Vitórias": t["v"],
@@ -126,17 +130,37 @@ for i, (tid, t) in enumerate(classificacao, start=1):
         "Saldo de Gols": t["sg"]
     })
 
-# 📋 Exibir tabela
+# 📋 Estilização HTML
+def aplicar_estilo_linha(df):
+    html = "<style>td, th { text-align: center; vertical-align: middle; }</style><table border='1' class='dataframe' style='width: 100%; border-collapse: collapse;'>"
+    html += "<thead><tr>"
+    for col in df.columns:
+        html += f"<th>{col}</th>"
+    html += "</tr></thead><tbody>"
+
+    total_linhas = len(df)
+    for i, row in df.iterrows():
+        if i < 4:
+            html += "<tr style='background-color: #d4edda;'>"
+        elif i >= total_linhas - 2:
+            html += "<tr style='background-color: #f8d7da;'>"
+        else:
+            html += "<tr>"
+
+        for val in row:
+            html += f"<td>{val}</td>"
+        html += "</tr>"
+    html += "</tbody></table>"
+    return html
+
+# ✅ Exibir tabela
 if dados:
     df_classificacao = pd.DataFrame(dados)
-    # Reordena colunas com escudo à esquerda
-    colunas = ["Escudo", "Time", "Pontos", "Jogos", "Vitórias", "Empates", "Derrotas", "Gols Pró", "Gols Contra", "Saldo de Gols"]
-    df_classificacao = df_classificacao[colunas]
-    st.write(df_classificacao.to_html(escape=False, index=False), unsafe_allow_html=True)
+    st.markdown(aplicar_estilo_linha(df_classificacao), unsafe_allow_html=True)
 else:
     st.info("Sem dados suficientes para exibir a tabela de classificação.")
 
-# 🧹 Botão de reset para admin
+# 🔧 Ações admin
 if eh_admin:
     st.markdown("---")
     st.subheader("🔧 Ações administrativas")
