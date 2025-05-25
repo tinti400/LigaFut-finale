@@ -9,12 +9,12 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com novo fundo e card escuro
+# 🎨 Estilo com imagem do Ronaldinho
 st.markdown("""
     <style>
     .stApp {
         background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
-                          url("https://hceqyuvrythihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinho.png");
+                          url("https://hceqyuvrythihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
@@ -33,7 +33,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🌐 Query params para login automático
+# 🌐 Login via URL
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -50,7 +50,7 @@ if "usuario" not in st.session_state and "usuario" in params:
     except:
         pass
 
-# 🔓 Verifica se já está logado
+# 🔓 Se já logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
@@ -62,7 +62,7 @@ if "usuario" in st.session_state:
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🔐 Login visual centralizado
+# 🔐 Formulário visual de login
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center;'>🏟️ LigaFut</h2>", unsafe_allow_html=True)
@@ -125,5 +125,4 @@ with st.expander("🔒 Trocar Senha"):
 # ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
-
 
