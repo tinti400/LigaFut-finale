@@ -1,12 +1,15 @@
 import streamlit as st
 from supabase import create_client, Client
 
+# ✅ Deve ser a primeira linha executada
+st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
+
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com fundo
+# 🎨 Estilo com fundo e card escuro
 st.markdown("""
     <style>
     .stApp {
@@ -28,9 +31,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
-
-# 🌐 Query params
+# 🌐 Query params para login automático
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -47,7 +48,7 @@ if "usuario" not in st.session_state and "usuario" in params:
     except:
         pass
 
-# 🔓 Já logado
+# 🔓 Verifica se já está logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
@@ -59,7 +60,7 @@ if "usuario" in st.session_state:
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🔐 Login visual
+# 🔐 Login visual centralizado
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center;'>🏟️ LigaFut</h2>", unsafe_allow_html=True)
@@ -119,7 +120,8 @@ with st.expander("🔒 Trocar Senha"):
             except Exception as e:
                 st.error(f"Erro ao atualizar senha: {e}")
 
-# ❓ Esqueci senha
+# ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
+
 
