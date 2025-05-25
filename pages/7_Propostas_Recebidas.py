@@ -19,7 +19,20 @@ if "usuario_id" not in st.session_state:
 id_time_logado = st.session_state["id_time"]
 nome_time_logado = st.session_state["nome_time"]
 
+# 🔒 Verifica se o mercado está aberto
+try:
+    status_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = status_ref.data[0]["mercado_aberto"] if status_ref.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
+
 st.title("📨 Propostas Recebidas")
+st.markdown(f"### Seu time: **{nome_time_logado}**")
+
+if not mercado_aberto:
+    st.warning("🚫 O mercado está fechado no momento. Você não pode aceitar ou recusar propostas.")
+    st.stop()
 
 # 🔍 Buscar apenas propostas pendentes
 res = supabase.table("negociacoes").select("*").eq("id_time_destino", id_time_logado).eq("status", "pendente").execute()
@@ -84,26 +97,25 @@ for proposta in propostas:
     with col2:
         if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
             try:
-                # 1️⃣ Transfere o jogador desejado para o time proponente
+                # 1️⃣ Transfere o jogador desejado
                 if tipo == "Somente Dinheiro":
                     supabase.table("elenco").update({
                         "id_time": time_origem_id,
                         "valor": valor
                     }).eq("id", jogador_id).execute()
                 else:
-                    # Mantém valor original
                     supabase.table("elenco").update({
                         "id_time": time_origem_id
                     }).eq("id", jogador_id).execute()
 
-                # 2️⃣ Transfere os jogadores oferecidos (se houver) para o time que recebeu a proposta
+                # 2️⃣ Transfere os jogadores oferecidos (troca)
                 for id_j in jogadores_oferecidos_ids:
-                    if isinstance(id_j, str) and id_j.strip() != "":
+                    if isinstance(id_j, str) and id_j.strip():
                         supabase.table("elenco").update({
                             "id_time": id_time_logado
                         }).eq("id", id_j).execute()
 
-                # 3️⃣ Atualiza o status da proposta
+                # 3️⃣ Atualiza o status
                 supabase.table("negociacoes").update({
                     "status": "aceita",
                     "valor_aceito": valor
