@@ -1,42 +1,43 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# ✅ Deve ser a primeira linha executada
+# ✅ Primeira linha obrigatória
 st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
-# 🔐 Conexão com Supabase
+# 🔐 Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo visual com fundo escurecido e textos brancos
+# 🎨 Estilo visual
 st.markdown("""
     <style>
     .stApp {
-        background-image: url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
+        background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)),
+                          url("https://hceqyuvrythihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        filter: brightness(0.3);
     }
     .login-card {
-        background-color: rgba(0, 0, 0, 0.85);
+        background-color: rgba(0, 0, 0, 0.8);
         padding: 2rem;
         border-radius: 16px;
-        max-width: 400px;
+        max-width: 420px;
         margin: auto;
         color: white;
     }
-    .login-card input, .login-card label {
-        color: white !important;
+    .login-card input {
+        color: black !important;
     }
-    .stTextInput label, .stPasswordInput label {
+    h2, p {
         color: white !important;
+        text-align: center;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 🌐 Query params para login automático
+# 🌐 Query params
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -53,23 +54,23 @@ if "usuario" not in st.session_state and "usuario" in params:
     except:
         pass
 
-# 🔓 Verifica se já está logado
+# 🔓 Sessão ativa
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
         for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao"]:
             st.session_state.pop(key, None)
         st.experimental_set_query_params()
-        st.success("Sessão encerrada. Recarregue ou faça login.")
+        st.success("Sessão encerrada.")
         st.stop()
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🔐 Login visual centralizado
+# 🔐 Login centralizado
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center;'>🏟️ LigaFut</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Simule qualquer campeonato com seus amigos</p>", unsafe_allow_html=True)
+    st.markdown("<h2>🏟️ LigaFut</h2>", unsafe_allow_html=True)
+    st.markdown("<p>Simule qualquer campeonato com seus amigos</p>", unsafe_allow_html=True)
 
     with st.form("login_form"):
         usuario = st.text_input("Usuário (e-mail)")
