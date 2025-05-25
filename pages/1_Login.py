@@ -9,26 +9,29 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com fundo do Ronaldinho e card escuro
+# 🎨 Estilo visual com fundo escurecido e textos brancos
 st.markdown("""
     <style>
     .stApp {
-        background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
-                          url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
+        background-image: url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
+        filter: brightness(0.3);
     }
     .login-card {
-        background-color: rgba(0, 0, 0, 0.8);
+        background-color: rgba(0, 0, 0, 0.85);
         padding: 2rem;
         border-radius: 16px;
         max-width: 400px;
         margin: auto;
         color: white;
     }
-    .login-card input {
-        color: black !important;
+    .login-card input, .login-card label {
+        color: white !important;
+    }
+    .stTextInput label, .stPasswordInput label {
+        color: white !important;
     }
     </style>
 """, unsafe_allow_html=True)
