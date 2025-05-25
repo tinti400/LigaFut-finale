@@ -9,35 +9,35 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com fundo do Ronaldinho + contraste ajustado + texto branco
-st.markdown("""
+# 🎨 Estilo com fundo e contraste ajustado
+st.markdown(f"""
     <style>
-    .stApp {
-        background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)),
-                          url("https://hceqyuvrythihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
+    .stApp {{
+        background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)),
+                          url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo//Ronaldinhobarca.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-    }
-    .login-card {
+    }}
+    .login-card {{
         background-color: rgba(0, 0, 0, 0.85);
         padding: 2rem;
         border-radius: 16px;
         max-width: 420px;
         margin: auto;
         color: white;
-    }
-    .login-card input {
+    }}
+    .login-card input {{
         color: black !important;
-    }
-    h2, p, label {
+    }}
+    h2, p, label {{
         color: white !important;
         text-align: center;
-    }
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-# 🌐 Login via query string
+# 🌐 Query params para login automático
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -54,7 +54,7 @@ if "usuario" not in st.session_state and "usuario" in params:
     except:
         pass
 
-# 🔓 Sessão ativa
+# 🔓 Já logado?
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
@@ -66,7 +66,7 @@ if "usuario" in st.session_state:
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🖼️ Login visual
+# 🧾 Formulário de login centralizado
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<h2>🏟️ LigaFut</h2>", unsafe_allow_html=True)
@@ -101,7 +101,7 @@ with st.container():
             st.warning("⚠️ Preencha todos os campos.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 🔁 Troca de senha
+# 🔁 Trocar senha
 with st.expander("🔒 Trocar Senha"):
     email_confirm = st.text_input("Confirme seu e-mail")
     senha_atual = st.text_input("Senha atual", type="password")
