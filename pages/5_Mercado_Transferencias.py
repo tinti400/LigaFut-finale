@@ -18,6 +18,18 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
+# 🛑 Verifica se o mercado está aberto
+try:
+    status_res = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = status_res.data[0]["mercado_aberto"] if status_res.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
+
+if not mercado_aberto:
+    st.warning("🚫 O mercado está fechado no momento. Aguarde a próxima janela de transferências.")
+    st.stop()
+
 # 💰 Verifica saldo do time
 try:
     saldo_res = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
@@ -67,12 +79,10 @@ elif filtro_ordenacao == "Nome Z-A":
 if "pagina_mercado" not in st.session_state:
     st.session_state["pagina_mercado"] = 1
 
-# Número de jogadores por página
 jogadores_por_pagina = 10
 total_jogadores = len(jogadores_filtrados)
 total_paginas = (total_jogadores + jogadores_por_pagina - 1) // jogadores_por_pagina
 
-# Obter jogadores da página atual
 pagina_atual = st.session_state["pagina_mercado"]
 inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
@@ -98,10 +108,7 @@ else:
     for jogador in jogadores_pagina:
         col1, col2, col3, col4, col5 = st.columns([1, 2, 2, 2, 2])
         with col1:
-            if jogador.get("foto"):
-                st.image(jogador["foto"], width=60)
-            else:
-                st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
+            st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
         with col2:
             st.markdown(f"**🎯 Jogador alvo:** {jogador.get('nome', 'Desconhecido')}")
             st.markdown(f"**📌 Posição:** {jogador.get('posicao', 'Desconhecida')}")
@@ -111,39 +118,49 @@ else:
         with col3:
             st.markdown(f"**💰 Valor:** R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
 
-        # Botão de Comprar
+        # ✅ Comprar
         if st.button(f"✅ Comprar {jogador['nome']}", key=f"comprar_{jogador['id']}"):
             if saldo_time >= jogador.get("valor", 0):
                 try:
-                    # Lógica para comprar o jogador
-                    # 1. Adiciona o jogador ao elenco do time
+                    # 1. Adiciona ao elenco
                     jogador_data = {
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
                         "overall": jogador["overall"],
                         "valor": jogador["valor"],
-                        "id_time": id_time  # Atualiza o time do jogador
+                        "id_time": id_time
                     }
                     supabase.table("elenco").insert(jogador_data).execute()
 
-                    # 2. Remove o jogador do mercado
+                    # 2. Remove do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
                     # 3. Atualiza saldo
-                    novo_saldo = saldo_time - jogador.get("valor", 0)
+                    novo_saldo = saldo_time - jogador["valor"]
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
+                    # 4. Registra no BID
+                    supabase.table("movimentacoes").insert({
+                        "jogador": jogador["nome"],
+                        "valor": jogador["valor"],
+                        "tipo": "Compra",
+                        "categoria": "Mercado",
+                        "id_time": id_time,
+                        "data": datetime.now().isoformat()
+                    }).execute()
+
                     st.success(f"Você comprou {jogador['nome']} com sucesso!")
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
             else:
                 st.error("❌ Saldo insuficiente.")
 
-        # **Botão de Excluir Jogador do Mercado (Exclusão Direta)**
+        # ❌ Excluir jogador do mercado
         if st.button(f"❌ Excluir {jogador['nome']} do Mercado", key=f"excluir_{jogador['id']}"):
             try:
-                # Exclui o jogador do mercado diretamente
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                st.success(f"Jogador {jogador['nome']} foi excluído com sucesso do mercado!")
+                st.success(f"Jogador {jogador['nome']} foi excluído do mercado!")
+                st.experimental_rerun()
             except Exception as e:
-                st.error(f"Erro ao excluir jogador do mercado: {e}")
+                st.error(f"Erro ao excluir jogador: {e}")
