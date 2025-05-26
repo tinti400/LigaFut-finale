@@ -1,3 +1,26 @@
+# 🔐 Conexão com Supabase
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
+
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+# 👑 Verifica se é administrador
+email_usuario = st.session_state.get("usuario", "")
+
+try:
+    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+    eh_admin = admin_ref.data and admin_ref.data[0].get("administrador", False)
+
+    if not eh_admin:
+        st.error("🔒 Acesso restrito! Esta página é exclusiva para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar permissões de administrador: {e}")
+    st.stop()
 # -*- coding: utf-8 -*- 
 import streamlit as st 
 from supabase import create_client 
