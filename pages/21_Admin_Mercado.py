@@ -43,6 +43,7 @@ except Exception as e:
 
 # 🔘 Botões de controle
 col1, col2, col3 = st.columns([2, 2, 2])
+
 with col1:
     if st.button("🟢 Abrir Mercado"):
         try:
@@ -62,15 +63,27 @@ with col2:
             st.error(f"Erro ao fechar mercado: {e}")
 
 with col3:
-    if st.button("🧹 Limpar Mercado"):
-        if st.button("Confirmar Limpeza do Mercado"):
-            try:
-                supabase.table("mercado_transferencias").delete().execute()
-                st.success("🧹 Todos os jogadores foram removidos do mercado!")
-            except Exception as e:
-                st.error(f"Erro ao limpar mercado: {e}")
-        else:
-            st.warning("Clique novamente para confirmar a exclusão de todos os jogadores.")
+    if "confirmar_limpeza" not in st.session_state:
+        st.session_state.confirmar_limpeza = False
+
+    if not st.session_state.confirmar_limpeza:
+        if st.button("🧹 Limpar Mercado"):
+            st.session_state.confirmar_limpeza = True
+    else:
+        st.warning("⚠️ Clique em Confirmar para limpar todos os jogadores do mercado.")
+        col_conf, col_cancel = st.columns([1, 1])
+        with col_conf:
+            if st.button("✅ Confirmar Limpeza do Mercado"):
+                try:
+                    supabase.table("mercado_transferencias").delete().neq("id", "").execute()
+                    st.success("🧹 Todos os jogadores foram removidos do mercado!")
+                    st.session_state.confirmar_limpeza = False
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"Erro ao limpar mercado: {e}")
+        with col_cancel:
+            if st.button("❌ Cancelar"):
+                st.session_state.confirmar_limpeza = False
 
 # 📝 Cadastro de jogador no mercado
 st.markdown("---")
