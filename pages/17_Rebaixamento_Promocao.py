@@ -1,4 +1,4 @@
-## -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from utils import calcular_movimentacao_divisoes, atualizar_classificacao
@@ -44,17 +44,17 @@ if st.button("🏁 Encerrar Temporada e Atualizar Divisões"):
 
         # 🔄 Atualiza divisões de rebaixados e promovidos
         for tid, _ in rebaixados:
-            supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", tid).execute()
+            supabase.table("usuarios").update({"Divisao": "Divisão 2"}).eq("time_id", tid).execute()
 
         for tid, _ in promovidos:
-            supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", tid).execute()
+            supabase.table("usuarios").update({"Divisao": "Divisão 1"}).eq("time_id", tid).execute()
 
         # 🔄 Playoff
         vencedor_id = playoff_div1[0] if vencedor == playoff_div1[1]["nome"] else playoff_div2[0]
         perdedor_id = playoff_div2[0] if vencedor == playoff_div1[1]["nome"] else playoff_div1[0]
 
-        supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", vencedor_id).execute()
-        supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", perdedor_id).execute()
+        supabase.table("usuarios").update({"Divisao": "Divisão 1"}).eq("time_id", vencedor_id).execute()
+        supabase.table("usuarios").update({"Divisao": "Divisão 2"}).eq("time_id", perdedor_id).execute()
 
         st.success("✅ Temporada encerrada e divisões atualizadas com sucesso!")
         st.rerun()
