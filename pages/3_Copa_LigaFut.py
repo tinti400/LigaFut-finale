@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 import random
-from datetime import datetime
 import uuid
 
 # 🔐 Conexão com Supabase
@@ -10,20 +9,6 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🏆 Copa LigaFut", page_icon="🏆", layout="centered")
-st.title("🏆 Copa LigaFut - Mata-mata")
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-import random
-import uuid
-
-# 🔐 Conexão com Supabase
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
-
-st.set_page_config(page_title="🏆 Copa LigaFut", page_icon="🏆", layout="centered")
 st.title("🏆 Copa LigaFut - Mata-mata")
 
 # 🔐 Verifica login e permissão
