@@ -65,7 +65,9 @@ with col2:
 with col3:
     if st.button("🧹 Limpar Mercado"):
         try:
-            supabase.table("mercado_transferencias").delete().neq("id", "").execute()
+            jogadores_ref = supabase.table("mercado_transferencias").select("id").execute()
+            for jogador in jogadores_ref.data:
+                supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
             st.success("🧹 Todos os jogadores foram removidos do mercado!")
         except Exception as e:
             st.error(f"Erro ao limpar mercado: {e}")
