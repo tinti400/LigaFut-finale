@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -35,43 +36,39 @@ if len(time_ids) < 2:
 # 📊 Gerar confrontos
 if st.button("⚙️ Gerar Copa LigaFut"):
     try:
-        supabase.table("copa_ligafut").delete().neq("fase", "").execute()
-
+        supabase.table("copa_ligafut").delete().neq("numero", -1).execute()
         random.shuffle(time_ids)
 
-        # Fase Preliminar se não for número ideal
         fase_atual = 1
+        numero_fase = 1
+        jogos_fase1 = []
 
-        if len(time_ids) > 16:
-            preliminar = time_ids[:6]
-            restantes = time_ids[6:]
-            jogos_preliminar = []
-            for i in range(0, len(preliminar), 2):
-                mandante = preliminar[i]
-                visitante = preliminar[i+1] if i+1 < len(preliminar) else None
+        # Fase preliminar se não for múltiplo de 16
+        while len(time_ids) % 2 != 0:
+            bye_time = time_ids.pop()
+            jogos_fase1.append({
+                "mandante": bye_time,
+                "visitante": "BYE",
+                "gols_mandante": None,
+                "gols_visitante": None
+            })
 
-                jogo = {
-                    "mandante": mandante,
-                    "visitante": visitante,
-                    "gols_mandante": None,
-                    "gols_visitante": None
-                }
-                jogos_preliminar.append(jogo)
+        # Confrontos diretos
+        for i in range(0, len(time_ids), 2):
+            jogos_fase1.append({
+                "mandante": time_ids[i],
+                "visitante": time_ids[i+1],
+                "gols_mandante": None,
+                "gols_visitante": None
+            })
 
-                supabase.table("copa_ligafut").insert({
-                    "fase": "Preliminar",
-                    "numero": fase_atual,
-                    "id_mandante": mandante,
-                    "id_visitante": visitante,
-                    "jogos": jogo
-                }).execute()
+        # Inserir fase 1
+        supabase.table("copa_ligafut").insert({
+            "numero": numero_fase,
+            "fase": "Fase 1",
+            "jogos": jogos_fase1
+        }).execute()
 
-            fase_atual += 1
-        else:
-            restantes = time_ids[:]
-
-        st.success("✅ Copa LigaFut criada com sucesso com fase preliminar!")
-        st.info("Acompanhe os resultados e avance manualmente para as próximas fases.")
-
+        st.success("✅ Copa LigaFut gerada com sucesso!")
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
