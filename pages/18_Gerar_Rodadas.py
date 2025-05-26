@@ -12,6 +12,23 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="Gerar Rodadas", page_icon="⚙️", layout="centered")
 st.title("⚙️ Gerar Rodadas da Divisão")
 
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+# 👑 Verifica se é admin pela tabela 'admins'
+email_usuario = st.session_state.get("usuario", "")
+try:
+    admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    eh_admin = len(admin_ref.data) > 0
+    if not eh_admin:
+        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
+    st.stop()
+
 # 🔹 Selecionar divisão
 opcao_divisao = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = opcao_divisao.split()[-1]
