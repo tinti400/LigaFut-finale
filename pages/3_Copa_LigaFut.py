@@ -4,14 +4,14 @@ from supabase import create_client
 import random
 import uuid
 
-# 🔐 Conexão com Supabase
+# 🔐 Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.title("🏆 Copa LigaFut - Mata-mata")
 
-# 🔐 Verifica login e permissão
+# 🔐 Verificação de login
 if "usuario_id" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
@@ -24,7 +24,7 @@ if not eh_admin:
     st.warning("🔐 Apenas administradores podem acessar esta página.")
     st.stop()
 
-# 📊 Buscar todos os times válidos (nome preenchido e ≠ EMPTY)
+# 📊 Buscar times válidos da tabela 'times'
 res_info = supabase.table("times").select("id", "nome", "logo").execute()
 times_map = {
     t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")}
@@ -33,80 +33,101 @@ times_map = {
 }
 time_ids = list(times_map.keys())
 
-# 🧠 Geração da estrutura da copa completa
-def gerar_chaveamento_completo(times_validos):
-    random.shuffle(times_validos)
+# 🔁 Gerar a primeira fase (Preliminar ou Oitavas)
+def gerar_primeira_fase(times):
+    random.shuffle(times)
     jogos = []
-    ids_oitavas = []
 
-    while len(times_validos) > 16:
-        t1 = times_validos.pop()
-        t2 = times_validos.pop()
-        jogos.append({
-            "id": str(uuid.uuid4()),
-            "fase": "Preliminar",
-            "numero": len(jogos) + 1,
-            "id_mandante": t1,
-            "id_visitante": t2,
-            "gols_mandante": None,
-            "gols_visitante": None
-        })
-        ids_oitavas.append("vencedor_de_" + str(len(jogos)))
-
-    while times_validos:
-        ids_oitavas.append(times_validos.pop())
-
-    fases = ["Oitavas", "Quartas", "Semifinal", "Final"]
-    fase_atual = ids_oitavas
-
-    for fase in fases:
-        nova_fase = []
-        for i in range(0, len(fase_atual), 2):
-            id1 = fase_atual[i]
-            id2 = fase_atual[i+1] if i+1 < len(fase_atual) else None
-            jogo_id = str(uuid.uuid4())
+    fase = "Preliminar" if len(times) > 16 else "Oitavas"
+    for i in range(0, len(times), 2):
+        if i + 1 < len(times):
             jogos.append({
-                "id": jogo_id,
+                "id": str(uuid.uuid4()),
                 "fase": fase,
                 "numero": len(jogos) + 1,
-                "id_mandante": id1,
-                "id_visitante": id2,
+                "id_mandante": times[i],
+                "id_visitante": times[i + 1],
                 "gols_mandante": None,
                 "gols_visitante": None
             })
-            nova_fase.append("vencedor_de_" + str(len(jogos)))
-        fase_atual = nova_fase
-
     return jogos
 
-# 🔘 Botão para gerar toda a copa
+# 🔘 Botão para gerar a primeira fase
 if st.button("⚙️ Gerar Nova Copa LigaFut"):
     if len(time_ids) < 2:
         st.warning("⚠️ Mínimo de 2 times válidos para gerar a Copa.")
         st.stop()
 
     try:
-        # ✅ Correção aqui: WHERE obrigatório no Supabase
         supabase.table("copa_ligafut").delete().neq("id", "").execute()
-        jogos = gerar_chaveamento_completo(time_ids[:])
+        jogos = gerar_primeira_fase(time_ids[:])
         for j in jogos:
             supabase.table("copa_ligafut").insert(j).execute()
-        st.success("✅ Copa LigaFut completa gerada com sucesso!")
+        st.success("✅ Primeira fase da Copa criada com sucesso!")
         st.rerun()
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
 
-# 📅 Exibir confrontos por fase
+# 🔄 Gerar próxima fase
+st.markdown("---")
+st.subheader("🔄 Avançar Fase")
+fases_ordem = ["Preliminar", "Oitavas", "Quartas", "Semifinal", "Final"]
+
+try:
+    res_jogos = supabase.table("copa_ligafut").select("*").order("numero").execute()
+    jogos = res_jogos.data
+
+    if not jogos:
+        st.info("Nenhuma fase criada ainda.")
+    else:
+        fase_atual = sorted(set(j["fase"] for j in jogos), key=lambda x: fases_ordem.index(x))[-1]
+        jogos_fase = [j for j in jogos if j["fase"] == fase_atual]
+
+        incompletos = [j for j in jogos_fase if j["gols_mandante"] is None or j["gols_visitante"] is None]
+        if incompletos:
+            st.warning(f"⚠️ Existem {len(incompletos)} jogos sem resultado na fase {fase_atual}.")
+        else:
+            if st.button("➡️ Gerar próxima fase"):
+                vencedores = []
+                for j in jogos_fase:
+                    if j["gols_mandante"] > j["gols_visitante"]:
+                        vencedores.append(j["id_mandante"])
+                    elif j["gols_visitante"] > j["gols_mandante"]:
+                        vencedores.append(j["id_visitante"])
+                    else:
+                        vencedores.append(random.choice([j["id_mandante"], j["id_visitante"]]))
+
+                idx_atual = fases_ordem.index(fase_atual)
+                if idx_atual + 1 >= len(fases_ordem):
+                    st.success("🏆 Final já jogada. A Copa terminou.")
+                else:
+                    nova_fase = fases_ordem[idx_atual + 1]
+                    novos_jogos = []
+                    for i in range(0, len(vencedores), 2):
+                        if i + 1 < len(vencedores):
+                            novos_jogos.append({
+                                "id": str(uuid.uuid4()),
+                                "fase": nova_fase,
+                                "numero": len(jogos) + i + 1,
+                                "id_mandante": vencedores[i],
+                                "id_visitante": vencedores[i + 1],
+                                "gols_mandante": None,
+                                "gols_visitante": None
+                            })
+                    for j in novos_jogos:
+                        supabase.table("copa_ligafut").insert(j).execute()
+                    st.success(f"✅ Fase {nova_fase} criada com sucesso!")
+                    st.rerun()
+
+except Exception as e:
+    st.error(f"Erro ao processar fases: {e}")
+
+# 📅 Exibir os jogos existentes
 st.markdown("---")
 st.subheader("🕛 Jogos da Copa")
 try:
-    res_copa = supabase.table("copa_ligafut").select("*").order("numero").execute()
-    jogos = res_copa.data
-
-    if not jogos:
-        st.info("Nenhum jogo encontrado. Gere a copa para iniciar.")
-    else:
-        fases = sorted(set(j["fase"] for j in jogos), key=lambda x: ["Preliminar", "Oitavas", "Quartas", "Semifinal", "Final"].index(x))
+    if jogos:
+        fases = sorted(set(j["fase"] for j in jogos), key=lambda x: fases_ordem.index(x))
         for fase in fases:
             st.markdown(f"### 🌟 Fase: {fase}")
             jogos_fase = [j for j in jogos if j["fase"] == fase]
@@ -114,9 +135,8 @@ try:
             for j in jogos_fase:
                 m_id = j.get("id_mandante")
                 v_id = j.get("id_visitante")
-
-                m_nome = times_map.get(m_id, {}).get("nome", m_id if m_id else "?")
-                v_nome = times_map.get(v_id, {}).get("nome", v_id if v_id else "?")
+                m_nome = times_map.get(m_id, {}).get("nome", "?")
+                v_nome = times_map.get(v_id, {}).get("nome", "?")
                 m_logo = times_map.get(m_id, {}).get("logo", "")
                 v_logo = times_map.get(v_id, {}).get("logo", "")
 
@@ -144,7 +164,6 @@ try:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao salvar: {e}")
-
 except Exception as e:
-    st.error(f"Erro ao carregar jogos: {e}")
+    st.error(f"Erro ao exibir jogos: {e}")
 
