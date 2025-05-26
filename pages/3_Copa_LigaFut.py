@@ -24,7 +24,7 @@ if not eh_admin:
     st.warning("🔐 Apenas administradores podem acessar esta página.")
     st.stop()
 
-# 📊 Buscar times válidos da tabela 'times'
+# 📊 Buscar times válidos
 res_info = supabase.table("times").select("id", "nome", "logo").execute()
 times_map = {
     t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")}
@@ -33,12 +33,12 @@ times_map = {
 }
 time_ids = list(times_map.keys())
 
-# 🔁 Gerar a primeira fase (Preliminar ou Oitavas)
+# 🔁 Gerar primeira fase com proteção contra times ímpares
 def gerar_primeira_fase(times):
     random.shuffle(times)
     jogos = []
-
     fase = "Preliminar" if len(times) > 16 else "Oitavas"
+
     for i in range(0, len(times), 2):
         if i + 1 < len(times):
             jogos.append({
@@ -50,6 +50,9 @@ def gerar_primeira_fase(times):
                 "gols_mandante": None,
                 "gols_visitante": None
             })
+        else:
+            st.warning(f"⚠️ O time **{times_map[times[i]]['nome']}** ficou sem adversário e foi ignorado.")
+
     return jogos
 
 # 🔘 Botão para gerar a primeira fase
@@ -63,12 +66,12 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
         jogos = gerar_primeira_fase(time_ids[:])
         for j in jogos:
             supabase.table("copa_ligafut").insert(j).execute()
-        st.success("✅ Primeira fase da Copa criada com sucesso!")
+        st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
 
-# 🔄 Gerar próxima fase
+# 🔄 Avançar fases
 st.markdown("---")
 st.subheader("🔄 Avançar Fase")
 fases_ordem = ["Preliminar", "Oitavas", "Quartas", "Semifinal", "Final"]
@@ -114,6 +117,8 @@ try:
                                 "gols_mandante": None,
                                 "gols_visitante": None
                             })
+                        else:
+                            st.warning(f"⚠️ O time ID {vencedores[i]} ficou sem adversário nesta fase.")
                     for j in novos_jogos:
                         supabase.table("copa_ligafut").insert(j).execute()
                     st.success(f"✅ Fase {nova_fase} criada com sucesso!")
@@ -122,7 +127,7 @@ try:
 except Exception as e:
     st.error(f"Erro ao processar fases: {e}")
 
-# 📅 Exibir os jogos existentes
+# 📅 Exibir jogos da copa
 st.markdown("---")
 st.subheader("🕛 Jogos da Copa")
 try:
