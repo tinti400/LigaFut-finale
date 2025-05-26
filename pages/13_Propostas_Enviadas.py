@@ -20,6 +20,17 @@ nome_time = st.session_state["nome_time"]
 
 st.title("📤 Propostas Enviadas")
 
+# 🚫 Verifica status do mercado
+try:
+    status_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = status_ref.data[0]["mercado_aberto"] if status_ref.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
+
+if not mercado_aberto:
+    st.warning("⚠️ O mercado está fechado. As propostas enviadas ainda estão visíveis, mas não podem ser aceitas ou recusadas no momento.")
+
 # 🔎 Buscar propostas enviadas
 try:
     propostas_ref = supabase.table("negociacoes") \
