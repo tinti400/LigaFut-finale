@@ -33,7 +33,7 @@ times_map = {
 }
 time_ids = list(times_map.keys())
 
-# 🔁 Gerar primeira fase com proteção contra times ímpares
+# 🔁 Gerar primeira fase com segurança
 def gerar_primeira_fase(times):
     random.shuffle(times)
     jogos = []
@@ -52,7 +52,6 @@ def gerar_primeira_fase(times):
             })
         else:
             st.warning(f"⚠️ O time **{times_map[times[i]]['nome']}** ficou sem adversário e foi ignorado.")
-
     return jogos
 
 # 🔘 Botão para gerar a primeira fase
@@ -60,7 +59,6 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
     if len(time_ids) < 2:
         st.warning("⚠️ Mínimo de 2 times válidos para gerar a Copa.")
         st.stop()
-
     try:
         supabase.table("copa_ligafut").delete().neq("id", "").execute()
         jogos = gerar_primeira_fase(time_ids[:])
@@ -107,18 +105,21 @@ try:
                     nova_fase = fases_ordem[idx_atual + 1]
                     novos_jogos = []
                     for i in range(0, len(vencedores), 2):
-                        if i + 1 < len(vencedores):
+                        id1 = vencedores[i]
+                        id2 = vencedores[i + 1] if i + 1 < len(vencedores) else None
+                        if id2:
                             novos_jogos.append({
                                 "id": str(uuid.uuid4()),
                                 "fase": nova_fase,
                                 "numero": len(jogos) + i + 1,
-                                "id_mandante": vencedores[i],
-                                "id_visitante": vencedores[i + 1],
+                                "id_mandante": id1,
+                                "id_visitante": id2,
                                 "gols_mandante": None,
                                 "gols_visitante": None
                             })
                         else:
-                            st.warning(f"⚠️ O time ID {vencedores[i]} ficou sem adversário nesta fase.")
+                            nome_time = times_map.get(id1, {}).get("nome", id1)
+                            st.warning(f"⚠️ O time **{nome_time}** ficou sem adversário nesta fase.")
                     for j in novos_jogos:
                         supabase.table("copa_ligafut").insert(j).execute()
                     st.success(f"✅ Fase {nova_fase} criada com sucesso!")
@@ -127,7 +128,7 @@ try:
 except Exception as e:
     st.error(f"Erro ao processar fases: {e}")
 
-# 📅 Exibir jogos da copa
+# 📅 Exibir jogos
 st.markdown("---")
 st.subheader("🕛 Jogos da Copa")
 try:
