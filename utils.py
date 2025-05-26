@@ -79,7 +79,8 @@ def atualizar_classificacao(supabase, divisao):
     times = supabase.table("times").select("id", "nome").execute().data
     times_map_all = {t["id"]: t["nome"] for t in times if t.get("id") and t.get("nome")}
 
-    usuarios_divisao = supabase.table("usuarios").select("time_id").eq("Divisao", f"Divisão {divisao}").execute().data
+    # 🔴 Aqui está o ajuste: campo com acento
+    usuarios_divisao = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {divisao}").execute().data
     time_ids_validos = [u["time_id"] for u in usuarios_divisao if u.get("time_id") in times_map_all]
     times_map = {tid: times_map_all[tid] for tid in time_ids_validos}
 
@@ -114,8 +115,8 @@ def calcular_movimentacao_divisoes(classif_div1, classif_div2):
 # ⚙️ Atualizar divisões após resultado do playoff
 def aplicar_movimentacao_divisoes(supabase, vencedor_id, perdedor_id):
     try:
-        supabase.table("usuarios").update({"Divisao": "Divisão 1"}).eq("time_id", vencedor_id).execute()
-        supabase.table("usuarios").update({"Divisao": "Divisão 2"}).eq("time_id", perdedor_id).execute()
+        supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", vencedor_id).execute()
+        supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", perdedor_id).execute()
         st.success("✅ Divisões atualizadas com base no resultado do playoff!")
     except Exception as e:
         st.error(f"Erro ao aplicar movimentação: {e}")
