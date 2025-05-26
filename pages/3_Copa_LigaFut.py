@@ -106,16 +106,20 @@ try:
 
                 col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
                 with col1:
-                    st.image(m_logo, width=40)
+                    if m_logo:
+                        st.image(m_logo, width=40)
                     st.markdown(f"**{m_nome}**")
+
                 with col2:
                     gm = st.number_input("", key=f"gm_{j['id']}", min_value=0, value=j.get("gols_mandante") or 0)
                 with col3:
                     st.markdown("**x**")
                 with col4:
                     gv = st.number_input("", key=f"gv_{j['id']}", min_value=0, value=j.get("gols_visitante") or 0)
+
                 with col5:
-                    st.image(v_logo, width=40)
+                    if v_logo:
+                        st.image(v_logo, width=40)
                     st.markdown(f"**{v_nome}**")
 
                 if st.button("Salvar", key=f"btn_{j['id']}"):
@@ -188,4 +192,3 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar jogos: {e}")
-
