@@ -4,7 +4,7 @@ import pandas as pd
 from supabase import create_client
 from datetime import datetime
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -166,32 +166,38 @@ if eh_admin:
         except Exception as e:
             st.error(f"Erro ao resetar rodadas: {e}")
 
-# 📅 Rodadas Geradas
+# 📅 Rodadas - visualização por página
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
 if not rodadas:
     st.info("Nenhuma rodada encontrada para esta divisão.")
 else:
-    for rodada in sorted(rodadas, key=lambda r: r.get("numero", 0)):
-        st.markdown(f"### 🕹️ Rodada {rodada.get('numero', '?')}")
-        for jogo in rodada.get("jogos", []):
-            m = jogo.get("mandante")
-            v = jogo.get("visitante")
-            gm = jogo.get("gols_mandante")
-            gv = jogo.get("gols_visitante")
+    rodadas_ordenadas = sorted(rodadas, key=lambda r: r.get("numero", 0))
+    lista_rodadas = [f"Rodada {r.get('numero', '?')}" for r in rodadas_ordenadas]
+    selecao = st.selectbox("🔁 Selecione a rodada para visualizar", lista_rodadas)
 
-            m_info = times_map.get(m, {"nome": "?", "logo": ""})
-            v_info = times_map.get(v, {"nome": "?", "logo": ""})
+    rodada_escolhida = rodadas_ordenadas[lista_rodadas.index(selecao)]
+    st.markdown(f"### 🕹️ {selecao}")
 
-            escudo_m = f"<img src='{m_info['logo']}' width='25' style='vertical-align: middle; margin-right: 5px;'>"
-            escudo_v = f"<img src='{v_info['logo']}' width='25' style='vertical-align: middle; margin-left: 5px;'>"
+    for jogo in rodada_escolhida.get("jogos", []):
+        m = jogo.get("mandante")
+        v = jogo.get("visitante")
+        gm = jogo.get("gols_mandante")
+        gv = jogo.get("gols_visitante")
 
-            nome_m = m_info["nome"]
-            nome_v = v_info["nome"]
-            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "vs"
+        m_info = times_map.get(m, {"nome": "?", "logo": ""})
+        v_info = times_map.get(v, {"nome": "?", "logo": ""})
 
-            st.markdown(f"<div style='font-size: 16px;'>"
-                        f"{escudo_m}<b>{nome_m}</b> {placar} <b>{nome_v}</b>{escudo_v}"
-                        f"</div>", unsafe_allow_html=True)
-        st.markdown("---")
+        escudo_m = f"<img src='{m_info['logo']}' width='25' style='vertical-align: middle; margin-right: 5px;'>"
+        escudo_v = f"<img src='{v_info['logo']}' width='25' style='vertical-align: middle; margin-left: 5px;'>"
+
+        nome_m = m_info["nome"]
+        nome_v = v_info["nome"]
+        placar = f"{gm} x {gv}" if gm is not None and gv is not None else "vs"
+
+        st.markdown(f"<div style='font-size: 16px;'>"
+                    f"{escudo_m}<b>{nome_m}</b> {placar} <b>{nome_v}</b>{escudo_v}"
+                    f"</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
