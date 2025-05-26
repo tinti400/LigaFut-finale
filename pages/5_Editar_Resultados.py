@@ -12,6 +12,23 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="Gerenciar Rodadas", page_icon="🏕️", layout="centered")
 st.title("🏕️ Gerenciar Rodadas da Divisão")
 
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+# 👑 Verifica se é admin pela tabela "admins"
+email_usuario = st.session_state.get("usuario", "")
+try:
+    admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    eh_admin = len(admin_ref.data) > 0
+    if not eh_admin:
+        st.error("🔒 Acesso restrito: somente administradores podem acessar esta página.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
+    st.stop()
+
 # 🔹 Filtro de divisão
 divisao = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
@@ -129,5 +146,3 @@ if rodadas_existentes:
             supabase.table(nome_tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_escolhida).execute()
             st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
             st.rerun()
-
-
