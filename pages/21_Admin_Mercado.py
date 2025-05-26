@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -23,7 +24,7 @@ try:
     admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
     eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
     if not eh_admin:
-        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.warning("🔐 Acesso permitido apenas para administradores.")
         st.stop()
 except Exception as e:
     st.error(f"Erro ao verificar administrador: {e}")
@@ -43,7 +44,6 @@ except Exception as e:
 
 # 🔘 Botões de controle
 col1, col2, col3 = st.columns([2, 2, 2])
-
 with col1:
     if st.button("🟢 Abrir Mercado"):
         try:
@@ -70,12 +70,11 @@ with col3:
         if st.button("🧹 Limpar Mercado"):
             st.session_state.confirmar_limpeza = True
     else:
-        st.warning("⚠️ Clique em Confirmar para limpar todos os jogadores do mercado.")
-        col_conf, col_cancel = st.columns([1, 1])
+        col_conf, col_cancel = st.columns(2)
         with col_conf:
-            if st.button("✅ Confirmar Limpeza do Mercado"):
+            if st.button("✅ Confirmar"):
                 try:
-                    supabase.table("mercado_transferencias").delete().neq("id", "").execute()
+                    supabase.table("mercado_transferencias").delete().execute()
                     st.success("🧹 Todos os jogadores foram removidos do mercado!")
                     st.session_state.confirmar_limpeza = False
                     st.experimental_rerun()
@@ -85,9 +84,9 @@ with col3:
             if st.button("❌ Cancelar"):
                 st.session_state.confirmar_limpeza = False
 
-# 📝 Cadastro de jogador no mercado
+# 📍 Cadastro de jogador no mercado
 st.markdown("---")
-st.subheader("📥 Adicionar Jogador ao Mercado")
+st.subheader("📅 Adicionar Jogador ao Mercado")
 
 with st.form("form_mercado"):
     nome = st.text_input("Nome do Jogador").strip()
@@ -134,6 +133,6 @@ try:
         jogadores_df = pd.DataFrame(jogadores_mercado)
         st.dataframe(jogadores_df)
     else:
-        st.info("📭 Nenhum jogador no mercado.")
+        st.info("📟 Nenhum jogador no mercado.")
 except Exception as e:
     st.error(f"Erro ao carregar jogadores do mercado: {e}")
