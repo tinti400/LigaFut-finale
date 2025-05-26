@@ -39,7 +39,6 @@ def gerar_chaveamento_completo(times_validos):
     jogos = []
     ids_oitavas = []
 
-    # Preliminar (caso haja mais de 16 times)
     while len(times_validos) > 16:
         t1 = times_validos.pop()
         t2 = times_validos.pop()
@@ -54,11 +53,9 @@ def gerar_chaveamento_completo(times_validos):
         })
         ids_oitavas.append("vencedor_de_" + str(len(jogos)))
 
-    # Restantes vão direto pras oitavas
     while times_validos:
         ids_oitavas.append(times_validos.pop())
 
-    # Gera fases seguintes
     fases = ["Oitavas", "Quartas", "Semifinal", "Final"]
     fase_atual = ids_oitavas
 
@@ -89,7 +86,8 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
         st.stop()
 
     try:
-        supabase.table("copa_ligafut").delete().execute()
+        # ✅ Correção aqui: WHERE obrigatório no Supabase
+        supabase.table("copa_ligafut").delete().neq("id", "").execute()
         jogos = gerar_chaveamento_completo(time_ids[:])
         for j in jogos:
             supabase.table("copa_ligafut").insert(j).execute()
@@ -149,3 +147,4 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar jogos: {e}")
+
