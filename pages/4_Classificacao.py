@@ -4,7 +4,7 @@ import pandas as pd
 from supabase import create_client
 from datetime import datetime
 
-# 🔐 Conexão com Supabase
+# 🔐 Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -13,7 +13,7 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
+# 🔒 Login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
@@ -23,21 +23,21 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seletor de divisão
+# 🔹 Divisão
 divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 📅 Buscar resultados
+# 📅 Buscar rodadas
 def buscar_resultados():
     try:
-        res = supabase.table(nome_tabela_rodadas).select("*").execute()
+        res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
         return res.data if res.data else []
     except Exception as e:
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes e logos
+# 👥 Buscar times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -50,7 +50,7 @@ def obter_nomes_times():
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
-# 🧠 Calcular classificação
+# 🧠 Classificação
 def calcular_classificacao(rodadas, times_map):
     tabela = {
         tid: {
@@ -105,21 +105,19 @@ def calcular_classificacao(rodadas, times_map):
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🔄 Carregar dados
+# 🔄 Dados
 rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Montar tabela
+# 📊 Tabela
 dados = []
 for i, (tid, t) in enumerate(classificacao, start=1):
-    nome_formatado = t["nome"].strip().capitalize()
-    escudo_html = f"<img src='{t['logo']}' width='25' style='margin-right:6px; vertical-align:middle;'>"
-    time_com_escudo = f"{escudo_html}{nome_formatado}"
-
+    escudo = f"<img src='{t['logo']}' width='25' style='vertical-align: middle; margin-right: 6px;'>"
+    nome = t["nome"].strip().capitalize()
     dados.append({
         "Posição": i,
-        "Time": time_com_escudo,
+        "Time": f"{escudo}{nome}",
         "Pontos": t["pontos"],
         "Jogos": t["v"] + t["e"] + t["d"],
         "Vitórias": t["v"],
@@ -130,7 +128,7 @@ for i, (tid, t) in enumerate(classificacao, start=1):
         "Saldo de Gols": t["sg"]
     })
 
-# 📋 Estilização HTML
+# 📋 Estilização da tabela
 def aplicar_estilo_linha(df):
     html = "<style>td, th { text-align: center; vertical-align: middle; }</style><table border='1' class='dataframe' style='width: 100%; border-collapse: collapse;'>"
     html += "<thead><tr>"
@@ -138,29 +136,23 @@ def aplicar_estilo_linha(df):
         html += f"<th>{col}</th>"
     html += "</tr></thead><tbody>"
 
-    total_linhas = len(df)
+    total = len(df)
     for i, row in df.iterrows():
-        if i < 4:
-            html += "<tr style='background-color: #d4edda;'>"
-        elif i >= total_linhas - 2:
-            html += "<tr style='background-color: #f8d7da;'>"
-        else:
-            html += "<tr>"
-
+        cor = "#d4edda" if i < 4 else "#f8d7da" if i >= total - 2 else ""
+        html += f"<tr style='background-color: {cor};'>" if cor else "<tr>"
         for val in row:
             html += f"<td>{val}</td>"
         html += "</tr>"
     html += "</tbody></table>"
     return html
 
-# ✅ Exibir tabela
 if dados:
-    df_classificacao = pd.DataFrame(dados)
-    st.markdown(aplicar_estilo_linha(df_classificacao), unsafe_allow_html=True)
+    df = pd.DataFrame(dados)
+    st.markdown(aplicar_estilo_linha(df), unsafe_allow_html=True)
 else:
-    st.info("Sem dados suficientes para exibir a tabela de classificação.")
+    st.info("Sem dados suficientes para exibir a classificação.")
 
-# 🔧 Ações admin
+# 🔧 Admin: reset rodadas
 if eh_admin:
     st.markdown("---")
     st.subheader("🔧 Ações administrativas")
@@ -173,3 +165,33 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao resetar rodadas: {e}")
+
+# 📅 Rodadas Geradas
+st.markdown("---")
+st.subheader("📅 Rodadas da Temporada")
+
+if not rodadas:
+    st.info("Nenhuma rodada encontrada para esta divisão.")
+else:
+    for rodada in sorted(rodadas, key=lambda r: r.get("numero", 0)):
+        st.markdown(f"### 🕹️ Rodada {rodada.get('numero', '?')}")
+        for jogo in rodada.get("jogos", []):
+            m = jogo.get("mandante")
+            v = jogo.get("visitante")
+            gm = jogo.get("gols_mandante")
+            gv = jogo.get("gols_visitante")
+
+            m_info = times_map.get(m, {"nome": "?", "logo": ""})
+            v_info = times_map.get(v, {"nome": "?", "logo": ""})
+
+            escudo_m = f"<img src='{m_info['logo']}' width='25' style='vertical-align: middle; margin-right: 5px;'>"
+            escudo_v = f"<img src='{v_info['logo']}' width='25' style='vertical-align: middle; margin-left: 5px;'>"
+
+            nome_m = m_info["nome"]
+            nome_v = v_info["nome"]
+            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "vs"
+
+            st.markdown(f"<div style='font-size: 16px;'>"
+                        f"{escudo_m}<b>{nome_m}</b> {placar} <b>{nome_v}</b>{escudo_v}"
+                        f"</div>", unsafe_allow_html=True)
+        st.markdown("---")
