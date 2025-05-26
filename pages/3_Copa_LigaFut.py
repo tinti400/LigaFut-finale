@@ -1,5 +1,5 @@
 
-  # -*- coding: utf-8 -*-
+ # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 import random
@@ -36,38 +36,52 @@ if len(time_ids) < 2:
 # 📊 Gerar confrontos
 if st.button("⚙️ Gerar Copa LigaFut"):
     try:
-        supabase.table("copa_ligafut").delete().neq("fase", "").execute()
+        supabase.table("copa_ligafut").delete().neq("numero_fase", -1).execute()
 
         random.shuffle(time_ids)
+        fase_numero = 1
+        jogos = []
+        fase = "Oitavas de Final"
 
-        # Fase Preliminar se não for número ideal
-        rodadas = []
-        fase_atual = 1
+        # Ajustar para múltiplos de 2 com fase preliminar
+        total = len(time_ids)
+        while (total & (total - 1)) != 0:  # não é potência de 2
+            total += 1
 
-        if len(time_ids) > 16:
-            # 6 times sorteados para a preliminar
-            preliminar = time_ids[:6]
-            restantes = time_ids[6:]
-            jogos_preliminar = []
-            for i in range(0, 6, 2):
-                jogos_preliminar.append({
-                    "mandante": preliminar[i],
-                    "visitante": preliminar[i+1],
+        byes = total - len(time_ids)
+        participantes = time_ids[:]
+
+        if byes > 0:
+            st.info(f"🎟 {byes} times avançarão automaticamente para a próxima fase.")
+            for i in range(byes):
+                jogos.append({
+                    "numero_fase": fase_numero,
+                    "fase": "Bye",
+                    "numero_jogo": i + 1,
+                    "id_mandante": participantes.pop(),
+                    "id_visitante": None,
                     "gols_mandante": None,
-                    "gols_visitante": None
+                    "gols_visitante": None,
+                    "vencedor": None
                 })
-            supabase.table("copa_ligafut").insert({
-                "fase": "Preliminar",
-                "numero": fase_atual,
-                "jogos": jogos_preliminar
-            }).execute()
-            fase_atual += 1
-        else:
-            restantes = time_ids[:]
 
-        # Oitavas, Quartas, Semi e Final (será preenchido manualmente após resultados)
-        st.success("✅ Copa LigaFut criada com sucesso com fase preliminar!")
-        st.info("Acompanhe os resultados e avance manualmente para as próximas fases.")
+        # Confrontos iniciais
+        numero_jogo = 1
+        for i in range(0, len(participantes), 2):
+            jogos.append({
+                "numero_fase": fase_numero,
+                "fase": fase,
+                "numero_jogo": numero_jogo,
+                "id_mandante": participantes[i],
+                "id_visitante": participantes[i+1],
+                "gols_mandante": None,
+                "gols_visitante": None,
+                "vencedor": None
+            })
+            numero_jogo += 1
+
+        supabase.table("copa_ligafut").insert(jogos).execute()
+        st.success(f"✅ Copa LigaFut criada com {len(jogos)} confrontos iniciais!")
 
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
