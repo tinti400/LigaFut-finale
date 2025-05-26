@@ -1,26 +1,3 @@
-# 🔐 Conexão com Supabase
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
-
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado para acessar esta página.")
-    st.stop()
-
-# 👑 Verifica se é administrador
-email_usuario = st.session_state.get("usuario", "")
-
-try:
-    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
-    eh_admin = admin_ref.data and admin_ref.data[0].get("administrador", False)
-
-    if not eh_admin:
-        st.error("🔒 Acesso restrito! Esta página é exclusiva para administradores.")
-        st.stop()
-except Exception as e:
-    st.error(f"Erro ao verificar permissões de administrador: {e}")
-    st.stop()
 # -*- coding: utf-8 -*- 
 import streamlit as st 
 from supabase import create_client 
@@ -34,22 +11,20 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 # ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 👑 Verifica se é admin
+# 👑 Verifica se é admin pela tabela 'admins'
 email_usuario = st.session_state.get("usuario", "")
-
-if not email_usuario or "/" in email_usuario:
-    st.error("⚠️ E-mail inválido para verificação de admin.")
-    st.stop()
-
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-eh_admin = len(admin_ref.data) > 0
-
-if not eh_admin:
-    st.warning("🔒 Acesso permitido apenas para administradores.")
+try:
+    admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    eh_admin = len(admin_ref.data) > 0
+    if not eh_admin:
+        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
     st.stop()
 
 # 🧾 Título
@@ -64,8 +39,8 @@ with st.form("form_leilao"):
         "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
     ])
     overall = st.number_input("Overall", min_value=1, max_value=99, step=1)
-    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100000, step=50000)
-    incremento_minimo = st.number_input("Incremento mínimo entre lances (R$)", min_value=100000, step=50000, value=3000000)
+    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100_000, step=50_000)
+    incremento_minimo = st.number_input("Incremento mínimo entre lances (R$)", min_value=100_000, step=50_000, value=3_000_000)
     duracao = st.slider("Duração do Leilão (minutos)", min_value=1, max_value=10, value=2)
     botao_criar = st.form_submit_button("Criar Leilão")
 
@@ -108,7 +83,6 @@ st.markdown("---")
 st.markdown("### ⚙️ Controle de Leilão Ativo")
 
 col1, col2 = st.columns(2)
-
 with col1:
     if st.button("✅ Ativar Leilão"):
         try:
@@ -127,7 +101,7 @@ with col2:
         except Exception as e:
             st.error(f"Erro ao desativar leilão: {e}")
 
-# 🔄 Atualização de lances no leilão
+# 🔄 Últimos dados do leilão
 st.markdown("---")
 st.markdown("### 🏆 Últimos Lances")
 
@@ -139,25 +113,22 @@ if leilao_data and leilao_data["ativo"]:
     st.markdown(f"**Posição:** {leilao_data['jogador']['posicao']}")
     st.markdown(f"**Valor Atual:** R$ {leilao_data['valor_atual']:,.0f}".replace(",", "."))
 
-    incremento_minimo = leilao_data.get("incremento_minimo", 3000000)
+    incremento_minimo = leilao_data.get("incremento_minimo", 3_000_000)
     lance_minimo = leilao_data["valor_atual"] + incremento_minimo
     
-    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {lance_minimo:,.0f})", min_value=lance_minimo)
+    lance_input = st.number_input(f"Digite seu lance (mínimo: R$ {lance_minimo:,.0f})", min_value=lance_minimo)
 
     if st.button(f"💸 Dar Lance de R$ {lance_input:,.0f}"):
         try:
-            if lance_input >= lance_minimo:
-                supabase.table("configuracoes").update({
-                    "valor_atual": lance_input,
-                    "ultimo_lance": datetime.utcnow().isoformat(),
-                    "id_time_atual": st.session_state.get("id_time"),
-                    "time_vencedor": f"Time {st.session_state.get('id_time')}"
-                }).eq("id", "leilao_sistema").execute()
+            supabase.table("configuracoes").update({
+                "valor_atual": lance_input,
+                "ultimo_lance": datetime.utcnow().isoformat(),
+                "id_time_atual": st.session_state.get("id_time"),
+                "time_vencedor": f"Time {st.session_state.get('id_time')}"
+            }).eq("id", "leilao_sistema").execute()
 
-                st.success(f"✅ Lance de R$ {lance_input:,.0f} realizado com sucesso!")
-                st.balloons()
-            else:
-                st.error(f"❌ O lance deve ser **maior ou igual** a R$ {lance_minimo:,.0f}!")
+            st.success(f"✅ Lance de R$ {lance_input:,.0f} registrado com sucesso!")
+            st.balloons()
         except Exception as e:
             st.error(f"Erro ao dar lance: {e}")
 else:
