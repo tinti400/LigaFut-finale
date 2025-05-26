@@ -24,7 +24,7 @@ try:
     admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
     eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
     if not eh_admin:
-        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.warning("🔐 Acesso permitido apenas para administradores.")
         st.stop()
 except Exception as e:
     st.error(f"Erro ao verificar administrador: {e}")
@@ -65,15 +65,14 @@ with col2:
 with col3:
     if st.button("🧹 Limpar Mercado"):
         try:
-            supabase.table("mercado_transferencias").delete().execute()
+            supabase.table("mercado_transferencias").delete().neq("id", "").execute()
             st.success("🧹 Todos os jogadores foram removidos do mercado!")
-            st.experimental_rerun()
         except Exception as e:
             st.error(f"Erro ao limpar mercado: {e}")
 
-# 📝 Cadastro de jogador no mercado
+# 📍 Cadastro de jogador no mercado
 st.markdown("---")
-st.subheader("📥 Adicionar Jogador ao Mercado")
+st.subheader("📅 Adicionar Jogador ao Mercado")
 
 with st.form("form_mercado"):
     nome = st.text_input("Nome do Jogador").strip()
@@ -109,7 +108,7 @@ if botao:
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
 
-# 📋 Jogadores no Mercado
+# 📊 Jogadores no Mercado
 st.markdown("---")
 st.subheader("📋 Jogadores no Mercado")
 
@@ -120,6 +119,6 @@ try:
         jogadores_df = pd.DataFrame(jogadores_mercado)
         st.dataframe(jogadores_df)
     else:
-        st.info("📭 Nenhum jogador no mercado.")
+        st.info("📍 Nenhum jogador no mercado.")
 except Exception as e:
     st.error(f"Erro ao carregar jogadores do mercado: {e}")
