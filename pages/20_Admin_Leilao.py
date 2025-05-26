@@ -42,6 +42,7 @@ with st.form("form_leilao"):
     ])
     overall = st.number_input("Overall", min_value=1, max_value=99, step=1)
     valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100000, step=50000)
+    incremento_minimo = st.number_input("Incremento mínimo entre lances (R$)", min_value=100000, step=50000, value=3000000)
     duracao = st.slider("Duração do Leilão (minutos)", min_value=1, max_value=10, value=2)
     botao_criar = st.form_submit_button("Criar Leilão")
 
@@ -62,7 +63,8 @@ if botao_criar:
             },
             "valor_inicial": valor_inicial,
             "valor_atual": valor_inicial,
-            "id_time_atual": None,           # ✅ Nenhum time de origem
+            "incremento_minimo": incremento_minimo,
+            "id_time_atual": None,
             "ultimo_lance": None,
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
@@ -106,43 +108,33 @@ with col2:
 st.markdown("---")
 st.markdown("### 🏆 Últimos Lances")
 
-# 🔍 Obtém os detalhes do leilão ativo
 leilao_ref = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
 leilao_data = leilao_ref.data[0] if leilao_ref.data else None
 
 if leilao_data and leilao_data["ativo"]:
-    st.markdown(f"**Jogador:** {leilao_data['jogador']['nome']}")  
+    st.markdown(f"**Jogador:** {leilao_data['jogador']['nome']}")
     st.markdown(f"**Posição:** {leilao_data['jogador']['posicao']}")
     st.markdown(f"**Valor Atual:** R$ {leilao_data['valor_atual']:,.0f}".replace(",", "."))
 
-    # 🎯 Atualizar o valor do lance
-    valor_lance = leilao_data["valor_atual"] + 3000000  # Aumento de 3 milhões
-
-    # Remover a opção de incremento e deixar apenas a digitação do valor
-    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {valor_lance:,.0f})", min_value=valor_lance)
+    incremento_minimo = leilao_data.get("incremento_minimo", 3000000)
+    lance_minimo = leilao_data["valor_atual"] + incremento_minimo
+    
+    lance_input = st.number_input(f"Digite seu lance (mínimo de R$ {lance_minimo:,.0f})", min_value=lance_minimo)
 
     if st.button(f"💸 Dar Lance de R$ {lance_input:,.0f}"):
-
         try:
-            # Verifica se o lance é maior que o valor atual e maior que o valor de incremento
-            if lance_input >= valor_lance:
-                # Atualiza o valor atual do lance
+            if lance_input >= lance_minimo:
                 supabase.table("configuracoes").update({
                     "valor_atual": lance_input,
-                    "ultimo_lance": datetime.utcnow().isoformat()
-                }).eq("id", "leilao_sistema").execute()
-
-                # Atualiza o time vencedor (presumindo que o time logado faça o lance)
-                id_time_vencedor = st.session_state.get("id_time")
-                supabase.table("configuracoes").update({
-                    "id_time_atual": id_time_vencedor,
-                    "time_vencedor": f"Time {id_time_vencedor}"
+                    "ultimo_lance": datetime.utcnow().isoformat(),
+                    "id_time_atual": st.session_state.get("id_time"),
+                    "time_vencedor": f"Time {st.session_state.get('id_time')}"
                 }).eq("id", "leilao_sistema").execute()
 
                 st.success(f"✅ Lance de R$ {lance_input:,.0f} realizado com sucesso!")
                 st.balloons()
             else:
-                st.error(f"❌ O lance deve ser **maior ou igual** a R$ {valor_lance:,.0f}!")
+                st.error(f"❌ O lance deve ser **maior ou igual** a R$ {lance_minimo:,.0f}!")
         except Exception as e:
             st.error(f"Erro ao dar lance: {e}")
 else:
