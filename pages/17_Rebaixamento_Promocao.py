@@ -12,6 +12,24 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="Rebaixamento e Promoção", page_icon="🏋️", layout="centered")
 st.title("🏋️ Rebaixamento, Promoção e Playoff")
 
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+email_usuario = st.session_state.get("usuario", "")
+
+# 👑 Verifica se é admin
+try:
+    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+    eh_admin = admin_ref.data and admin_ref.data[0].get("administrador", False)
+    if not eh_admin:
+        st.error("🔒 Acesso restrito! Esta página é exclusiva para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar permissão de administrador: {e}")
+    st.stop()
+
 # 🔄 Atualiza classificações
 df_div1 = atualizar_classificacao(supabase, 1)
 df_div2 = atualizar_classificacao(supabase, 2)
@@ -44,17 +62,17 @@ if st.button("🏁 Encerrar Temporada e Atualizar Divisões"):
 
         # 🔄 Atualiza divisões de rebaixados e promovidos
         for tid, _ in rebaixados:
-            supabase.table("usuarios").update({"Divisao": "Divisão 2"}).eq("time_id", tid).execute()
+            supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", tid).execute()
 
         for tid, _ in promovidos:
-            supabase.table("usuarios").update({"Divisao": "Divisão 1"}).eq("time_id", tid).execute()
+            supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", tid).execute()
 
         # 🔄 Playoff
         vencedor_id = playoff_div1[0] if vencedor == playoff_div1[1]["nome"] else playoff_div2[0]
         perdedor_id = playoff_div2[0] if vencedor == playoff_div1[1]["nome"] else playoff_div1[0]
 
-        supabase.table("usuarios").update({"Divisao": "Divisão 1"}).eq("time_id", vencedor_id).execute()
-        supabase.table("usuarios").update({"Divisao": "Divisão 2"}).eq("time_id", perdedor_id).execute()
+        supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", vencedor_id).execute()
+        supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", perdedor_id).execute()
 
         st.success("✅ Temporada encerrada e divisões atualizadas com sucesso!")
         st.rerun()
