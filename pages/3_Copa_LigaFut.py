@@ -2,76 +2,185 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import random
+import uuid
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="⚽ Copa LigaFut", layout="centered")
-st.title("\U0001f3c6 Copa LigaFut - Resultados")
+st.set_page_config(page_title="Copa LigaFut", layout="wide")
+st.title("🏆 Copa LigaFut - Mata-mata (Ida e Volta)")
 
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+# 🔐 Verifica login
+if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 📅 Buscar fase atual da copa
+# 👥 Buscar times cadastrados
+res_times = supabase.table("times").select("id,nome").execute()
+times = res_times.data if res_times.data else []
+mapa_times = {t['id']: t['nome'] for t in times}
+
+# 🗓️ Selecionar times
+st.subheader("📌 Selecione os times participantes da Copa")
+st.caption("Escolha entre 16 e 20 times:")
+
+selected_teams = st.multiselect("Times:", [f"{t['nome']} — {t['id']}" for t in times])
+
+if st.button("✨ Gerar Copa"):
+    if len(selected_teams) < 16:
+        st.error("❌ É preciso selecionar no mínimo 16 times.")
+        st.stop()
+    if len(selected_teams) > 20:
+        st.error("❌ O limite máximo são 20 times.")
+        st.stop()
+
+    time_ids = [t.split(" — ")[-1] for t in selected_teams]
+    fase = "oitavas"
+    confrontos = []
+
+    if len(time_ids) > 16:
+        num_jogos_pre = len(time_ids) - 16
+        fase = "preliminar"
+        st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
+
+        times_pre = random.sample(time_ids, num_jogos_pre * 2)
+        restantes = list(set(time_ids) - set(times_pre))
+
+        random.shuffle(times_pre)
+        for i in range(0, len(times_pre), 2):
+            confrontos.append({
+                "mandante_ida": times_pre[i],
+                "visitante_ida": times_pre[i+1],
+                "gols_ida_m": None,
+                "gols_ida_v": None,
+                "gols_volta_m": None,
+                "gols_volta_v": None
+            })
+
+        restantes.sort()
+        for i in range(0, len(restantes), 2):
+            confrontos.append({
+                "mandante_ida": restantes[i],
+                "visitante_ida": restantes[i+1],
+                "gols_ida_m": None,
+                "gols_ida_v": None,
+                "gols_volta_m": None,
+                "gols_volta_v": None
+            })
+
+    else:
+        random.shuffle(time_ids)
+        for i in range(0, len(time_ids), 2):
+            confrontos.append({
+                "mandante_ida": time_ids[i],
+                "visitante_ida": time_ids[i+1],
+                "gols_ida_m": None,
+                "gols_ida_v": None,
+                "gols_volta_m": None,
+                "gols_volta_v": None
+            })
+
+    supabase.table("copa_ligafut").insert({
+        "id": str(uuid.uuid4()),
+        "numero": 1,
+        "fase": fase,
+        "jogos": confrontos,
+        "data_criacao": datetime.utcnow()
+    }).execute()
+
+    st.success("✅ Copa criada com sucesso!")
+    st.rerun()
+
+# 🗒️ Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
-dados_copa = res.data[0] if res.data else {}
-fase = dados_copa.get("fase", "")
-jogos = dados_copa.get("jogos", [])
+doc = res.data[0] if res.data else {}
+if not doc:
+    st.stop()
 
-# 🔍 Obter nomes dos times
-res_times = supabase.table("times").select("id", "nome").execute()
-times_map = {t["id"]: t["nome"] for t in res_times.data}
+jogos = doc.get("jogos", [])
+fase = doc.get("fase", "")
+st.subheader(f"📅 Confrontos da Fase: {fase.upper()}")
 
-st.subheader(f"⚔️ Resultados da fase: {fase.capitalize()}")
-novos_jogos = []
+classificados = []
 
 for i, jogo in enumerate(jogos):
-    # Verifica o formato do confronto
-    if "mandante_ida" in jogo and "visitante_ida" in jogo:
-        id_m = jogo["mandante_ida"]
-        id_v = jogo["visitante_ida"]
-        gols_ida_m = jogo.get("gols_ida_mandante", 0)
-        gols_ida_v = jogo.get("gols_ida_visitante", 0)
-        gols_volta_m = jogo.get("gols_volta_mandante", 0)
-        gols_volta_v = jogo.get("gols_volta_visitante", 0)
-    else:
-        id_m = jogo["mandante"]
-        id_v = jogo["visitante"]
-        gols_ida_m = jogo.get("gols_mandante", 0)
-        gols_ida_v = jogo.get("gols_visitante", 0)
-        gols_volta_m = 0
-        gols_volta_v = 0
+    id_m = jogo.get("mandante_ida")
+    id_v = jogo.get("visitante_ida")
+    nome_m = mapa_times.get(id_m, "?")
+    nome_v = mapa_times.get(id_v, "?")
 
-    nome_m = times_map.get(id_m, "?")
-    nome_v = times_map.get(id_v, "?")
-
-    st.markdown(f"**{nome_m} x {nome_v}**")
+    st.markdown(f"### {nome_m} x {nome_v}")
     col1, col2, col3, col4 = st.columns(4)
-
     with col1:
-        ida_m = st.number_input("Gols ida mandante", min_value=0, value=gols_ida_m, key=f"gm_ida_{i}")
+        ida_m = st.number_input("Gols Ida (Mandante)", min_value=0, value=jogo.get("gols_ida_m") or 0, key=f"im_{i}")
     with col2:
-        ida_v = st.number_input("Gols ida visitante", min_value=0, value=gols_ida_v, key=f"gv_ida_{i}")
+        ida_v = st.number_input("Gols Ida (Visitante)", min_value=0, value=jogo.get("gols_ida_v") or 0, key=f"iv_{i}")
     with col3:
-        volta_m = st.number_input("Gols volta mandante", min_value=0, value=gols_volta_m, key=f"gm_volta_{i}")
+        volta_m = st.number_input("Gols Volta (Visitante)", min_value=0, value=jogo.get("gols_volta_m") or 0, key=f"vm_{i}")
     with col4:
-        volta_v = st.number_input("Gols volta visitante", min_value=0, value=gols_volta_v, key=f"gv_volta_{i}")
+        volta_v = st.number_input("Gols Volta (Mandante)", min_value=0, value=jogo.get("gols_volta_v") or 0, key=f"vv_{i}")
 
-    novos_jogos.append({
-        "mandante_ida": id_m,
-        "visitante_ida": id_v,
-        "gols_ida_mandante": ida_m,
-        "gols_ida_visitante": ida_v,
-        "gols_volta_mandante": volta_m,
-        "gols_volta_visitante": volta_v
-    })
+    total_m = ida_m + volta_v
+    total_v = ida_v + volta_m
+    resultado = f"{total_m} x {total_v}"
 
-if st.button("📉 Salvar Resultados"):
-    supabase.table("copa_ligafut").update({"jogos": novos_jogos}).eq("id", dados_copa["id"]).execute()
-    st.success("Resultados salvos com sucesso!")
-    st.rerun()
+    if total_m > total_v:
+        st.success(f"✅ {nome_m} classificado ({resultado})")
+        classificados.append(id_m)
+    elif total_v > total_m:
+        st.success(f"✅ {nome_v} classificado ({resultado})")
+        classificados.append(id_v)
+    else:
+        st.warning(f"⚠️ Empate no agregado: {resultado} - Definir vencedor por pênaltis")
+
+    if st.button("Salvar Resultado", key=f"btn_{i}"):
+        jogo.update({
+            "gols_ida_m": ida_m,
+            "gols_ida_v": ida_v,
+            "gols_volta_m": volta_m,
+            "gols_volta_v": volta_v
+        })
+        supabase.table("copa_ligafut").update({"jogos": jogos}).eq("id", doc["id"]).execute()
+        st.success("✅ Resultado atualizado com sucesso!")
+        st.rerun()
+
+# Avançar de fase manualmente
+if len(classificados) == len(jogos):
+    if st.button("➡️ Avançar para próxima fase"):
+        nova_fase = {
+            "preliminar": "oitavas",
+            "oitavas": "quartas",
+            "quartas": "semifinal",
+            "semifinal": "final",
+            "final": "encerrado"
+        }.get(fase, "encerrado")
+
+        if nova_fase == "encerrado":
+            st.success("🏆 Copa encerrada!")
+        else:
+            random.shuffle(classificados)
+            novos_jogos = []
+            for i in range(0, len(classificados), 2):
+                novos_jogos.append({
+                    "mandante_ida": classificados[i],
+                    "visitante_ida": classificados[i+1],
+                    "gols_ida_m": None,
+                    "gols_ida_v": None,
+                    "gols_volta_m": None,
+                    "gols_volta_v": None
+                })
+
+            supabase.table("copa_ligafut").insert({
+                "id": str(uuid.uuid4()),
+                "numero": doc["numero"] + 1,
+                "fase": nova_fase,
+                "jogos": novos_jogos,
+                "data_criacao": datetime.utcnow()
+            }).execute()
+
+            st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
+            st.rerun()
 
