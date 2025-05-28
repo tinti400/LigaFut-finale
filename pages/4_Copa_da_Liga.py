@@ -11,14 +11,14 @@ st.set_page_config(page_title="🏆 Copa - LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut - Chaveamento</h1><hr>", unsafe_allow_html=True)
 
 # 📥 Buscar times
-@st.cache_data
+@st.cache  # Corrigido para compatibilidade com Streamlit Cloud
 def buscar_times():
     res = supabase.table("times").select("id, nome, escudo_url").execute()
     return {item["id"]: item for item in res.data}
 
-# 🔁 Buscar jogos por fase (usando nova tabela)
+# 🔁 Buscar jogos por fase na nova tabela
 def buscar_jogos(fase):
-    res = supabase.table("18_Copa_ligafut").select("*").eq("fase", fase).order("id").execute()
+    res = supabase.table("18_resultados_copa_ligafut").select("*").eq("fase", fase).order("id").execute()
     return res.data
 
 # 🎨 Exibir card do confronto
