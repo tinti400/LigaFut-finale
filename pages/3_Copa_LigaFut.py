@@ -73,7 +73,6 @@ if st.button("✨ Gerar Copa"):
                 })
             else:
                 st.warning(f"⚠️ Time sem adversário: {mapa_times.get(restantes[i], 'Desconhecido')}. Ignorado.")
-
     else:
         random.shuffle(time_ids)
         for i in range(0, len(time_ids), 2):
@@ -95,9 +94,9 @@ if st.button("✨ Gerar Copa"):
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
-    st.experimental_rerun()  # <- Corrigido aqui
+    st.experimental_rerun()
 
-# 🗒️ Exibir confrontos + edição dos resultados
+# 💒 Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
 doc = res.data[0] if res.data else {}
 if not doc:
@@ -105,7 +104,7 @@ if not doc:
 
 jogos = doc.get("jogos", [])
 fase = doc.get("fase", "")
-st.subheader(f"📅 Confrontos da Fase: {fase.upper()}")
+st.subheader(f"🗕️ Confrontos da Fase: {fase.upper()}")
 
 classificados = []
 
@@ -167,14 +166,17 @@ if len(classificados) == len(jogos):
             random.shuffle(classificados)
             novos_jogos = []
             for i in range(0, len(classificados), 2):
-                novos_jogos.append({
-                    "mandante_ida": classificados[i],
-                    "visitante_ida": classificados[i+1],
-                    "gols_ida_m": None,
-                    "gols_ida_v": None,
-                    "gols_volta_m": None,
-                    "gols_volta_v": None
-                })
+                if i + 1 < len(classificados):
+                    novos_jogos.append({
+                        "mandante_ida": classificados[i],
+                        "visitante_ida": classificados[i+1],
+                        "gols_ida_m": None,
+                        "gols_ida_v": None,
+                        "gols_volta_m": None,
+                        "gols_volta_v": None
+                    })
+                else:
+                    st.warning(f"⚠️ Time sem adversário na próxima fase: {mapa_times.get(classificados[i], 'Desconhecido')}")
 
             supabase.table("copa_ligafut").insert({
                 "id": str(uuid.uuid4()),
