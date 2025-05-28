@@ -83,17 +83,19 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
 
         supabase.table("copa_ligafut").delete().neq("id", "").execute()
         fase = "Preliminar" if len(time_ids) > 16 else "Oitavas"
-st.write("🎯 Lista de IDs para gerar confrontos:", time_ids)
-jogos = gerar_confrontos(time_ids, fase)
 
+        st.write("🎯 Lista de IDs para gerar confrontos:", time_ids)
+        jogos = gerar_confrontos(time_ids, fase)
+
+        # Debug de cada jogo
         for j in jogos:
-    m = j.get("id_mandante", "")
-    v = j.get("id_visitante", "")
-    if not is_valid_uuid(m):
-        st.error(f"❌ ID do mandante inválido: '{m}' no jogo: {j}")
-    if not is_valid_uuid(v):
-        st.error(f"❌ ID do visitante inválido: '{v}' no jogo: {j}")
-st.write("🧪 Jogos preparados:", jogos)
+            m = j.get("id_mandante", "")
+            v = j.get("id_visitante", "")
+            if not is_valid_uuid(m):
+                st.error(f"❌ ID do mandante inválido: '{m}' no jogo: {j}")
+            if not is_valid_uuid(v):
+                st.error(f"❌ ID do visitante inválido: '{v}' no jogo: {j}")
+        st.write("🧪 Jogos preparados:", jogos)
 
         # 🔒 Filtro final de segurança antes de salvar
         jogos_filtrados = []
