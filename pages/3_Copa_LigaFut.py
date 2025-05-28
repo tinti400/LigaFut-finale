@@ -33,15 +33,6 @@ def is_valid_uuid(u):
     except:
         return False
 
-# 📊 Buscar times válidos
-res_info = supabase.table("times").select("id", "nome", "logo").execute()
-times_map = {
-    t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")}
-    for t in res_info.data
-    if t.get("nome") and is_valid_uuid(t["id"])
-}
-time_ids = list(times_map.keys())
-
 # ⚖️ Gerar confrontos
 def gerar_confrontos(times, fase):
     random.shuffle(times)
@@ -57,6 +48,8 @@ def gerar_confrontos(times, fase):
                 "gols_mandante": None,
                 "gols_visitante": None
             })
+        else:
+            st.warning(f"⚠️ O time **{times[i]}** ficou sem adversário e foi ignorado.")
     return jogos
 
 # ▶️ Avançar fase
@@ -87,10 +80,28 @@ def avancar_fase(jogos_fase_atual, fase_atual):
 
 # 🔄 Botão para iniciar copa
 if st.button("⚙️ Gerar Nova Copa LigaFut"):
-    if len(time_ids) < 2:
-        st.warning("⚠️ É preciso ao menos 2 times para iniciar a copa.")
-        st.stop()
     try:
+        res_info = supabase.table("times").select("id", "nome", "logo").execute()
+        times_map = {
+            t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")}
+            for t in res_info.data
+            if t.get("nome") and is_valid_uuid(t["id"])
+        }
+
+        time_ids = []
+        for tid, info in times_map.items():
+            nome = info.get("nome", "")
+            if is_valid_uuid(tid) and nome.strip() != "":
+                time_ids.append(tid)
+            else:
+                st.warning(f"🚫 Time ignorado: nome inválido ou ID corrompido → nome='{nome}', id='{tid}'")
+
+        st.write("📋 Times válidos para a Copa:", [times_map[tid]["nome"] for tid in time_ids])
+
+        if len(time_ids) < 2:
+            st.warning("⚠️ É preciso ao menos 2 times válidos para iniciar a copa.")
+            st.stop()
+
         supabase.table("copa_ligafut").delete().neq("id", "").execute()
         fase = "Preliminar" if len(time_ids) > 16 else "Oitavas"
         jogos = gerar_confrontos(time_ids, fase)
@@ -101,81 +112,6 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
         }).execute()
         st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
+
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
-
-# 📅 Exibir rodadas
-st.markdown("---")
-st.subheader("📅 Fases da Copa")
-
-try:
-    res_jogos = supabase.table("copa_ligafut").select("*").order("numero").execute()
-    rodadas = res_jogos.data
-
-    if not rodadas:
-        st.info("Nenhum jogo cadastrado ainda.")
-    else:
-        fases_ordem = ["Preliminar", "Oitavas", "Quartas", "Semifinal", "Final"]
-        fases = sorted(set(r["fase"] for r in rodadas), key=lambda x: fases_ordem.index(x))
-
-        for rodada in rodadas:
-            fase = rodada["fase"]
-            jogos_fase = rodada["jogos"]
-            st.markdown(f"### 🎯 {fase}")
-            for jogo in jogos_fase:
-                m_id = jogo["id_mandante"]
-                v_id = jogo["id_visitante"]
-                m_nome = times_map.get(m_id, {}).get("nome", m_id)
-                v_nome = times_map.get(v_id, {}).get("nome", v_id)
-
-                col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-                with col1:
-                    st.markdown(f"**{m_nome}**")
-                with col2:
-                    gm = st.number_input("", key=f"gm_{jogo['id']}", min_value=0, value=jogo.get("gols_mandante") or 0)
-                with col3:
-                    st.markdown("**x**")
-                with col4:
-                    gv = st.number_input("", key=f"gv_{jogo['id']}", min_value=0, value=jogo.get("gols_visitante") or 0)
-                with col5:
-                    st.markdown(f"**{v_nome}**")
-
-                if st.button("Salvar", key=f"btn_{jogo['id']}"):
-                    try:
-                        # Atualiza placar do jogo
-                        for j in jogos_fase:
-                            if j["id"] == jogo["id"]:
-                                j["gols_mandante"] = gm
-                                j["gols_visitante"] = gv
-                        supabase.table("copa_ligafut").update({
-                            "jogos": jogos_fase
-                        }).eq("id", rodada["id"]).execute()
-                        st.success("✅ Resultado salvo!")
-
-                        # Verifica se pode avançar
-                        if all(j["gols_mandante"] is not None and j["gols_visitante"] is not None for j in jogos_fase):
-                            proxima_fase, nova_rodada = avancar_fase(jogos_fase, fase)
-                            if proxima_fase and nova_rodada:
-                                supabase.table("copa_ligafut").insert({
-                                    "numero": len(fases) + 1,
-                                    "fase": proxima_fase,
-                                    "jogos": nova_rodada
-                                }).execute()
-                                st.success(f"🚀 {proxima_fase} criada automaticamente!")
-                            elif fase == "Final":
-                                vencedor = None
-                                for j in jogos_fase:
-                                    if j["gols_mandante"] > j["gols_visitante"]:
-                                        vencedor = times_map.get(j["id_mandante"], {}).get("nome", "Desconhecido")
-                                    elif j["gols_visitante"] > j["gols_mandante"]:
-                                        vencedor = times_map.get(j["id_visitante"], {}).get("nome", "Desconhecido")
-                                    else:
-                                        vencedor = times_map.get(random.choice([j["id_mandante"], j["id_visitante"]]), {}).get("nome", "Desconhecido")
-                                st.balloons()
-                                st.success(f"🏆 **{vencedor} é o campeão da Copa LigaFut!**")
-
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
-except Exception as e:
-    st.error(f"Erro ao carregar dados da copa: {e}")
