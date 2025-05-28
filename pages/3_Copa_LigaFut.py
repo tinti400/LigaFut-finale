@@ -128,7 +128,7 @@ if res_fases.data:
 
             supabase.table("copa_ligafut").update({"jogos": novos_jogos}).eq("numero", numero_fase).execute()
             st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
-            st.rerun()
+            st.experimental_rerun()
 
 # 📺 Exibir últimos confrontos criados
 res_ult = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
