@@ -25,65 +25,34 @@ mapa_times = {t['id']: t['nome'] for t in times}
 
 # 🗓️ Selecionar times
 st.subheader("📌 Selecione os times participantes da Copa")
-st.caption("Escolha entre 16 e 20 times:")
+st.caption("Escolha exatamente 19 times para este formato:")
 
 selected_teams = st.multiselect("Times:", [f"{t['nome']} — {t['id']}" for t in times])
 
 if st.button("✨ Gerar Copa"):
-    if len(selected_teams) < 16:
-        st.error("❌ É preciso selecionar no mínimo 16 times.")
-        st.stop()
-    if len(selected_teams) > 20:
-        st.error("❌ O limite máximo são 20 times.")
+    if len(selected_teams) != 19:
+        st.error("❌ Este formato exige exatamente 19 times.")
         st.stop()
 
     time_ids = [t.split(" — ")[-1] for t in selected_teams]
-    fase = "oitavas"
+    fase = "preliminar"
     confrontos = []
 
-    if len(time_ids) > 16:
-        num_jogos_pre = len(time_ids) - 16
-        fase = "preliminar"
-        st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
+    # Seleciona 6 times para a preliminar
+    times_preliminar = random.sample(time_ids, 6)
+    times_classificados = list(set(time_ids) - set(times_preliminar))
 
-        times_pre = random.sample(time_ids, num_jogos_pre * 2)
-        restantes = list(set(time_ids) - set(times_pre))
-
-        random.shuffle(times_pre)
-        for i in range(0, len(times_pre), 2):
-            confrontos.append({
-                "mandante_ida": times_pre[i],
-                "visitante_ida": times_pre[i+1],
-                "gols_ida_m": None,
-                "gols_ida_v": None,
-                "gols_volta_m": None,
-                "gols_volta_v": None
-            })
-
-        restantes.sort()
-        for i in range(0, len(restantes), 2):
-            if i + 1 < len(restantes):
-                confrontos.append({
-                    "mandante_ida": restantes[i],
-                    "visitante_ida": restantes[i+1],
-                    "gols_ida_m": None,
-                    "gols_ida_v": None,
-                    "gols_volta_m": None,
-                    "gols_volta_v": None
-                })
-            else:
-                st.warning(f"⚠️ Time sem adversário: {mapa_times.get(restantes[i], 'Desconhecido')}. Ignorado.")
-    else:
-        random.shuffle(time_ids)
-        for i in range(0, len(time_ids), 2):
-            confrontos.append({
-                "mandante_ida": time_ids[i],
-                "visitante_ida": time_ids[i+1],
-                "gols_ida_m": None,
-                "gols_ida_v": None,
-                "gols_volta_m": None,
-                "gols_volta_v": None
-            })
+    # Gera 3 confrontos na preliminar
+    random.shuffle(times_preliminar)
+    for i in range(0, 6, 2):
+        confrontos.append({
+            "mandante_ida": times_preliminar[i],
+            "visitante_ida": times_preliminar[i+1],
+            "gols_ida_m": None,
+            "gols_ida_v": None,
+            "gols_volta_m": None,
+            "gols_volta_v": None
+        })
 
     supabase.table("copa_ligafut").insert({
         "id": str(uuid.uuid4()),
@@ -93,10 +62,10 @@ if st.button("✨ Gerar Copa"):
         "data_criacao": datetime.utcnow().isoformat()
     }).execute()
 
-    st.success("✅ Copa criada com sucesso!")
+    st.success("✅ Fase preliminar criada com sucesso!")
     st.experimental_rerun()
 
-# 💒 Exibir confrontos + edição dos resultados
+# 🗒️ Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
 doc = res.data[0] if res.data else {}
 if not doc:
@@ -104,7 +73,7 @@ if not doc:
 
 jogos = doc.get("jogos", [])
 fase = doc.get("fase", "")
-st.subheader(f"🗕️ Confrontos da Fase: {fase.upper()}")
+st.subheader(f"📅 Confrontos da Fase: {fase.upper()}")
 
 classificados = []
 
@@ -163,20 +132,20 @@ if len(classificados) == len(jogos):
         if nova_fase == "encerrado":
             st.success("🏆 Copa encerrada!")
         else:
+            if fase == "preliminar":
+                classificados += times_classificados
+
             random.shuffle(classificados)
             novos_jogos = []
             for i in range(0, len(classificados), 2):
-                if i + 1 < len(classificados):
-                    novos_jogos.append({
-                        "mandante_ida": classificados[i],
-                        "visitante_ida": classificados[i+1],
-                        "gols_ida_m": None,
-                        "gols_ida_v": None,
-                        "gols_volta_m": None,
-                        "gols_volta_v": None
-                    })
-                else:
-                    st.warning(f"⚠️ Time sem adversário na próxima fase: {mapa_times.get(classificados[i], 'Desconhecido')}")
+                novos_jogos.append({
+                    "mandante_ida": classificados[i],
+                    "visitante_ida": classificados[i+1],
+                    "gols_ida_m": None,
+                    "gols_ida_v": None,
+                    "gols_volta_m": None,
+                    "gols_volta_v": None
+                })
 
             supabase.table("copa_ligafut").insert({
                 "id": str(uuid.uuid4()),
