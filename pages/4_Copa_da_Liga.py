@@ -10,11 +10,17 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="🏆 Copa - LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut - Chaveamento</h1><hr>", unsafe_allow_html=True)
 
-# 📥 Buscar times
-@st.cache  # Corrigido para compatibilidade com Streamlit Cloud
+# 📥 Buscar times (ajustado: usa 'logo' como escudo)
+@st.cache
 def buscar_times():
-    res = supabase.table("times").select("id, nome, escudo_url").execute()
-    return {item["id"]: item for item in res.data}
+    res = supabase.table("times").select("id, nome, logo").execute()
+    return {
+        item["id"]: {
+            "nome": item["nome"],
+            "escudo_url": item.get("logo", "")
+        }
+        for item in res.data
+    }
 
 # 🔁 Buscar jogos por fase na nova tabela
 def buscar_jogos(fase):
@@ -96,3 +102,4 @@ with col5:
         st.success(f"🏆 Campeão:\n\n**{vencedor['nome']}**")
     else:
         st.info("Aguardando finalização da final.")
+
