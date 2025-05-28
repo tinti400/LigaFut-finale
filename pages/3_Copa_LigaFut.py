@@ -75,7 +75,15 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
             else:
                 st.warning(f"🚫 Time ignorado: nome='{nome}', id='{tid}' (inválido)")
 
-        st.write("📋 Times válidos para a Copa:", [times_map[tid]["nome"] for tid in time_ids])
+        st.write("📋 Times válidos para a Copa:")
+for tid in time_ids:
+    nome = times_map.get(tid, {}).get("nome", "Desconhecido")
+    st.write(f"🟩 {nome} — ID: '{tid}'")
+
+# 🧪 Verificação individual dos UUIDs
+for i, tid in enumerate(time_ids):
+    if not is_valid_uuid(tid):
+        st.error(f"❌ time_ids[{i}] contém UUID inválido: '{tid}'")
 
         if len(time_ids) < 2:
             st.warning("⚠️ É preciso ao menos 2 times válidos para iniciar a copa.")
