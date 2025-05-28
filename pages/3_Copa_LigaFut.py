@@ -108,11 +108,11 @@ if res_pre.data:
         with col1:
             st.write(f"**{mapa_times.get(jogo['mandante'], 'Desconhecido')}**")
         with col2:
-            gol_m = st.number_input("Gols", key=f"gm{i}", min_value=0, step=1, value=jogo["gols_mandante"] or 0)
+            gol_m = st.number_input("Gols", key=f"gm{i}", min_value=0, step=1, value=0 if jogo["gols_mandante"] is None else jogo["gols_mandante"])
             gols_mandante.append(gol_m)
         with col3:
             st.write(f"**{mapa_times.get(jogo['visitante'], 'Desconhecido')}**")
-            gol_v = st.number_input("Gols ", key=f"gv{i}", min_value=0, step=1, value=jogo["gols_visitante"] or 0)
+            gol_v = st.number_input("Gols ", key=f"gv{i}", min_value=0, step=1, value=0 if jogo["gols_visitante"] is None else jogo["gols_visitante"])
             gols_visitante.append(gol_v)
 
     if st.button("💾 Salvar Resultados"):
