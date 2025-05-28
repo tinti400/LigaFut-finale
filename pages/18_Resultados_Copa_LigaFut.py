@@ -97,7 +97,7 @@ if "id" not in doc:
 
 jogos = doc.get("jogos", [])
 fase = doc.get("fase", "")
-st.subheader(f"📅 Confrontos da Fase: {fase.upper()}")
+st.subheader(f"🗕️ Confrontos da Fase: {fase.upper()}")
 
 classificados = doc.get("classificados", [])
 
@@ -133,7 +133,7 @@ for i, jogo in enumerate(jogos):
     else:
         st.warning(f"⚠️ Empate no agregado: {resultado} - Definir vencedor por pênaltis")
 
-    if st.button("💾 Salvar Resultado", key=f"btn_{i}"):
+    if st.button("📅 Salvar Resultado", key=f"btn_{i}"):
         jogo.update({
             "gols_ida_m": ida_m,
             "gols_ida_v": ida_v,
@@ -148,7 +148,10 @@ for i, jogo in enumerate(jogos):
         st.experimental_rerun()
 
 # ➔ Avançar de fase ou declarar campeão
-if len(classificados) == len(jogos):
+if all(j.get("gols_ida_m") is not None and j.get("gols_ida_v") is not None and 
+       j.get("gols_volta_m") is not None and j.get("gols_volta_v") is not None 
+       for j in jogos):
+
     if fase == "final":
         nome_campeao = mapa_times.get(classificados[0], "Desconhecido")
         st.success(f"🏆 CAMPEÃO DA COPA LIGAFUT: **{nome_campeao}**")
