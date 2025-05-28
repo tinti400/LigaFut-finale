@@ -27,7 +27,7 @@ def buscar_jogos(fase):
     res = supabase.table("copa_ligafut").select("*").eq("fase", fase).order("numero").execute()
     return res.data
 
-# 🎨 Exibir confronto com nome, logo e placares (ida/volta + agregado)
+# 🎨 Exibir confronto com escudo, nome, ida/volta e agregado
 def exibir_card(jogo):
     id_m = jogo.get("mandante_ida")
     id_v = jogo.get("visitante_ida")
@@ -47,27 +47,27 @@ def exibir_card(jogo):
     try:
         gm_total = int(gm_ida) + int(gm_volta)
         gv_total = int(gv_ida) + int(gv_volta)
-        agregado = f"{gm_total} x {gv_total}"
+        agregado = f"{gm_total}x{gv_total}"
     except:
-        agregado = "? x ?"
+        agregado = "?x?"
 
-    # Resultado detalhado entre parênteses
-    detalhes = f"({gm_ida} x {gv_ida} / {gm_volta} x {gv_volta})"
-
+    # HTML com estilo FIFA
     card = f"""
-    <div style='background:#222;padding:10px;border-radius:10px;margin-bottom:10px;color:white'>
-        <div style='display:flex;align-items:center;justify-content:space-between;'>
-            <div style='text-align:center;width:45%'>
-                {'<img src="'+mandante['escudo_url']+'" width="40"><br>' if mandante['escudo_url'] else ''}
-                {mandante["nome"]}
+    <div style='background:#111;padding:15px;border-radius:12px;margin-bottom:10px;color:white;text-align:center'>
+        <div style='display:flex;align-items:center;justify-content:space-between'>
+            <div style='text-align:center;width:40%'>
+                <img src='{mandante["escudo_url"]}' width='50'><br>
+                <span style='font-size:14px'>{mandante["nome"]}</span>
             </div>
-            <div style='width:10%; text-align:center;'>
-                <div style='font-size:12px'>{detalhes}</div>
-                <div style='font-size:20px; font-weight:bold'>{agregado}</div>
+            <div style='text-align:center;width:20%'>
+                <div style='font-size:24px;font-weight:bold'>{agregado}</div>
+                <div style='font-size:12px;line-height:1.2;margin-top:5px'>
+                    ({gm_ida}x{gv_ida})<br>({gm_volta}x{gv_volta})
+                </div>
             </div>
-            <div style='text-align:center;width:45%'>
-                {'<img src="'+visitante['escudo_url']+'" width="40"><br>' if visitante['escudo_url'] else ''}
-                {visitante["nome"]}
+            <div style='text-align:center;width:40%'>
+                <img src='{visitante["escudo_url"]}' width='50'><br>
+                <span style='font-size:14px'>{visitante["nome"]}</span>
             </div>
         </div>
     </div>
@@ -94,7 +94,7 @@ def exibir_fase(coluna, titulo, rodadas):
         else:
             st.info("Sem jogos cadastrados.")
 
-# 🧾 Exibição por fase
+# 🧾 Exibir todas as fases
 exibir_fase(col1, "🔰 Oitavas", oitavas)
 exibir_fase(col2, "🥅 Quartas", quartas)
 exibir_fase(col3, "⚔️ Semifinal", semis)
