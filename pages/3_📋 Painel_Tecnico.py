@@ -1,6 +1,8 @@
+
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from dateutil.parser import parse
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -36,36 +38,29 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
+st.subheader("📈 Últimas Compras")
 
-# 🔀 Navegação entre seções internas
-st.markdown("### 🔍 Ações rápidas")
-
-aba = st.radio("Escolha uma seção:", [
-    "🔙 Voltar para o Painel",
-    "👥 Elenco",
-    "🤝 Negociações",
-    "📥 Propostas Recebidas",
-    "📤 Propostas Enviadas",
-    "🔨 Leilão do Sistema"
-], index=0, horizontal=True)
+try:
+    compras = supabase.table("movimentacoes").select("*").eq("id_time", id_time).eq("tipo", "Compra").order("data", desc=True).limit(10).execute().data
+    if compras:
+        for c in compras:
+            data = parse(c["data"]).strftime("%d/%m %H:%M")
+            st.markdown(f"✅ **{c['jogador']}** comprado por **R$ {c['valor']:,.0f}** em {data}".replace(",", "."))
+    else:
+        st.info("Nenhuma compra registrada ainda.")
+except Exception as e:
+    st.error(f"Erro ao carregar compras: {e}")
 
 st.markdown("---")
+st.subheader("📤 Últimas Vendas")
 
-# 🔁 Redireciona visualmente sem recarregar o app
-if aba == "👥 Elenco":
-    with st.spinner("Carregando Elenco..."):
-        exec(open("pages/4_Elenco.py").read())
-elif aba == "🤝 Negociações":
-    with st.spinner("Carregando Negociações..."):
-        exec(open("pages/12_Negociacoes.py").read())
-elif aba == "📥 Propostas Recebidas":
-    with st.spinner("Carregando Propostas Recebidas..."):
-        exec(open("pages/13_Propostas_Recebidas.py").read())
-elif aba == "📤 Propostas Enviadas":
-    with st.spinner("Carregando Propostas Enviadas..."):
-        exec(open("pages/16_Propostas_Enviadas.py").read())
-elif aba == "🔨 Leilão do Sistema":
-    with st.spinner("Carregando Leilão..."):
-        exec(open("pages/11_Leilao_Sistema.py").read())
-else:
-    st.success("Use os botões acima para navegar pelas seções do seu time.")
+try:
+    vendas = supabase.table("movimentacoes").select("*").eq("id_time", id_time).eq("tipo", "Venda").order("data", desc=True).limit(10).execute().data
+    if vendas:
+        for v in vendas:
+            data = parse(v["data"]).strftime("%d/%m %H:%M")
+            st.markdown(f"📤 **{v['jogador']}** vendido por **R$ {v['valor']:,.0f}** em {data}".replace(",", "."))
+    else:
+        st.info("Nenhuma venda registrada ainda.")
+except Exception as e:
+    st.error(f"Erro ao carregar vendas: {e}")
