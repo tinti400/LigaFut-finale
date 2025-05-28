@@ -132,12 +132,8 @@ with col5:
             total_v = int(gv) + int(gv2)
             vencedor_id = jogo_final["mandante_ida"] if total_m > total_v else jogo_final["visitante_ida"]
             vencedor = times.get(vencedor_id, {"nome": "?"})
-            st.success(f"🏆 Campeão:
-
-**{vencedor['nome']}**")
+            st.success(f"🏆 Campeão: **{vencedor['nome']}**")
         else:
             st.info("Aguardando resultado da final.")
     else:
         st.info("Final não cadastrada.")
-
-
