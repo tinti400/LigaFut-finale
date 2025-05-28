@@ -22,12 +22,19 @@ def buscar_times():
         for item in res.data
     }
 
-# 🔁 Buscar dados da copa mais recente, independente da fase
-def buscar_fase(fase):
-    todas = supabase.table("copa_ligafut").select("*").eq("fase", fase).order("data_criacao", desc=True).execute()
-    return todas.data[:1] if todas.data else []
+# 🔁 Identificar data mais recente da copa
+def buscar_data_mais_recente():
+    res = supabase.table("copa_ligafut").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
+    if res.data:
+        return res.data[0]["data_criacao"]
+    return None
 
-# 🎨 Exibir confronto com escudo, nome, ida/volta e agregado
+# 🔁 Buscar fase da copa pela data
+def buscar_fase(fase, data):
+    res = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("data_criacao", data).execute()
+    return res.data if res.data else []
+
+# 🎨 Exibir confronto
 def exibir_card(jogo):
     id_m = jogo.get("mandante_ida")
     id_v = jogo.get("visitante_ida")
@@ -69,13 +76,14 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 🔄 Buscar dados
+# 🔄 Dados
 times = buscar_times()
-preliminar = buscar_fase("preliminar")
-oitavas = buscar_fase("oitavas")
-quartas = buscar_fase("quartas")
-semis = buscar_fase("semifinal")
-final = buscar_fase("final")
+data_atual = buscar_data_mais_recente()
+preliminar = buscar_fase("preliminar", data_atual)
+oitavas = buscar_fase("oitavas", data_atual)
+quartas = buscar_fase("quartas", data_atual)
+semis = buscar_fase("semifinal", data_atual)
+final = buscar_fase("final", data_atual)
 
 # 📌 Layout visual
 col0, col1, col2, col3, col4, col5 = st.columns([1.1, 1.1, 1.1, 1.1, 1.1, 1])
