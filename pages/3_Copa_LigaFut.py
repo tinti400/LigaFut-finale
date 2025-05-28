@@ -140,11 +140,22 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
             else:
                 st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
 
-        supabase.table("copa_ligafut").insert({
-            "numero": 1,
-            "fase": fase,
-            "jogos": jogos_filtrados
-        }).execute()
+        import json
+
+# 🔒 Reforço: garantir que todos jogos tenham IDs válidos
+jogos_filtrados = [
+    j for j in jogos_filtrados
+    if is_valid_uuid(j.get("id", ""))
+    and is_valid_uuid(j.get("id_mandante", ""))
+    and is_valid_uuid(j.get("id_visitante", ""))
+]
+
+# 💾 Inserção segura
+supabase.table("copa_ligafut").insert({
+    "numero": 1,
+    "fase": fase,
+    "jogos": json.loads(json.dumps(jogos_filtrados))
+}).execute()
 
         st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
