@@ -136,7 +136,7 @@ if tempo_restante > 0:
                 st.error("❌ Saldo insuficiente.")
             elif novo_lance <= valor_atual:
                 st.warning("⚠️ Seu lance não é o maior.")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 try:
                     agora = datetime.utcnow()
@@ -152,11 +152,12 @@ if tempo_restante > 0:
                     }).eq("id", leilao["id"]).execute()
 
                     st.success(f"✅ Lance de R$ {novo_lance:,.0f} enviado com sucesso!")
-                    st.rerun()
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao registrar lance: {e}")
 else:
     st.info("⏱️ O tempo do leilão acabou.")
 
 if st.button("🔄 Atualizar"):
-    st.rerun()
+    st.experimental_rerun()
+
