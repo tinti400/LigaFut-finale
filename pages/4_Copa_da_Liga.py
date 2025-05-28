@@ -11,7 +11,7 @@ st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut - Chaveamento</h1><hr>", unsafe_allow_html=True)
 
 # 🔁 Buscar times (id + nome + logo)
-@st.cache
+@st.cache_data
 def buscar_times():
     res = supabase.table("times").select("id, nome, logo").execute()
     return {
@@ -22,11 +22,6 @@ def buscar_times():
         for item in res.data
     }
 
-# 🔁 Buscar jogos por fase
-def buscar_jogos(fase):
-    res = supabase.table("copa_ligafut").select("*").eq("fase", fase).order("numero").execute()
-    return res.data
-
 # 🎨 Exibir confronto com escudo, nome, ida/volta e agregado
 def exibir_card(jogo):
     id_m = jogo.get("mandante_ida")
@@ -35,15 +30,11 @@ def exibir_card(jogo):
     mandante = times.get(id_m, {"nome": "Aguardando", "escudo_url": ""})
     visitante = times.get(id_v, {"nome": "Aguardando", "escudo_url": ""})
 
-    # Gols de ida
     gm_ida = jogo.get("gols_ida_m", "?") if jogo.get("gols_ida_m") is not None else "?"
     gv_ida = jogo.get("gols_ida_v", "?") if jogo.get("gols_ida_v") is not None else "?"
-
-    # Gols de volta
     gm_volta = jogo.get("gols_volta_v", "?") if jogo.get("gols_volta_v") is not None else "?"
     gv_volta = jogo.get("gols_volta_m", "?") if jogo.get("gols_volta_m") is not None else "?"
 
-    # Soma dos gols
     try:
         gm_total = int(gm_ida) + int(gm_volta)
         gv_total = int(gv_ida) + int(gv_volta)
@@ -51,7 +42,6 @@ def exibir_card(jogo):
     except:
         agregado = "?x?"
 
-    # HTML com estilo FIFA
     card = f"""
     <div style='background:#111;padding:15px;border-radius:12px;margin-bottom:10px;color:white;text-align:center'>
         <div style='display:flex;align-items:center;justify-content:space-between'>
@@ -74,12 +64,24 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 🔄 Buscar dados
+# 🔄 Buscar dados da copa mais recente
+res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).execute()
+copas = res.data if res.data else []
+if not copas:
+    st.warning("Nenhuma copa encontrada.")
+    st.stop()
+
+ultima_data = copas[0]["data_criacao"]
+rodadas_recentes = [c for c in copas if c["data_criacao"][:19] >= ultima_data[:19]]
+
+def filtrar_por_fase(fase_nome):
+    return [c for c in rodadas_recentes if c["fase"] == fase_nome]
+
 times = buscar_times()
-oitavas = buscar_jogos("oitavas")
-quartas = buscar_jogos("quartas")
-semis = buscar_jogos("semifinal")
-final = buscar_jogos("final")
+oitavas = filtrar_por_fase("oitavas")
+quartas = filtrar_por_fase("quartas")
+semis = filtrar_por_fase("semifinal")
+final = filtrar_por_fase("final")
 
 # 📌 Layout visual
 col1, col2, col3, col4, col5 = st.columns([1.2, 1.2, 1.2, 1.2, 1])
@@ -94,13 +96,11 @@ def exibir_fase(coluna, titulo, rodadas):
         else:
             st.info("Sem jogos cadastrados.")
 
-# 🧾 Exibir todas as fases
 exibir_fase(col1, "🔰 Oitavas", oitavas)
 exibir_fase(col2, "🥅 Quartas", quartas)
 exibir_fase(col3, "⚔️ Semifinal", semis)
 exibir_fase(col4, "🏁 Final", final)
 
-# 🏆 Campeão
 with col5:
     st.markdown("### 🏆 Campeão")
     if final and final[0].get("jogos"):
