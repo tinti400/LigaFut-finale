@@ -11,7 +11,7 @@ st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut - Chaveamento</h1><hr>", unsafe_allow_html=True)
 
 # 🔁 Buscar times (id + nome + logo)
-@st.cache_data
+@st.cache
 def buscar_times():
     res = supabase.table("times").select("id, nome, logo").execute()
     return {
@@ -119,3 +119,4 @@ with col5:
             st.info("Aguardando resultado da final.")
     else:
         st.info("Final não cadastrada.")
+
