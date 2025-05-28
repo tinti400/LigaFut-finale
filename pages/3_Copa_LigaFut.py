@@ -91,7 +91,7 @@ if st.button("✨ Gerar Copa"):
         "numero": 1,
         "fase": fase,
         "jogos": confrontos,
-        "data_criacao": datetime.utcnow()
+        "data_criacao": datetime.utcnow().isoformat()
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
@@ -181,9 +181,8 @@ if len(classificados) == len(jogos):
                 "numero": doc["numero"] + 1,
                 "fase": nova_fase,
                 "jogos": novos_jogos,
-                "data_criacao": datetime.utcnow()
+                "data_criacao": datetime.utcnow().isoformat()
             }).execute()
 
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
             st.rerun()
-
