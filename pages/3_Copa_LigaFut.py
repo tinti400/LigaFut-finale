@@ -39,15 +39,23 @@ def gerar_confrontos(times, fase):
     jogos = []
     for i in range(0, len(times), 2):
         if i + 1 < len(times):
-            jogos.append({
-                "id": str(uuid.uuid4()),
-                "fase": fase,
-                "numero": len(jogos) + 1,
-                "id_mandante": times[i],
-                "id_visitante": times[i + 1],
-                "gols_mandante": None,
-                "gols_visitante": None
-            })
+            m_id = times[i]
+            v_id = times[i + 1]
+            if is_valid_uuid(m_id) and is_valid_uuid(v_id):
+                jogo_id = str(uuid.uuid4())
+                jogos.append({
+                    "id": jogo_id,
+                    "fase": fase,
+                    "numero": len(jogos) + 1,
+                    "id_mandante": m_id,
+                    "id_visitante": v_id,
+                    "gols_mandante": None,
+                    "gols_visitante": None
+                })
+            else:
+                st.warning(f"🚫 Jogo ignorado: mandante='{m_id}', visitante='{v_id}'")
+        else:
+            st.warning(f"⚠️ Time sem adversário: {times[i]}")
     return jogos
 
 # ▶️ Avançar fase
@@ -143,5 +151,7 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
 
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
+
+
 
 
