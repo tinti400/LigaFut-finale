@@ -95,7 +95,7 @@ if st.button("✨ Gerar Copa"):
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
-    st.rerun()
+     st.experimental_rerun()
 
 # 🗒️ Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
@@ -148,7 +148,7 @@ for i, jogo in enumerate(jogos):
         })
         supabase.table("copa_ligafut").update({"jogos": jogos}).eq("id", doc["id"]).execute()
         st.success("✅ Resultado atualizado com sucesso!")
-        st.rerun()
+        st.experimental_rerun()
 
 # Avançar de fase manualmente
 if len(classificados) == len(jogos):
@@ -185,4 +185,5 @@ if len(classificados) == len(jogos):
             }).execute()
 
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
-            st.rerun()
+            st.experimental_rerun()
+
