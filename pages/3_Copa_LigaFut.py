@@ -1,88 +1,106 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import random
 from datetime import datetime
+import random
+import uuid
 
-# 🔐 Conexão com Supabase
+# ⚡️ Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🏆 Copa LigaFut", layout="centered")
-st.title("🏆 Copa LigaFut - Mata-mata")
+st.set_page_config(page_title="Copa LigaFut", layout="wide")
+st.title("\U0001f3c6 Copa LigaFut - Mata-mata")
 
-# ✅ Verifica login
+# 🔐 Verifica login
 if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 📥 Buscar todos os times
-res_times = supabase.table("times").select("id, nome").execute()
-times = res_times.data or []
-times = sorted(times, key=lambda x: x["nome"])
+# 👥 Buscar times cadastrados
+res_times = supabase.table("times").select("id,nome").execute()
+times = res_times.data if res_times.data else []
 
-# 🎯 Selecionar manualmente os times para a Copa
-st.subheader("📋 Selecione os times participantes da Copa")
-opcoes = [f"{t['nome']} — {t['id']}" for t in times]
-selecionados = st.multiselect("Escolha exatamente 16 times:", options=opcoes)
+# 📅 Exibir seleção manual dos times
+st.subheader("\U0001f4cb Selecione os times participantes da Copa")
+st.caption("Escolha entre 16 e 20 times:")
 
-if st.button("⚽ Gerar Copa"):
-    if len(selecionados) != 16:
-        st.error("❌ Você deve selecionar exatamente 16 times para o sorteio.")
+selected_teams = st.multiselect("Times:", [f"{t['nome']} — {t['id']}" for t in times])
+
+if st.button("✨ Gerar Copa"):
+    if len(selected_teams) < 16:
+        st.error("❌ É preciso selecionar no mínimo 16 times.")
+        st.stop()
+    if len(selected_teams) > 20:
+        st.error("❌ O limite máximo são 20 times.")
         st.stop()
 
-    # 🔄 Embaralhar times e gerar confrontos
-    try:
-        time_ids = [t.split(" — ")[1] for t in selecionados]
-        random.shuffle(time_ids)
-        confrontos = []
-        for i in range(0, len(time_ids), 2):
-            mandante = time_ids[i]
-            visitante = time_ids[i + 1]
+    time_ids = [t.split(" — ")[-1] for t in selected_teams]
+    fase = "oitavas"
+    confrontos = []
+
+    if len(time_ids) > 16:
+        # Fase preliminar necessária
+        num_jogos_pre = len(time_ids) - 16
+        fase = "preliminar"
+        st.info(f"\u26a0\ufe0f Criando fase preliminar com {num_jogos_pre} jogos")
+
+        times_pre = random.sample(time_ids, num_jogos_pre * 2)
+        restantes = list(set(time_ids) - set(times_pre))
+
+        random.shuffle(times_pre)
+        for i in range(0, len(times_pre), 2):
             confrontos.append({
-                "mandante": mandante,
-                "visitante": visitante,
+                "mandante": times_pre[i],
+                "visitante": times_pre[i+1],
                 "gols_mandante": None,
                 "gols_visitante": None
             })
 
-        # 📤 Inserir confrontos na Supabase
-        data = {
+        supabase.table("copa_ligafut").insert({
+            "id": str(uuid.uuid4()),
+            "numero": 1,
+            "fase": "preliminar",
             "jogos": confrontos,
-            "fase": "oitavas",
-            "data_criacao": datetime.now().isoformat()
-        }
-        supabase.table("copa_ligafut").insert(data).execute()
-        st.success("✅ Copa criada com sucesso!")
-        st.json(confrontos)
+            "data_criacao": datetime.utcnow()
+        }).execute()
 
-    except Exception as e:
-        st.error(f"Erro ao gerar a copa: {e}")
+        st.success("✅ Fase preliminar criada com sucesso!")
+        st.stop()
 
-# 📋 Mostrar última copa criada
-st.markdown("---")
-st.subheader("📅 Últimos Confrontos Gerados")
-
-try:
-    res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
-    ultima_copa = res.data[0] if res.data else None
-
-    if ultima_copa and "jogos" in ultima_copa:
-        jogos = ultima_copa["jogos"]
-        # Criar mapa de IDs -> nomes
-        mapa = {t["id"]: t["nome"] for t in times}
-
-        for jogo in jogos:
-            if isinstance(jogo, dict) and "mandante" in jogo and "visitante" in jogo:
-                nome_mandante = mapa.get(jogo["mandante"], "Desconhecido")
-                nome_visitante = mapa.get(jogo["visitante"], "Desconhecido")
-                st.markdown(f"🔷 **{nome_mandante}** x **{nome_visitante}**")
-            else:
-                st.warning("⚠️ Jogo inválido ou dados ausentes.")
     else:
-        st.info("Nenhuma copa encontrada.")
-except Exception as e:
-    st.error(f"Erro ao buscar confrontos: {e}")
+        # Gerar oitavas diretamente
+        random.shuffle(time_ids)
+        for i in range(0, len(time_ids), 2):
+            confrontos.append({
+                "mandante": time_ids[i],
+                "visitante": time_ids[i+1],
+                "gols_mandante": None,
+                "gols_visitante": None
+            })
+
+        supabase.table("copa_ligafut").insert({
+            "id": str(uuid.uuid4()),
+            "numero": 1,
+            "fase": "oitavas",
+            "jogos": confrontos,
+            "data_criacao": datetime.utcnow()
+        }).execute()
+
+        st.success("✅ Copa criada com sucesso!")
+
+# 🔢 Exibir última rodada criada
+res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
+jogos = res.data[0]["jogos"] if res.data else []
+fase = res.data[0]["fase"] if res.data else ""
+
+st.subheader("\U0001f4c5 Últimos Confrontos Gerados")
+mapa = {t['id']: t['nome'] for t in times}
+
+for jogo in jogos:
+    mandante = mapa.get(jogo["mandante"], "Desconhecido")
+    visitante = mapa.get(jogo["visitante"], "Desconhecido")
+    st.markdown(f"\U0001f537 **{mandante}** x **{visitante}**")
 
 
