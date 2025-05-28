@@ -83,6 +83,6 @@ else:
             "fim": fim.isoformat()
         }).eq("id", leilao["id"]).execute()
         st.success("✅ Novo leilão iniciado automaticamente. Recarregue a página.")
-        st.rerun()
+        st.experimental_rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
