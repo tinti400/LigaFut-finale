@@ -88,25 +88,27 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
         st.write("🧪 Jogos gerados:", jogos)
 
         # 🔒 Filtro final de segurança antes de salvar
-jogos_filtrados = []
-for jogo in jogos:
-    if (
-        is_valid_uuid(jogo.get("id_mandante", ""))
-        and is_valid_uuid(jogo.get("id_visitante", ""))
-    ):
-        jogos_filtrados.append(jogo)
-    else:
-        st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
+        jogos_filtrados = []
+        for jogo in jogos:
+            if (
+                is_valid_uuid(jogo.get("id_mandante", ""))
+                and is_valid_uuid(jogo.get("id_visitante", ""))
+            ):
+                jogos_filtrados.append(jogo)
+            else:
+                st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
 
-# 💾 Inserção segura no Supabase
-supabase.table("copa_ligafut").insert({
-    "numero": 1,
-    "fase": fase,
-    "jogos": jogos_filtrados
-}).execute()
+        # 💾 Inserção segura no Supabase
+        supabase.table("copa_ligafut").insert({
+            "numero": 1,
+            "fase": fase,
+            "jogos": jogos_filtrados
+        }).execute()
+
         st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
 
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
+
 
