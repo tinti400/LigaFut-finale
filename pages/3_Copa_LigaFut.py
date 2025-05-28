@@ -40,7 +40,6 @@ if st.button("✨ Gerar Copa"):
     confrontos = []
 
     if len(time_ids) > 16:
-        # Fase Preliminar
         fase = "preliminar"
         num_jogos_pre = len(time_ids) - 16
         st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
@@ -62,14 +61,13 @@ if st.button("✨ Gerar Copa"):
             "numero": 1,
             "fase": "preliminar",
             "jogos": confrontos,
-            "data_criacao": datetime.utcnow()
+            "data_criacao": datetime.utcnow().isoformat()
         }).execute()
 
         st.success("✅ Fase preliminar criada com sucesso!")
         st.rerun()
 
     else:
-        # Oitavas direto
         fase = "oitavas"
         random.shuffle(time_ids)
         for i in range(0, len(time_ids), 2):
@@ -85,90 +83,52 @@ if st.button("✨ Gerar Copa"):
             "numero": 1,
             "fase": "oitavas",
             "jogos": confrontos,
-            "data_criacao": datetime.utcnow()
+            "data_criacao": datetime.utcnow().isoformat()
         }).execute()
 
-        st.success("✅ Oitavas de final criadas com sucesso!")
+        st.success("✅ Copa criada com sucesso!")
         st.rerun()
 
-# 🔍 Verificar se existe fase preliminar pendente
-res_pre = supabase.table("copa_ligafut").select("*").eq("fase", "preliminar").order("data_criacao", desc=True).limit(1).execute()
-if res_pre.data:
-    preliminar = res_pre.data[0]
-    jogos = preliminar["jogos"]
-    id_rodada = preliminar["id"]
+# 🔍 Exibir e editar resultados das fases existentes
+res_fases = supabase.table("copa_ligafut").select("*").order("numero").execute()
+if res_fases.data:
+    st.subheader("📝 Editar Resultados das Fases")
+    fases_disponiveis = [f"{f['numero']} - {f['fase']}" for f in res_fases.data]
+    fase_escolhida = st.selectbox("Selecione a fase para editar", fases_disponiveis)
+    numero_fase = int(fase_escolhida.split(" - ")[0])
+    fase_dados = next(f for f in res_fases.data if f["numero"] == numero_fase)
+    jogos = fase_dados["jogos"]
 
-    st.subheader("📝 Inserir Resultados da Fase Preliminar")
+    for jogo in jogos:
+        mandante = jogo["mandante"]
+        visitante = jogo["visitante"]
+        nome_m = mapa_times.get(mandante, mandante)
+        nome_v = mapa_times.get(visitante, visitante)
 
-    gols_mandante = []
-    gols_visitante = []
-
-    for i, jogo in enumerate(jogos):
-        col1, col2, col3 = st.columns([4, 1, 4])
+        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
         with col1:
-            st.write(f"**{mapa_times.get(jogo['mandante'], 'Desconhecido')}**")
-        with col2:
-            gol_m = st.number_input("Gols", key=f"gm{i}", min_value=0, step=1, value=0 if jogo["gols_mandante"] is None else jogo["gols_mandante"])
-            gols_mandante.append(gol_m)
+            st.markdown(f"**{nome_m}**")
         with col3:
-            st.write(f"**{mapa_times.get(jogo['visitante'], 'Desconhecido')}**")
-            gol_v = st.number_input("Gols ", key=f"gv{i}", min_value=0, step=1, value=0 if jogo["gols_visitante"] is None else jogo["gols_visitante"])
-            gols_visitante.append(gol_v)
+            st.markdown("**x**")
+        with col5:
+            st.markdown(f"**{nome_v}**")
 
-    if st.button("💾 Salvar Resultados"):
-        for i in range(len(jogos)):
-            jogos[i]["gols_mandante"] = gols_mandante[i]
-            jogos[i]["gols_visitante"] = gols_visitante[i]
+        with col2:
+            gm = st.number_input(" ", min_value=0, value=0 if jogo["gols_mandante"] is None else jogo["gols_mandante"], key=f"gm_{numero_fase}_{mandante}_{visitante}")
+        with col4:
+            gv = st.number_input("  ", min_value=0, value=0 if jogo["gols_visitante"] is None else jogo["gols_visitante"], key=f"gv_{numero_fase}_{visitante}_{mandante}")
 
-        supabase.table("copa_ligafut").update({"jogos": jogos}).eq("id", id_rodada).execute()
-        st.success("✅ Resultados salvos com sucesso!")
-        st.rerun()
+        if st.button("📂 Salvar", key=f"salvar_{numero_fase}_{mandante}_{visitante}"):
+            novos_jogos = []
+            for j in jogos:
+                if j["mandante"] == mandante and j["visitante"] == visitante:
+                    j["gols_mandante"] = gm
+                    j["gols_visitante"] = gv
+                novos_jogos.append(j)
 
-    if st.button("➡️ Gerar Oitavas de Final"):
-        vencedores = []
-        for jogo in jogos:
-            if jogo["gols_mandante"] is None or jogo["gols_visitante"] is None:
-                st.error("⚠️ Preencha todos os resultados antes de gerar as oitavas.")
-                st.stop()
-            if jogo["gols_mandante"] > jogo["gols_visitante"]:
-                vencedores.append(jogo["mandante"])
-            else:
-                vencedores.append(jogo["visitante"])
-
-        # Identificar os outros que não participaram da preliminar
-        todos = set()
-        for j in jogos:
-            todos.add(j["mandante"])
-            todos.add(j["visitante"])
-        all_participantes = supabase.table("copa_ligafut").select("jogos").execute()
-        envolvidos = set()
-        for r in all_participantes.data:
-            for j in r["jogos"]:
-                envolvidos.add(j["mandante"])
-                envolvidos.add(j["visitante"])
-        diretos = list(envolvidos - todos)
-        ids_oitavas = diretos + vencedores
-        random.shuffle(ids_oitavas)
-
-        confrontos_oitavas = []
-        for i in range(0, len(ids_oitavas), 2):
-            confrontos_oitavas.append({
-                "mandante": ids_oitavas[i],
-                "visitante": ids_oitavas[i+1],
-                "gols_mandante": None,
-                "gols_visitante": None
-            })
-
-        supabase.table("copa_ligafut").insert({
-            "id": str(uuid.uuid4()),
-            "numero": 2,
-            "fase": "oitavas",
-            "jogos": confrontos_oitavas,
-            "data_criacao": datetime.utcnow()
-        }).execute()
-
-        st.success("✅ Oitavas de final criadas com sucesso!")
-        st.rerun()
+            supabase.table("copa_ligafut").update({"jogos": novos_jogos}).eq("numero", numero_fase).execute()
+            st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
+            st.rerun()
 
 # 📺 Exibir últimos confrontos criados
 res_ult = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
