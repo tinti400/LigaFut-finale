@@ -142,7 +142,7 @@ for i, jogo in enumerate(jogos):
         })
         supabase.table("copa_ligafut").update({
             "jogos": jogos,
-            "classificados": [str(c) for c in classificados]
+            "classificados": list(set(classificados))
         }).eq("id", doc["id"]).execute()
         st.success("✅ Resultado atualizado com sucesso!")
         st.experimental_rerun()
@@ -152,15 +152,6 @@ if len(classificados) == len(jogos):
     if fase == "final":
         nome_campeao = mapa_times.get(classificados[0], "Desconhecido")
         st.success(f"🏆 CAMPEÃO DA COPA LIGAFUT: **{nome_campeao}**")
-
-        # 🔐 Salvar no histórico de campeões
-        supabase.table("historico_copa").insert({
-            "id": str(uuid.uuid4()),
-            "nome": nome_campeao,
-            "time_id": classificados[0],
-            "data_titulo": datetime.utcnow().isoformat()
-        }).execute()
-
     else:
         if st.button("➡️ Avançar para próxima fase"):
             nova_fase = {
@@ -195,15 +186,3 @@ if len(classificados) == len(jogos):
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
             st.experimental_rerun()
 
-# 🏅 Histórico de campeões
-st.subheader("🏅 Últimos Campeões da Copa LigaFut")
-
-historico = supabase.table("historico_copa").select("*").order("data_titulo", desc=True).limit(10).execute()
-campeoes = historico.data if historico.data else []
-
-if campeoes:
-    for h in campeoes:
-        data = datetime.fromisoformat(h["data_titulo"]).strftime("%d/%m/%Y")
-        st.markdown(f"- **{h['nome']}** 🏆 ({data})")
-else:
-    st.info("Nenhum campeão registrado ainda.")
