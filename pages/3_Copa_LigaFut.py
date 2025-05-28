@@ -11,7 +11,7 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Copa LigaFut", layout="wide")
-st.title("\U0001f3c6 Copa LigaFut - Mata-mata")
+st.title("🏆 Copa LigaFut - Mata-mata")
 
 # 🔐 Verifica login
 if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
@@ -23,7 +23,7 @@ res_times = supabase.table("times").select("id,nome").execute()
 times = res_times.data if res_times.data else []
 
 # 📅 Exibir seleção manual dos times
-st.subheader("\U0001f4cb Selecione os times participantes da Copa")
+st.subheader("📋 Selecione os times participantes da Copa")
 st.caption("Escolha entre 16 e 20 times:")
 
 selected_teams = st.multiselect("Times:", [f"{t['nome']} — {t['id']}" for t in times])
@@ -44,7 +44,7 @@ if st.button("✨ Gerar Copa"):
         # Fase preliminar necessária
         num_jogos_pre = len(time_ids) - 16
         fase = "preliminar"
-        st.info(f"\u26a0\ufe0f Criando fase preliminar com {num_jogos_pre} jogos")
+        st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
 
         times_pre = random.sample(time_ids, num_jogos_pre * 2)
         restantes = list(set(time_ids) - set(times_pre))
@@ -63,7 +63,7 @@ if st.button("✨ Gerar Copa"):
             "numero": 1,
             "fase": "preliminar",
             "jogos": confrontos,
-            "data_criacao": datetime.utcnow()
+            "data_criacao": datetime.utcnow().isoformat()
         }).execute()
 
         st.success("✅ Fase preliminar criada com sucesso!")
@@ -85,7 +85,7 @@ if st.button("✨ Gerar Copa"):
             "numero": 1,
             "fase": "oitavas",
             "jogos": confrontos,
-            "data_criacao": datetime.utcnow()
+            "data_criacao": datetime.utcnow().isoformat()
         }).execute()
 
         st.success("✅ Copa criada com sucesso!")
@@ -95,12 +95,12 @@ res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True
 jogos = res.data[0]["jogos"] if res.data else []
 fase = res.data[0]["fase"] if res.data else ""
 
-st.subheader("\U0001f4c5 Últimos Confrontos Gerados")
+st.subheader("📅 Últimos Confrontos Gerados")
 mapa = {t['id']: t['nome'] for t in times}
 
 for jogo in jogos:
     mandante = mapa.get(jogo["mandante"], "Desconhecido")
     visitante = mapa.get(jogo["visitante"], "Desconhecido")
-    st.markdown(f"\U0001f537 **{mandante}** x **{visitante}**")
+    st.markdown(f"🔷 **{mandante}** x **{visitante}**")
 
 
