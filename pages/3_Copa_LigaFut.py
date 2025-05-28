@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 import random
 import uuid
+import json
 
 # 🔐 Supabase
 url = st.secrets["supabase"]["url"]
@@ -58,32 +59,6 @@ def gerar_confrontos(times, fase):
             st.warning(f"⚠️ Time sem adversário: {times[i]}")
     return jogos
 
-# ▶️ Avançar fase
-def avancar_fase(jogos_fase_atual, fase_atual):
-    proxima_fase_map = {
-        "Preliminar": "Oitavas",
-        "Oitavas": "Quartas",
-        "Quartas": "Semifinal",
-        "Semifinal": "Final"
-    }
-    proxima_fase = proxima_fase_map.get(fase_atual)
-    if not proxima_fase:
-        return None, None
-
-    vencedores = []
-    for jogo in jogos_fase_atual:
-        if jogo["gols_mandante"] is None or jogo["gols_visitante"] is None:
-            return None, None
-        if jogo["gols_mandante"] > jogo["gols_visitante"]:
-            vencedores.append(jogo["id_mandante"])
-        elif jogo["gols_visitante"] > jogo["gols_mandante"]:
-            vencedores.append(jogo["id_visitante"])
-        else:
-            vencedores.append(random.choice([jogo["id_mandante"], jogo["id_visitante"]]))
-
-    proxima_rodada = gerar_confrontos(vencedores, proxima_fase)
-    return proxima_fase, proxima_rodada
-
 # 🔄 Botão para iniciar copa
 if st.button("⚙️ Gerar Nova Copa LigaFut"):
     try:
@@ -130,32 +105,24 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
                 st.error(f"❌ ID do visitante inválido: '{v}' no jogo: {j}")
         st.write("🧪 Jogos preparados:", jogos)
 
+        # 🔒 Filtro final de segurança antes de salvar
         jogos_filtrados = []
         for jogo in jogos:
             if (
-                is_valid_uuid(jogo.get("id_mandante", ""))
+                is_valid_uuid(jogo.get("id", ""))
+                and is_valid_uuid(jogo.get("id_mandante", ""))
                 and is_valid_uuid(jogo.get("id_visitante", ""))
             ):
                 jogos_filtrados.append(jogo)
             else:
                 st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
 
-        import json
-
-# 🔒 Reforço: garantir que todos jogos tenham IDs válidos
-jogos_filtrados = [
-    j for j in jogos_filtrados
-    if is_valid_uuid(j.get("id", ""))
-    and is_valid_uuid(j.get("id_mandante", ""))
-    and is_valid_uuid(j.get("id_visitante", ""))
-]
-
-# 💾 Inserção segura
-supabase.table("copa_ligafut").insert({
-    "numero": 1,
-    "fase": fase,
-    "jogos": json.loads(json.dumps(jogos_filtrados))
-}).execute()
+        # 💾 Inserção segura no Supabase
+        supabase.table("copa_ligafut").insert({
+            "numero": 1,
+            "fase": fase,
+            "jogos": json.loads(json.dumps(jogos_filtrados))
+        }).execute()
 
         st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
