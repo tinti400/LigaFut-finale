@@ -117,22 +117,22 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
             else:
                 st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
 
-        # 💾 Inserção segura no Supabase
+        # 🔍 Mostra os jogos antes de salvar
         st.subheader("🔎 Debug - Conteúdo final dos jogos para insert:")
-st.json(jogos_filtrados)
+        st.json(jogos_filtrados)
 
-supabase.table("copa_ligafut").insert({
-    "numero": 1,
-    "fase": fase,
-    "jogos": json.loads(json.dumps(jogos_filtrados))
-}).execute()
+        # 💾 Inserção segura no Supabase
+        supabase.table("copa_ligafut").insert({
+            "numero": 1,
+            "fase": fase,
+            "jogos": json.loads(json.dumps(jogos_filtrados))
+        }).execute()
 
         st.success("✅ Primeira fase criada com sucesso!")
         st.rerun()
 
     except Exception as e:
         st.error(f"Erro ao gerar a copa: {e}")
-
 
 
 
