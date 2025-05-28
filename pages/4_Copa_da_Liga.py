@@ -11,7 +11,7 @@ st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut - Chaveamento</h1><hr>", unsafe_allow_html=True)
 
 # 🔁 Buscar times (id + nome + logo)
-@st.cache_data
+@st.cache
 def buscar_times():
     res = supabase.table("times").select("id, nome, logo").execute()
     return {
@@ -22,19 +22,10 @@ def buscar_times():
         for item in res.data
     }
 
-# 🔁 Buscar a copa mais recente
-def buscar_copa_recente():
-    resultado = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
-    return resultado.data[0] if resultado.data else None
-
-# 🔁 Buscar todas as fases da mesma edição
-def buscar_fases_copa(numero):
-    fases = ["preliminar", "oitavas", "quartas", "semifinal", "final"]
-    dados = {}
-    for fase in fases:
-        rodada = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("numero", numero).order("data_criacao", desc=True).execute()
-        dados[fase] = rodada.data
-    return dados
+# 🔁 Buscar dados da copa mais recente, independente da fase
+def buscar_fase(fase):
+    todas = supabase.table("copa_ligafut").select("*").eq("fase", fase).order("data_criacao", desc=True).execute()
+    return todas.data[:1] if todas.data else []
 
 # 🎨 Exibir confronto com escudo, nome, ida/volta e agregado
 def exibir_card(jogo):
@@ -78,13 +69,16 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 🔄 Executar carregamentos
+# 🔄 Buscar dados
 times = buscar_times()
-copa_atual = buscar_copa_recente()
-fases_da_copa = buscar_fases_copa(copa_atual["numero"]) if copa_atual else {}
+preliminar = buscar_fase("preliminar")
+oitavas = buscar_fase("oitavas")
+quartas = buscar_fase("quartas")
+semis = buscar_fase("semifinal")
+final = buscar_fase("final")
 
 # 📌 Layout visual
-col1, col2, col3, col4, col5 = st.columns([1.2, 1.2, 1.2, 1.2, 1])
+col0, col1, col2, col3, col4, col5 = st.columns([1.1, 1.1, 1.1, 1.1, 1.1, 1])
 
 def exibir_fase(coluna, titulo, rodadas):
     with coluna:
@@ -96,18 +90,18 @@ def exibir_fase(coluna, titulo, rodadas):
         else:
             st.info("Sem jogos cadastrados.")
 
-# 🧾 Exibir todas as fases da copa atual
-exibir_fase(col1, "🟡 Preliminar", fases_da_copa.get("preliminar", []))
-exibir_fase(col2, "🔰 Oitavas", fases_da_copa.get("oitavas", []))
-exibir_fase(col3, "🥅 Quartas", fases_da_copa.get("quartas", []))
-exibir_fase(col4, "⚔️ Semifinal", fases_da_copa.get("semifinal", []))
-exibir_fase(col5, "🏁 Final", fases_da_copa.get("final", []))
+# 🧾 Exibir todas as fases
+exibir_fase(col0, "🔎 Preliminar", preliminar)
+exibir_fase(col1, "🔰 Oitavas", oitavas)
+exibir_fase(col2, "🥅 Quartas", quartas)
+exibir_fase(col3, "⚔️ Semifinal", semis)
+exibir_fase(col4, "🏁 Final", final)
 
 # 🏆 Campeão
-if fases_da_copa.get("final"):
-    jogos_finais = fases_da_copa["final"][0].get("jogos", [])
-    if jogos_finais:
-        jogo_final = jogos_finais[0]
+with col5:
+    st.markdown("### 🏆 Campeão")
+    if final and final[0].get("jogos"):
+        jogo_final = final[0]["jogos"][0]
         gm = jogo_final.get("gols_ida_m")
         gv = jogo_final.get("gols_ida_v")
         gm2 = jogo_final.get("gols_volta_v")
@@ -116,19 +110,11 @@ if fases_da_copa.get("final"):
             total_m = int(gm) + int(gm2)
             total_v = int(gv) + int(gv2)
             vencedor_id = jogo_final["mandante_ida"] if total_m > total_v else jogo_final["visitante_ida"]
-            vencedor = times.get(vencedor_id, {"nome": "?", "escudo_url": ""})
-            st.markdown(f"""
-                <div style='background:#222;padding:15px;border-radius:10px;text-align:center;color:white'>
-                    <img src="{vencedor['escudo_url']}" width="60"><br><br>
-                    🏆 <b>Campeão da Copa:</b><br>
-                    <span style='font-size:18px'>{vencedor['nome']}</span>
-                </div>
-            """, unsafe_allow_html=True)
+            vencedor = times.get(vencedor_id, {"nome": "?"})
+            st.success(f"🏆 Campeão:\n\n**{vencedor['nome']}**")
         else:
             st.info("Aguardando resultado da final.")
     else:
         st.info("Final não cadastrada.")
-else:
-    st.info("Aguardando fases finais.")
 
 
