@@ -39,23 +39,42 @@ def gerar_confrontos(times, fase):
     jogos = []
     for i in range(0, len(times), 2):
         if i + 1 < len(times):
-            m_id = times[i]
-            v_id = times[i + 1]
-            if is_valid_uuid(m_id) and is_valid_uuid(v_id):
-                jogos.append({
-                    "id": str(uuid.uuid4()),
-                    "fase": fase,
-                    "numero": len(jogos) + 1,
-                    "id_mandante": m_id,
-                    "id_visitante": v_id,
-                    "gols_mandante": None,
-                    "gols_visitante": None
-                })
-            else:
-                st.warning(f"🚫 Jogo ignorado: ID inválido → mandante='{m_id}', visitante='{v_id}'")
-        else:
-            st.warning(f"⚠️ Time sem adversário: {times[i]}")
+            jogos.append({
+                "id": str(uuid.uuid4()),
+                "fase": fase,
+                "numero": len(jogos) + 1,
+                "id_mandante": times[i],
+                "id_visitante": times[i + 1],
+                "gols_mandante": None,
+                "gols_visitante": None
+            })
     return jogos
+
+# ▶️ Avançar fase
+def avancar_fase(jogos_fase_atual, fase_atual):
+    proxima_fase_map = {
+        "Preliminar": "Oitavas",
+        "Oitavas": "Quartas",
+        "Quartas": "Semifinal",
+        "Semifinal": "Final"
+    }
+    proxima_fase = proxima_fase_map.get(fase_atual)
+    if not proxima_fase:
+        return None, None
+
+    vencedores = []
+    for jogo in jogos_fase_atual:
+        if jogo["gols_mandante"] is None or jogo["gols_visitante"] is None:
+            return None, None
+        if jogo["gols_mandante"] > jogo["gols_visitante"]:
+            vencedores.append(jogo["id_mandante"])
+        elif jogo["gols_visitante"] > jogo["gols_mandante"]:
+            vencedores.append(jogo["id_visitante"])
+        else:
+            vencedores.append(random.choice([jogo["id_mandante"], jogo["id_visitante"]]))
+
+    proxima_rodada = gerar_confrontos(vencedores, proxima_fase)
+    return proxima_fase, proxima_rodada
 
 # 🔄 Botão para iniciar copa
 if st.button("⚙️ Gerar Nova Copa LigaFut"):
@@ -76,14 +95,13 @@ if st.button("⚙️ Gerar Nova Copa LigaFut"):
                 st.warning(f"🚫 Time ignorado: nome='{nome}', id='{tid}' (inválido)")
 
         st.write("📋 Times válidos para a Copa:")
-for tid in time_ids:
-    nome = times_map.get(tid, {}).get("nome", "Desconhecido")
-    st.write(f"🟩 {nome} — ID: '{tid}'")
+        for tid in time_ids:
+            nome = times_map.get(tid, {}).get("nome", "Desconhecido")
+            st.write(f"🟩 {nome} — ID: '{tid}'")
 
-# 🧪 Verificação individual dos UUIDs
-for i, tid in enumerate(time_ids):
-    if not is_valid_uuid(tid):
-        st.error(f"❌ time_ids[{i}] contém UUID inválido: '{tid}'")
+        for i, tid in enumerate(time_ids):
+            if not is_valid_uuid(tid):
+                st.error(f"❌ time_ids[{i}] contém UUID inválido: '{tid}'")
 
         if len(time_ids) < 2:
             st.warning("⚠️ É preciso ao menos 2 times válidos para iniciar a copa.")
@@ -95,7 +113,6 @@ for i, tid in enumerate(time_ids):
         st.write("🎯 Lista de IDs para gerar confrontos:", time_ids)
         jogos = gerar_confrontos(time_ids, fase)
 
-        # Debug de cada jogo
         for j in jogos:
             m = j.get("id_mandante", "")
             v = j.get("id_visitante", "")
@@ -105,7 +122,6 @@ for i, tid in enumerate(time_ids):
                 st.error(f"❌ ID do visitante inválido: '{v}' no jogo: {j}")
         st.write("🧪 Jogos preparados:", jogos)
 
-        # 🔒 Filtro final de segurança antes de salvar
         jogos_filtrados = []
         for jogo in jogos:
             if (
@@ -116,7 +132,6 @@ for i, tid in enumerate(time_ids):
             else:
                 st.warning(f"🚫 Jogo removido antes de salvar: {jogo}")
 
-        # 💾 Inserção segura no Supabase
         supabase.table("copa_ligafut").insert({
             "numero": 1,
             "fase": fase,
