@@ -61,7 +61,7 @@ if st.button("⚽ Gerar Copa"):
         st.error(f"Erro ao gerar a copa: {e}")
 
 # 📋 Mostrar última copa criada
-st.divider()
+st.markdown("---")
 st.subheader("📅 Últimos Confrontos Gerados")
 
 try:
