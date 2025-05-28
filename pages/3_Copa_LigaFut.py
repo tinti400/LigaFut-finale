@@ -43,14 +43,13 @@ if st.button("✨ Gerar Copa"):
     times_classificados = []
 
     if len(time_ids) > 16:
-        # 👇 Ajuste para que sobrem exatamente 16 após preliminar
         num_jogos_pre = (len(time_ids) - 16)
         fase = "preliminar"
         st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
 
         times_pre = random.sample(time_ids, num_jogos_pre * 2)
         restantes = list(set(time_ids) - set(times_pre))
-        times_classificados = restantes.copy()  # já classificados direto
+        times_classificados = restantes.copy()
 
         random.shuffle(times_pre)
         for i in range(0, len(times_pre), 2):
@@ -79,7 +78,7 @@ if st.button("✨ Gerar Copa"):
         "numero": 1,
         "fase": fase,
         "jogos": confrontos,
-        "classificados": times_classificados,
+        "classificados": [str(c) for c in times_classificados],
         "data_criacao": datetime.utcnow().isoformat()
     }).execute()
 
@@ -139,12 +138,12 @@ for i, jogo in enumerate(jogos):
         })
         supabase.table("copa_ligafut").update({
             "jogos": jogos,
-            "classificados": classificados
+            "classificados": [str(c) for c in classificados]
         }).eq("id", doc["id"]).execute()
         st.success("✅ Resultado atualizado com sucesso!")
         st.experimental_rerun()
 
-# Avançar de fase manualmente
+# ➔ Avançar de fase manualmente
 if len(classificados) == len(jogos):
     if st.button("➡️ Avançar para próxima fase"):
         nova_fase = {
@@ -182,4 +181,5 @@ if len(classificados) == len(jogos):
 
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
             st.experimental_rerun()
+
 
