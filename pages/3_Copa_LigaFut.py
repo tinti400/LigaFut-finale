@@ -62,14 +62,17 @@ if st.button("✨ Gerar Copa"):
 
         restantes.sort()
         for i in range(0, len(restantes), 2):
-            confrontos.append({
-                "mandante_ida": restantes[i],
-                "visitante_ida": restantes[i+1],
-                "gols_ida_m": None,
-                "gols_ida_v": None,
-                "gols_volta_m": None,
-                "gols_volta_v": None
-            })
+            if i + 1 < len(restantes):
+                confrontos.append({
+                    "mandante_ida": restantes[i],
+                    "visitante_ida": restantes[i+1],
+                    "gols_ida_m": None,
+                    "gols_ida_v": None,
+                    "gols_volta_m": None,
+                    "gols_volta_v": None
+                })
+            else:
+                st.warning(f"⚠️ Time sem adversário: {mapa_times.get(restantes[i], 'Desconhecido')}. Ignorado.")
 
     else:
         random.shuffle(time_ids)
@@ -109,8 +112,8 @@ classificados = []
 for i, jogo in enumerate(jogos):
     id_m = jogo.get("mandante_ida")
     id_v = jogo.get("visitante_ida")
-    nome_m = mapa_times.get(id_m, "?")
-    nome_v = mapa_times.get(id_v, "?")
+    nome_m = mapa_times.get(id_m, f"? ({id_m})")
+    nome_v = mapa_times.get(id_v, f"? ({id_v})")
 
     st.markdown(f"### {nome_m} x {nome_v}")
     col1, col2, col3, col4 = st.columns(4)
