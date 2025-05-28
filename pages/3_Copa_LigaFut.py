@@ -38,12 +38,13 @@ if st.button("✨ Gerar Copa"):
         st.stop()
 
     time_ids = [t.split(" — ")[-1] for t in selected_teams]
+    total = len(time_ids)
     fase = "oitavas"
     confrontos = []
     times_classificados = []
 
-    if len(time_ids) > 16:
-        num_jogos_pre = (len(time_ids) - 16)
+    if total > 16:
+        num_jogos_pre = (total - 16)
         fase = "preliminar"
         st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
 
@@ -78,14 +79,14 @@ if st.button("✨ Gerar Copa"):
         "numero": 1,
         "fase": fase,
         "jogos": confrontos,
-        "classificados": [str(c) for c in times_classificados],
+        "classificados": times_classificados,
         "data_criacao": datetime.utcnow().isoformat()
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
     st.experimental_rerun()
 
-# 🗒️ Exibir confrontos + edição dos resultados
+# 🗒️ Exibir confrontos
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
 doc = res.data[0] if res.data else {}
 if not doc:
@@ -138,13 +139,15 @@ for i, jogo in enumerate(jogos):
         })
         supabase.table("copa_ligafut").update({
             "jogos": jogos,
-            "classificados": [str(c) for c in classificados]
+            "classificados": classificados
         }).eq("id", doc["id"]).execute()
         st.success("✅ Resultado atualizado com sucesso!")
         st.experimental_rerun()
 
 # ➔ Avançar de fase manualmente
-if len(classificados) == len(jogos):
+todos_com_resultado = all(j["gols_ida_m"] is not None and j["gols_ida_v"] is not None and j["gols_volta_m"] is not None and j["gols_volta_v"] is not None for j in jogos)
+
+if todos_com_resultado and len(classificados) == (len(jogos) + len(classificados) - len(jogos)):
     if st.button("➡️ Avançar para próxima fase"):
         nova_fase = {
             "preliminar": "oitavas",
@@ -181,5 +184,6 @@ if len(classificados) == len(jogos):
 
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
             st.experimental_rerun()
+
 
 
