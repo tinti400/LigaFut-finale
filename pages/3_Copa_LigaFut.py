@@ -22,7 +22,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Função para buscar times
-@st.cache_data
+@st.cache
 def buscar_times():
     response = supabase.table("times").select("id, nome").execute()
     if response.data:
@@ -76,7 +76,7 @@ def atualizar_resultado(index, gols_mandante, gols_visitante):
         st.error(f"Erro ao atualizar resultado: {e}")
 
 # FUNÇÃO para exibir jogos
-@st.cache_data
+@st.cache
 def mapear_times():
     times = buscar_times()
     return {t["id"]: t["nome"] for t in times}
