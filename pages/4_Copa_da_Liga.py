@@ -34,7 +34,7 @@ def buscar_fase(fase, data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("data_criacao", data).execute()
     return res.data if res.data else []
 
-# 🎨 Exibir confronto
+# 🎨 Exibir confronto com escudo, nome, ida/volta e agregado (melhorado)
 def exibir_card(jogo):
     id_m = jogo.get("mandante_ida")
     id_v = jogo.get("visitante_ida")
@@ -55,28 +55,41 @@ def exibir_card(jogo):
         agregado = "?x?"
 
     card = f"""
-    <div style='background:#111;padding:15px;border-radius:12px;margin-bottom:10px;color:white;text-align:center'>
+    <div style='
+        background:#111;
+        padding:15px;
+        border-radius:12px;
+        margin-bottom:15px;
+        color:white;
+        text-align:center;
+        height:180px;
+        display:flex;
+        flex-direction:column;
+        justify-content:space-between;
+        box-shadow:0 0 10px rgba(0,0,0,0.5)'
+    >
         <div style='display:flex;align-items:center;justify-content:space-between'>
             <div style='text-align:center;width:40%'>
-                <img src='{mandante["escudo_url"]}' width='50'><br>
-                <span style='font-size:14px'>{mandante["nome"]}</span>
+                <img src='{mandante["escudo_url"]}' width='45'><br>
+                <span style='font-size:13px'>{mandante["nome"]}</span>
             </div>
             <div style='text-align:center;width:20%'>
-                <div style='font-size:24px;font-weight:bold'>{agregado}</div>
-                <div style='font-size:12px;line-height:1.2;margin-top:5px'>
-                    ({gm_ida}x{gv_ida})<br>({gm_volta}x{gv_volta})
-                </div>
+                <div style='font-size:20px;font-weight:bold'>{agregado}</div>
             </div>
             <div style='text-align:center;width:40%'>
-                <img src='{visitante["escudo_url"]}' width='50'><br>
-                <span style='font-size:14px'>{visitante["nome"]}</span>
+                <img src='{visitante["escudo_url"]}' width='45'><br>
+                <span style='font-size:13px'>{visitante["nome"]}</span>
             </div>
+        </div>
+        <div style='margin-top:5px;font-size:11px;line-height:1.2;color:#ccc'>
+            Ida: ({gm_ida}x{gv_ida})<br>
+            Volta: ({gm_volta}x{gv_volta})
         </div>
     </div>
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 🔄 Dados
+# 🔄 Buscar dados
 times = buscar_times()
 data_atual = buscar_data_mais_recente()
 preliminar = buscar_fase("preliminar", data_atual)
@@ -119,7 +132,9 @@ with col5:
             total_v = int(gv) + int(gv2)
             vencedor_id = jogo_final["mandante_ida"] if total_m > total_v else jogo_final["visitante_ida"]
             vencedor = times.get(vencedor_id, {"nome": "?"})
-            st.success(f"🏆 Campeão:\n\n**{vencedor['nome']}**")
+            st.success(f"🏆 Campeão:
+
+**{vencedor['nome']}**")
         else:
             st.info("Aguardando resultado da final.")
     else:
