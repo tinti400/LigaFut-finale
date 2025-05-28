@@ -95,7 +95,7 @@ if st.button("✨ Gerar Copa"):
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
-     st.experimental_rerun()
+    st.experimental_rerun()  # <- Corrigido aqui
 
 # 🗒️ Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
@@ -186,4 +186,3 @@ if len(classificados) == len(jogos):
 
             st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
             st.experimental_rerun()
-
