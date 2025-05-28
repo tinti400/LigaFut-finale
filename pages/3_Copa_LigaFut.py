@@ -38,13 +38,12 @@ if st.button("✨ Gerar Copa"):
         st.stop()
 
     time_ids = [t.split(" — ")[-1] for t in selected_teams]
-    total = len(time_ids)
     fase = "oitavas"
     confrontos = []
     times_classificados = []
 
-    if total > 16:
-        num_jogos_pre = (total - 16)
+    if len(time_ids) > 16:
+        num_jogos_pre = (len(time_ids) - 16)
         fase = "preliminar"
         st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre} jogos")
 
@@ -79,14 +78,14 @@ if st.button("✨ Gerar Copa"):
         "numero": 1,
         "fase": fase,
         "jogos": confrontos,
-        "classificados": times_classificados,
+        "classificados": [str(c) for c in times_classificados],
         "data_criacao": datetime.utcnow().isoformat()
     }).execute()
 
     st.success("✅ Copa criada com sucesso!")
     st.experimental_rerun()
 
-# 🗒️ Exibir confrontos
+# 🗒️ Exibir confrontos + edição dos resultados
 res = supabase.table("copa_ligafut").select("*").order("data_criacao", desc=True).limit(1).execute()
 doc = res.data[0] if res.data else {}
 if not doc:
@@ -94,9 +93,10 @@ if not doc:
 
 jogos = doc.get("jogos", [])
 fase = doc.get("fase", "")
-st.subheader(f"📅 Confrontos da Fase: {fase.upper()}")
+st.subheader(f"🗕️ Confrontos da Fase: {fase.upper()}")
 
 classificados = doc.get("classificados", [])
+todos_com_resultado = True
 
 for i, jogo in enumerate(jogos):
     id_m = jogo.get("mandante_ida")
@@ -129,6 +129,7 @@ for i, jogo in enumerate(jogos):
             classificados.append(id_v)
     else:
         st.warning(f"⚠️ Empate no agregado: {resultado} - Definir vencedor por pênaltis")
+        todos_com_resultado = False
 
     if st.button("Salvar Resultado", key=f"btn_{i}"):
         jogo.update({
@@ -139,14 +140,12 @@ for i, jogo in enumerate(jogos):
         })
         supabase.table("copa_ligafut").update({
             "jogos": jogos,
-            "classificados": classificados
+            "classificados": [str(c) for c in classificados]
         }).eq("id", doc["id"]).execute()
         st.success("✅ Resultado atualizado com sucesso!")
         st.experimental_rerun()
 
-# ➔ Avançar de fase manualmente
-todos_com_resultado = all(j["gols_ida_m"] is not None and j["gols_ida_v"] is not None and j["gols_volta_m"] is not None and j["gols_volta_v"] is not None for j in jogos)
-
+# ➔ Avançar de fase ou declarar campeão
 if todos_com_resultado and len(classificados) == (len(jogos) + len(classificados) - len(jogos)):
     if st.button("➡️ Avançar para próxima fase"):
         nova_fase = {
@@ -158,7 +157,17 @@ if todos_com_resultado and len(classificados) == (len(jogos) + len(classificados
         }.get(fase, "encerrado")
 
         if nova_fase == "encerrado":
-            st.success("🏆 Copa encerrada!")
+            if len(classificados) == 1:
+                campeao_id = classificados[0]
+                nome_campeao = mapa_times.get(campeao_id, campeao_id)
+                st.balloons()
+                st.success(f"🏆 **{nome_campeao} é o grande campeão da Copa LigaFut!** 🏆")
+                supabase.table("copa_ligafut").update({
+                    "classificados": classificados,
+                    "campeao": nome_campeao
+                }).eq("id", doc["id"]).execute()
+            else:
+                st.warning("⚠️ A final terminou empatada ou está com dados incompletos. Defina o vencedor.")
         else:
             random.shuffle(classificados)
             novos_jogos = []
