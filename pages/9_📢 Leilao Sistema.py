@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*- 
 import streamlit as st 
 from supabase import create_client 
@@ -30,18 +31,17 @@ if not res.data:
     st.stop()
 id_time_usuario = res.data[0]["id"]
 
-# 🔍 Leilão ativo
-leilao_res = supabase.table("configuracoes").select("*").eq("id", "leilao_sistema").execute()
-leilao = leilao_res.data[0] if leilao_res.data else None
-
-if not leilao or not leilao.get("ativo", False):
+# 🔍 Buscar leilão ativo
+res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).limit(1).execute()
+if not res.data:
     st.warning("⚠️ Nenhum leilão ativo no momento.")
     st.stop()
 
-jogador = leilao.get("jogador", {})
-valor_atual = leilao.get("valor_atual", 0)
-incremento = leilao.get("incremento", 3_000_000)
-id_time_vencedor = leilao.get("time_vencedor", "")
+leilao = res.data[0]
+jogador = leilao["jogador"]
+valor_atual = leilao["valor_atual"]
+incremento = leilao["incremento_minimo"]
+id_time_vencedor = leilao.get("id_time_atual", "")
 fim = leilao.get("fim")
 
 # ⏱️ Cronômetro
@@ -105,7 +105,7 @@ if tempo_restante == 0:
                 )
 
                 st.success(f"✅ O time {nome_time_vencedor} levou {jogador['nome']} por R$ {valor_atual:,.0f}.")
-        supabase.table("configuracoes").update({"ativo": False}).eq("id", "leilao_sistema").execute()
+        supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", leilao["id"]).execute()
         st.stop()
     except Exception as e:
         st.error(f"Erro ao finalizar o leilão: {e}")
@@ -136,7 +136,7 @@ if tempo_restante > 0:
                 st.error("❌ Saldo insuficiente.")
             elif novo_lance <= valor_atual:
                 st.warning("⚠️ Seu lance não é o maior.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 try:
                     agora = datetime.utcnow()
@@ -144,18 +144,19 @@ if tempo_restante > 0:
                     if (fim_dt - agora).total_seconds() <= 15:
                         novo_fim = agora + timedelta(seconds=15)
 
-                    supabase.table("configuracoes").update({
+                    supabase.table("leiloes").update({
                         "valor_atual": novo_lance,
-                        "time_vencedor": id_time_usuario,
+                        "id_time_atual": id_time_usuario,
+                        "time_vencedor": nome_time_usuario,
                         "fim": novo_fim.isoformat()
-                    }).eq("id", "leilao_sistema").execute()
+                    }).eq("id", leilao["id"]).execute()
 
                     st.success(f"✅ Lance de R$ {novo_lance:,.0f} enviado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao registrar lance: {e}")
 else:
     st.info("⏱️ O tempo do leilão acabou.")
 
 if st.button("🔄 Atualizar"):
-    st.experimental_rerun()
+    st.rerun()
