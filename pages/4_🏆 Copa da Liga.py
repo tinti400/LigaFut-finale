@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from datetime import datetime
 import pandas as pd
-from collections import defaultdict
+from datetime import datetime
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -79,15 +78,20 @@ def exibir_card_grupo(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 🔢 Classificação por grupo
+# 📊 Função de classificação por grupo
 def calcular_classificacao(jogos):
-    tabela = defaultdict(lambda: {"P": 0, "J": 0, "V": 0, "E": 0, "D": 0, "GP": 0, "GC": 0, "SG": 0})
+    tabela = {}
     for jogo in jogos:
-        m = jogo.get("mandante")
-        v = jogo.get("visitante")
+        m = jogo["mandante"]
+        v = jogo["visitante"]
         gm = jogo.get("gols_mandante")
         gv = jogo.get("gols_visitante")
-        if None in (m, v, gm, gv):
+
+        for t in [m, v]:
+            if t not in tabela:
+                tabela[t] = {"P": 0, "J": 0, "V": 0, "E": 0, "D": 0, "GP": 0, "GC": 0, "SG": 0}
+
+        if gm is None or gv is None:
             continue
 
         tabela[m]["J"] += 1
@@ -113,7 +117,13 @@ def calcular_classificacao(jogos):
 
     for t in tabela:
         tabela[t]["SG"] = tabela[t]["GP"] - tabela[t]["GC"]
-    return tabela
+
+    df = pd.DataFrame.from_dict(tabela, orient="index")
+    df["Time"] = df.index.map(lambda x: times[x]["nome"] if x in times else x)
+    df["Logo"] = df.index.map(lambda x: f"<img src='{times[x]['escudo_url']}' width='20'>" if x in times else "")
+    df = df[["Time", "Logo", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
+    df = df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
+    return df
 
 # 🔁 Buscar tudo
 times = buscar_times()
@@ -140,22 +150,18 @@ for idx, (grupo, jogos) in enumerate(sorted(grupos_por_nome.items())):
         for jogo in jogos:
             exibir_card_grupo(jogo)
 
-        st.markdown("#### Classificação")
-        tabela = calcular_classificacao(jogos)
-        df = pd.DataFrame.from_dict(tabela, orient="index")
-        df["Time"] = df.index.map(lambda tid: times.get(tid, {}).get("nome", "?"))
-        df["Logo"] = df.index.map(lambda tid: times.get(tid, {}).get("escudo_url", ""))
-        df = df[["Time", "Logo", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
-        df = df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
+# 📈 Tabelas de classificação
+st.markdown("<hr>", unsafe_allow_html=True)
+st.subheader("📈 Classificação dos Grupos")
+for idx, (grupo, jogos) in enumerate(sorted(grupos_por_nome.items())):
+    st.markdown(f"#### {grupo}")
+    df_class = calcular_classificacao(jogos)
+    def estilo_linha(row):
+        if row.name < 4:
+            return ['background-color: #d4edda'] * len(row)
+        return [''] * len(row)
 
-        def color_rows(row):
-            if row.name < 4:
-                return ["background-color: #d4edda"] * len(row)
-            return ["background-color: white"] * len(row)
-
-        df_display = df.drop(columns=["Logo"])
-        styled_df = df_display.style.apply(color_rows, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
+    st.markdown(df_class.style.apply(estilo_linha, axis=1).to_html(escape=False, index=False), unsafe_allow_html=True)
 
 # 🧾 Exibir mata-mata
 def exibir_fase_mata(nome, dados, coluna):
