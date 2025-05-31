@@ -9,7 +9,7 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="📅 Resultados Fase de Grupos", layout="wide")
-st.title("📅 Fase de Grupos - Resultados")
+st.title("📅 Resultados da Fase de Grupos")
 
 # ✅ Verifica login
 dados_sessao = st.session_state
@@ -42,7 +42,7 @@ def buscar_times():
 times = buscar_times()
 
 # 🔢 Buscar jogos da fase de grupos
-res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).execute()
+res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).eq("fase", "grupos").execute()
 grupo_data = res.data if res.data else []
 
 if not grupo_data:
@@ -70,15 +70,16 @@ for idx, jogo in enumerate(jogos):
     gols_m = jogo.get("gols_mandante")
     gols_v = jogo.get("gols_visitante")
 
-    col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 3])
+    col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
         gols_m_edit = st.number_input(
             f"Gols {mandante_nome}",
             min_value=0,
-            value=gols_m if gols_m is not None else 0,
-            key=f"gm_{idx}"
+            value=int(gols_m) if gols_m is not None else 0,
+            key=f"gm_{idx}",
+            format="%d"
         )
     with col3:
         st.markdown("**X**")
@@ -86,23 +87,28 @@ for idx, jogo in enumerate(jogos):
         gols_v_edit = st.number_input(
             f"Gols {visitante_nome}",
             min_value=0,
-            value=gols_v if gols_v is not None else 0,
-            key=f"gv_{idx}"
+            value=int(gols_v) if gols_v is not None else 0,
+            key=f"gv_{idx}",
+            format="%d"
         )
     with col5:
         st.markdown(f"**{visitante_nome}**")
 
-    if st.button("💾 Salvar Resultado", key=f"btn_salvar_{idx}"):
-        # Atualizar gols e salvar no Supabase
+    st.markdown("")
+
+    if st.button("💾 Salvar Resultado", key=f"salvar_{idx}"):
         jogos[idx]["gols_mandante"] = gols_m_edit
         jogos[idx]["gols_visitante"] = gols_v_edit
 
         try:
-            supabase.table("copa_ligafut").update({"jogos": jogos}).eq("grupo", tab).eq("data_criacao", data_atual).execute()
+            supabase.table("copa_ligafut").update({
+                "jogos": jogos
+            }).eq("grupo", tab).eq("data_criacao", data_atual).eq("fase", "grupos").execute()
             st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
-            st.error(f"Erro ao salvar resultado: {e}")
+            st.error(f"Erro ao salvar: {e}")
 
     st.markdown("---")
+
 
 
