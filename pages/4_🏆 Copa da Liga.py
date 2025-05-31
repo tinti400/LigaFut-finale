@@ -34,7 +34,7 @@ def buscar_fase(fase, data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("data_criacao", data).execute()
     return res.data if res.data else []
 
-# 🎨 Exibir confronto com escudo, nome, ida/volta e agregado (melhorado)
+# 🎨 Exibir confronto com escudo, nome, ida/volta e agregado (mata-mata)
 def exibir_card(jogo):
     id_m = jogo.get("mandante_ida")
     id_v = jogo.get("visitante_ida")
@@ -66,8 +66,7 @@ def exibir_card(jogo):
         display:flex;
         flex-direction:column;
         justify-content:space-between;
-        box-shadow:0 0 10px rgba(0,0,0,0.5)'
-    >
+        box-shadow:0 0 10px rgba(0,0,0,0.5)'>
         <div style='display:flex;align-items:center;justify-content:space-between'>
             <div style='text-align:center;width:40%'>
                 <img src='{mandante["escudo_url"]}' width='45'><br>
@@ -89,16 +88,52 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
+# 🎨 Exibir jogo simples de fase de grupos
+def exibir_jogo_simples(jogo):
+    id_m = jogo.get("mandante")
+    id_v = jogo.get("visitante")
+    gm = jogo.get("gols_mandante")
+    gv = jogo.get("gols_visitante")
+
+    mandante = times.get(id_m, {"nome": "Aguardando", "escudo_url": ""})
+    visitante = times.get(id_v, {"nome": "Aguardando", "escudo_url": ""})
+
+    placar = f"{gm} x {gv}" if None not in (gm, gv) else "vs"
+
+    linha = f"""
+    <div style='margin-bottom:10px; font-size:15px; text-align:center; background:#f5f5f5; padding:10px; border-radius:8px;'>
+        <img src="{mandante['escudo_url']}" width="25" style="vertical-align:middle; margin-right:6px;">
+        <b>{mandante['nome']}</b> {placar} <b>{visitante['nome']}</b>
+        <img src="{visitante['escudo_url']}" width="25" style="vertical-align:middle; margin-left:6px;">
+    </div>
+    """
+    st.markdown(linha, unsafe_allow_html=True)
+
 # 🔄 Buscar dados
 times = buscar_times()
 data_atual = buscar_data_mais_recente()
+
+# 🎯 Fase de grupos
+grupos = []
+if data_atual:
+    grupos = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data_atual).execute().data
+
+if grupos:
+    st.markdown("## 📊 Fase de Grupos")
+    colunas = st.columns(4)
+    for i, grupo in enumerate(grupos):
+        with colunas[i % 4]:
+            st.markdown(f"### {grupo['grupo']}")
+            for jogo in grupo.get("jogos", []):
+                exibir_jogo_simples(jogo)
+
+# 🧱 Fases eliminatórias
 preliminar = buscar_fase("preliminar", data_atual)
 oitavas = buscar_fase("oitavas", data_atual)
 quartas = buscar_fase("quartas", data_atual)
 semis = buscar_fase("semifinal", data_atual)
 final = buscar_fase("final", data_atual)
 
-# 📌 Layout visual
 col0, col1, col2, col3, col4, col5 = st.columns([1.1, 1.1, 1.1, 1.1, 1.1, 1])
 
 def exibir_fase(coluna, titulo, rodadas):
@@ -111,7 +146,6 @@ def exibir_fase(coluna, titulo, rodadas):
         else:
             st.info("Sem jogos cadastrados.")
 
-# 🧾 Exibir todas as fases
 exibir_fase(col0, "🔎 Preliminar", preliminar)
 exibir_fase(col1, "🔰 Oitavas", oitavas)
 exibir_fase(col2, "🥅 Quartas", quartas)
