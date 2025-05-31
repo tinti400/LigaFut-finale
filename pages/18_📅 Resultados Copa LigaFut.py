@@ -2,13 +2,6 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-from collections import defaultdict
-import random
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-from datetime import datetime
-import random
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -85,8 +78,7 @@ for idx, jogo in enumerate(jogos):
             f"Gols {mandante_nome}",
             min_value=0,
             value=gols_m if gols_m is not None else 0,
-            key=f"gm_{idx}",
-            label_visibility="visible"
+            key=f"gm_{idx}"
         )
     with col3:
         st.markdown("**X**")
@@ -95,8 +87,7 @@ for idx, jogo in enumerate(jogos):
             f"Gols {visitante_nome}",
             min_value=0,
             value=gols_v if gols_v is not None else 0,
-            key=f"gv_{idx}",
-            label_visibility="visible"
+            key=f"gv_{idx}"
         )
     with col5:
         st.markdown(f"**{visitante_nome}**")
@@ -112,5 +103,6 @@ for idx, jogo in enumerate(jogos):
         except Exception as e:
             st.error(f"Erro ao salvar resultado: {e}")
 
-    st.divider()
+    st.markdown("---")
+
 
