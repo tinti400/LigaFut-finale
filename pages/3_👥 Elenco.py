@@ -19,8 +19,8 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🖼️ Logo do time centralizada
-url_logo = f"https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/logos/{id_time}.png"
+# 🖼️ Logo do time centralizada (forçando lowercase)
+url_logo = f"https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/logos/{id_time.lower()}.png"
 
 st.markdown(
     f"""
@@ -41,7 +41,6 @@ if arquivo:
     try:
         df_importado = pd.read_excel(arquivo)
 
-        # Verifica se as colunas obrigatórias existem
         colunas_esperadas = {"nome", "posicao", "overall", "valor"}
         if not colunas_esperadas.issubset(df_importado.columns):
             st.error("❌ A planilha precisa ter as colunas: nome, posicao, overall, valor")
@@ -88,7 +87,6 @@ if elenco:
     nome_filtrado = st.text_input("🔍 Buscar por nome:")
     overall_min = st.slider("⭐ Filtrar por Overall mínimo:", min_value=0, max_value=100, value=0)
 
-    # Aplicar filtros
     df_filtrado = df_elenco.copy()
     if posicao_selecionada != "Todas":
         df_filtrado = df_filtrado[df_filtrado["posicao"] == posicao_selecionada]
@@ -96,7 +94,6 @@ if elenco:
         df_filtrado = df_filtrado[df_filtrado["nome"].str.contains(nome_filtrado, case=False, na=False)]
     df_filtrado = df_filtrado[df_filtrado["overall"] >= overall_min]
 
-    # Exibir resultado filtrado
     if df_filtrado.empty:
         st.info("Nenhum jogador encontrado com os filtros aplicados.")
     else:
@@ -121,10 +118,7 @@ if elenco:
                             valor_jogador = jogador["valor"]
                             valor_recebido = round(valor_jogador * 0.7)
 
-                            # Remove do elenco
                             supabase.table("elenco").delete().eq("id_time", id_time).eq("id", jogador["id"]).execute()
-
-                            # Adiciona ao mercado
                             supabase.table("mercado_transferencias").insert({
                                 "nome": jogador["nome"],
                                 "posicao": jogador["posicao"],
@@ -132,13 +126,11 @@ if elenco:
                                 "valor": jogador["valor"]
                             }).execute()
 
-                            # Atualiza saldo
                             saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
                             saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
                             novo_saldo = saldo + valor_recebido
                             supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                            # Registra no BID
                             supabase.table("movimentacoes").insert({
                                 "jogador": jogador["nome"],
                                 "valor": jogador["valor"],
@@ -161,3 +153,4 @@ else:
 if st.button("🔙 Voltar ao Painel"):
     st.session_state["pagina"] = "usuario"
     st.rerun()
+
