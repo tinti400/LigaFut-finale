@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import random
 from datetime import datetime
+import random
+import itertools
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -53,14 +54,14 @@ if st.button("⚙️ Gerar Grupos da Copa"):
     grupos = {"Grupo A": [], "Grupo B": [], "Grupo C": [], "Grupo D": []}
     nomes_grupos = list(grupos.keys())
 
-    # Distribui os times nos grupos (1 com 6, 3 com 5)
+    # Distribui os times nos grupos (1 com 6, 3 com 5) se ≥ 21 times
     qtd_grupos = [6, 5, 5, 5] if len(times_escolhidos) >= 21 else [5] * 4
     idx = 0
     for i, qtd in enumerate(qtd_grupos):
         grupos[nomes_grupos[i]] = times_escolhidos[idx:idx+qtd]
         idx += qtd
 
-    # 💾 Salvar grupos com data atual
+    # 💾 Salvar grupos na tabela `grupos_copa` com data atual
     data_copa = datetime.now().strftime("%Y-%m-%d")
 
     try:
@@ -72,12 +73,38 @@ if st.button("⚙️ Gerar Grupos da Copa"):
                     "id_time": id_time,
                     "data_criacao": data_copa
                 }).execute()
-        st.success("✅ Grupos da Copa gerados e salvos com sucesso!")
     except Exception as e:
         st.error(f"Erro ao salvar grupos: {e}")
+        st.stop()
+
+    # ⚽ Gera confrontos por grupo e salva na tabela copa_ligafut
+    try:
+        supabase.table("copa_ligafut").delete().eq("fase", "grupos").eq("data_criacao", data_copa).execute()
+
+        for grupo_nome, lista_times in grupos.items():
+            jogos = []
+            for mandante, visitante in itertools.combinations(lista_times, 2):
+                jogos.append({
+                    "mandante": mandante,
+                    "visitante": visitante,
+                    "gols_mandante": None,
+                    "gols_visitante": None
+                })
+            doc = {
+                "grupo": grupo_nome,
+                "fase": "grupos",
+                "data_criacao": data_copa,
+                "jogos": jogos
+            }
+            supabase.table("copa_ligafut").insert(doc).execute()
+        st.success("✅ Grupos e confrontos da Copa gerados e salvos com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar confrontos: {e}")
+        st.stop()
 
     # 🖼️ Visualização
     st.subheader("📊 Grupos Gerados")
     for grupo, lista in grupos.items():
         nomes = [nome for nome, id_ in opcoes.items() if id_ in lista]
         st.markdown(f"**{grupo}**: {', '.join(nomes)}")
+
