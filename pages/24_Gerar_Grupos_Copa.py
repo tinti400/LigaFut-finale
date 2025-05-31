@@ -1,7 +1,8 @@
+# 24_Gerar_Grupos_Copa.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
+import random
 from datetime import datetime
 
 # 🔐 Conexão Supabase
@@ -9,8 +10,8 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="📅 Resultados da Copa - LigaFut", layout="wide")
-st.title("📅 Resultados da Fase de Grupos - Copa LigaFut")
+st.set_page_config(page_title="🎯 Gerar Grupos da Copa", layout="centered")
+st.title("🎯 Gerar Grupos da Copa LigaFut")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -19,72 +20,66 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 
 # 👑 Verifica se é admin
 email_usuario = st.session_state.get("usuario", "")
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-eh_admin = len(admin_ref.data) > 0
+try:
+    admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    eh_admin = len(admin_ref.data) > 0
+    if not eh_admin:
+        st.warning("🔒 Acesso permitido apenas para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
+    st.stop()
 
 # 🔄 Buscar times
-res = supabase.table("times").select("id, nome").execute()
-times_dict = {t["id"]: t["nome"] for t in res.data}
+try:
+    todos_times = supabase.table("times").select("id, nome").execute().data
+except Exception as e:
+    st.error(f"Erro ao buscar times: {e}")
+    st.stop()
 
-# 🔄 Buscar grupos
-data_mais_recente = supabase.table("grupos_copa").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
-data_copa = data_mais_recente.data[0]["data_criacao"] if data_mais_recente.data else None
+# 📌 Seleção manual dos times
+st.subheader("📌 Selecione os times participantes")
+opcoes = {t['nome']: t['id'] for t in todos_times}
+selecionados = st.multiselect("Escolha os times que irão participar da Copa:", list(opcoes.keys()))
 
-res = supabase.table("grupos_copa").select("grupo, id_time").eq("data_criacao", data_copa).execute()
-grupos = {}
-for item in res.data:
-    grupo = item["grupo"]
-    if grupo not in grupos:
-        grupos[grupo] = []
-    grupos[grupo].append(item["id_time"])
+if st.button("⚙️ Gerar Grupos da Copa"):
+    if len(selecionados) < 4:
+        st.warning("🚨 É necessário no mínimo 4 times para formar grupos.")
+        st.stop()
 
-# 🔁 Gerar jogos (caso não existam)
-jogos_res = supabase.table("resultados_grupos").select("*").eq("data_criacao", data_copa).execute()
-if not jogos_res.data:
-    from itertools import combinations
-    for grupo_nome, ids in grupos.items():
-        for a, b in combinations(ids, 2):
-            jogo = {
-                "grupo": grupo_nome,
-                "mandante": a,
-                "visitante": b,
-                "gols_mandante": None,
-                "gols_visitante": None,
-                "data_criacao": data_copa
-            }
-            supabase.table("resultados_grupos").insert(jogo).execute()
+    times_escolhidos = [opcoes[nome] for nome in selecionados]
+    random.shuffle(times_escolhidos)
 
-# 🔄 Buscar jogos atualizados
-res = supabase.table("resultados_grupos").select("*").eq("data_criacao", data_copa).order("grupo").execute()
-jogos = res.data
+    grupos = {"Grupo A": [], "Grupo B": [], "Grupo C": [], "Grupo D": []}
+    nomes_grupos = list(grupos.keys())
 
-# 🎯 Exibir e permitir edição
-st.markdown("## 📝 Edição de Resultados")
-grupo_atual = None
-for i, jogo in enumerate(jogos):
-    grupo = jogo["grupo"]
-    if grupo != grupo_atual:
-        st.subheader(f"{grupo}")
-        grupo_atual = grupo
+    # Distribui os times nos grupos (1 com 6, 3 com 5)
+    qtd_grupos = [6, 5, 5, 5] if len(times_escolhidos) >= 21 else [5] * 4
+    idx = 0
+    for i, qtd in enumerate(qtd_grupos):
+        grupos[nomes_grpos[i]] = times_escolhidos[idx:idx+qtd]
+        idx += qtd
 
-    col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 3])
-    with col1:
-        st.markdown(f"**{times_dict.get(jogo['mandante'], '?')}** vs **{times_dict.get(jogo['visitante'], '?')}**")
-    with col2:
-        gols_m = st.number_input("Gols M", key=f"gm{i}", value=jogo["gols_mandante"] or 0, min_value=0)
-    with col3:
-        st.markdown("x")
-    with col4:
-        gols_v = st.number_input("Gols V", key=f"gv{i}", value=jogo["gols_visitante"] or 0, min_value=0)
-    with col5:
-        if eh_admin:
-            if st.button("Salvar", key=f"salvar{i}"):
-                supabase.table("resultados_grupos").update({
-                    "gols_mandante": gols_m,
-                    "gols_visitante": gols_v
-                }).eq("id", jogo["id"]).execute()
-                st.success("✅ Resultado salvo!")
-                st.rerun()
-        else:
-            st.caption("Somente administradores podem editar.")
+    # 💾 Salvar grupos com data atual
+    data_copa = datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        supabase.table("grupos_copa").delete().neq("grupo", "").execute()
+        for grupo_nome, lista_times in grupos.items():
+            for id_time in lista_times:
+                supabase.table("grupos_copa").insert({
+                    "grupo": grupo_nome,
+                    "id_time": id_time,
+                    "data_criacao": data_copa
+                }).execute()
+        st.success("✅ Grupos da Copa gerados e salvos com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar grupos: {e}")
+
+    # 🖼️ Visualização
+    st.subheader("📊 Grupos Gerados")
+    for grupo, lista in grupos.items():
+        nomes = [nome for nome, id_ in opcoes.items() if id_ in lista]
+        st.markdown(f"**{grupo}**: {', '.join(nomes)}")
+
 
