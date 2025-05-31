@@ -27,7 +27,7 @@ if len(admin_ref.data) == 0:
 
 # ⏲️ Data da copa mais recente
 def buscar_data_recente():
-    res = supabase.table("copa_ligafut").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
+    res = supabase.table("grupos_copa").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
     return res.data[0]["data_criacao"] if res.data else None
 
 data_atual = buscar_data_recente()
@@ -42,8 +42,8 @@ def buscar_times():
 
 times = buscar_times()
 
-# 🔢 Buscar grupos
-res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data_atual).execute()
+# 🔢 Buscar jogos da fase de grupos
+res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).execute()
 grupo_data = res.data if res.data else []
 
 if not grupo_data:
@@ -127,7 +127,7 @@ for idx, jogo in enumerate(jogos):
 
 if st.button("✅ Salvar Resultados"):
     try:
-        supabase.table("copa_ligafut").update({"jogos": novo_resultado}).eq("grupo", tab).eq("fase", "grupos").eq("data_criacao", data_atual).execute()
+        supabase.table("copa_ligafut").update({"jogos": novo_resultado}).eq("grupo", tab).eq("data_criacao", data_atual).execute()
         st.success("Resultados atualizados com sucesso!")
         st.rerun()
     except Exception as e:
