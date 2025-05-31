@@ -37,14 +37,10 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar times
+# 👥 Buscar times da divisão diretamente da tabela 'times'
 def obter_nomes_times():
     try:
-        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
-        time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
-        if not time_ids:
-            return {}
-        res = supabase.table("times").select("id", "nome", "logo").in_("id", time_ids).execute()
+        res = supabase.table("times").select("id", "nome", "logo", "divisao").eq("divisao", divisao).execute()
         return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in res.data}
     except Exception as e:
         st.error(f"Erro ao buscar nomes dos times: {e}")
