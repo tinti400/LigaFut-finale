@@ -39,62 +39,11 @@ def obter_nomes_times():
     res_nomes = supabase.table("times").select("id", "nome").execute()
     return {t["id"]: t["nome"] for t in res_nomes.data}
 
-# ⚽ Gerar confrontos estilo Brasileirão com FOLGA
-def gerar_rodadas_brasileirao(times):
-    random.shuffle(times)
-    if len(times) % 2 != 0:
-        times.append("FOLGA_PLACEHOLDER")
-
-    n = len(times)
-    metade = n // 2
-    rodadas = []
-
-    for turno in [0, 1]:  # ida e volta
-        lista = times[:]
-        for i in range(n - 1):
-            rodada = []
-            for j in range(metade):
-                t1 = lista[j]
-                t2 = lista[n - 1 - j]
-
-                if "FOLGA_PLACEHOLDER" in [t1, t2]:
-                    time_folgando = t2 if t1 == "FOLGA_PLACEHOLDER" else t1
-                    rodada.append({
-                        "mandante": time_folgando,
-                        "visitante": "FOLGA",
-                        "gols_mandante": None,
-                        "gols_visitante": None
-                    })
-                else:
-                    rodada.append({
-                        "mandante": t1 if turno == 0 else t2,
-                        "visitante": t2 if turno == 0 else t1,
-                        "gols_mandante": None,
-                        "gols_visitante": None
-                    })
-            rodadas.append(rodada)
-            lista = [lista[0]] + [lista[-1]] + lista[1:-1]
-    return rodadas
-
 # 🔍 Buscar rodadas existentes
 def buscar_rodadas():
     return supabase.table(nome_tabela_rodadas).select("*").order("numero").execute().data
 
-# ⚙️ Botão para gerar rodadas
-if st.button("⚙️ Gerar Rodadas da " + divisao):
-    time_ids = obter_times(divisao)
-    if len(time_ids) < 2:
-        st.warning("🚨 Mínimo de 2 times para gerar confrontos.")
-        st.stop()
-
-    supabase.table(nome_tabela_rodadas).delete().neq("numero", -1).execute()
-    rodadas = gerar_rodadas_brasileirao(time_ids)
-    for i, jogos in enumerate(rodadas, 1):
-        supabase.table(nome_tabela_rodadas).insert({"numero": i, "jogos": jogos}).execute()
-    st.success(f"✅ {len(rodadas)} rodadas geradas com sucesso para {divisao}!")
-    st.rerun()
-
-# 🔍 Editor de resultados por rodada
+# 🔍 Rodadas
 rodadas_existentes = buscar_rodadas()
 times_map = obter_nomes_times()
 
@@ -116,13 +65,13 @@ if rodadas_existentes:
         with col2:
             gm = st.number_input(f"Gols {nome_m}", min_value=0,
                                  value=jogo.get("gols_mandante") if jogo.get("gols_mandante") is not None else 0,
-                                 key=f"gm_{idx}")
+                                 key=f"gm_{idx}", format="%d")
         with col3:
             st.markdown("**X**")
         with col4:
             gv = st.number_input(f"Gols {nome_v}", min_value=0,
                                  value=jogo.get("gols_visitante") if jogo.get("gols_visitante") is not None else 0,
-                                 key=f"gv_{idx}")
+                                 key=f"gv_{idx}", format="%d")
         with col5:
             st.markdown(f"**{nome_v}**")
 
@@ -141,3 +90,4 @@ if rodadas_existentes:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
+
