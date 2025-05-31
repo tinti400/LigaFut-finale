@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+from datetime import datetime
+import pandas as pd
+from collections import defaultdict
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -76,6 +79,46 @@ def exibir_card_grupo(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
+# 📊 Calcular classificação por grupo
+def calcular_classificacao(jogos):
+    tabela = defaultdict(lambda: {"P": 0, "J": 0, "V": 0, "E": 0, "D": 0, "GP": 0, "GC": 0, "SG": 0})
+    for jogo in jogos:
+        m = jogo.get("mandante")
+        v = jogo.get("visitante")
+        gm = jogo.get("gols_mandante")
+        gv = jogo.get("gols_visitante")
+        if None in (m, v, gm, gv):
+            continue
+
+        tabela[m]["J"] += 1
+        tabela[v]["J"] += 1
+        tabela[m]["GP"] += gm
+        tabela[m]["GC"] += gv
+        tabela[v]["GP"] += gv
+        tabela[v]["GC"] += gm
+
+        if gm > gv:
+            tabela[m]["V"] += 1
+            tabela[v]["D"] += 1
+            tabela[m]["P"] += 3
+        elif gv > gm:
+            tabela[v]["V"] += 1
+            tabela[m]["D"] += 1
+            tabela[v]["P"] += 3
+        else:
+            tabela[m]["E"] += 1
+            tabela[v]["E"] += 1
+            tabela[m]["P"] += 1
+            tabela[v]["P"] += 1
+
+    for t in tabela:
+        tabela[t]["SG"] = tabela[t]["GP"] - tabela[t]["GC"]
+
+    df = pd.DataFrame.from_dict(tabela, orient="index")
+    df["Time"] = df.index.map(lambda tid: times.get(tid, {}).get("nome", "?"))
+    df = df[["Time", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
+    return df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
+
 # 🔁 Buscar tudo
 times = buscar_times()
 data_atual = buscar_data_mais_recente()
@@ -100,6 +143,9 @@ for idx, (grupo, jogos) in enumerate(sorted(grupos_por_nome.items())):
         st.markdown(f"### {grupo}")
         for jogo in jogos:
             exibir_card_grupo(jogo)
+        st.markdown("### Classificação")
+        df_class = calcular_classificacao(jogos)
+        st.dataframe(df_class, use_container_width=True)
 
 # 🧾 Exibir mata-mata
 def exibir_fase_mata(nome, dados, coluna):
