@@ -132,5 +132,6 @@ if rodadas_existentes:
 
             supabase.table(nome_tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_escolhida).execute()
             st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
-            st.rerun()
+            st.experimental_rerun()
+
 
