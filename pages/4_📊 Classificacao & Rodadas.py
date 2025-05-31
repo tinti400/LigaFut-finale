@@ -52,14 +52,7 @@ def obter_nomes_times():
 
 # 🧠 Classificação
 def calcular_classificacao(rodadas, times_map):
-    tabela = {
-        tid: {
-            "nome": times_map[tid]["nome"],
-            "logo": times_map[tid]["logo"],
-            "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
-        }
-        for tid in times_map
-    }
+    tabela = {}
 
     for rodada in rodadas:
         for jogo in rodada.get("jogos", []):
@@ -102,6 +95,15 @@ def calcular_classificacao(rodadas, times_map):
                 tabela[v]["pontos"] += 1
                 tabela[m]["e"] += 1
                 tabela[v]["e"] += 1
+
+    # 🔄 Garante que todos os times da divisão estejam presentes
+    for tid in times_map:
+        if tid not in tabela:
+            tabela[tid] = {
+                "nome": times_map[tid]["nome"],
+                "logo": times_map[tid]["logo"],
+                "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
+            }
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
