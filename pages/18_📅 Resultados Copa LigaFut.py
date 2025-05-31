@@ -3,189 +3,145 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import random
-import uuid
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="Copa LigaFut", layout="wide")
-st.title("🏆 Copa LigaFut - Mata-mata (Ida e Volta)")
+st.set_page_config(page_title="📅 Resultados Fase de Grupos", layout="wide")
+st.title("📅 Fase de Grupos - Resultados")
 
-# 🔐 Verifica login
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+# ✅ Verifica login
+dados_sessao = st.session_state
+if "usuario_id" not in dados_sessao:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 👥 Buscar times cadastrados
-res_times = supabase.table("times").select("id,nome").execute()
-times = res_times.data if res_times.data else []
-mapa_times = {t['id']: t['nome'] for t in times}
-
-# 🗓️ Selecionar times
-st.subheader("📌 Selecione os times participantes da Copa")
-st.caption("Escolha entre 16 e 20 times:")
-
-selected_teams = st.multiselect("Times:", [f"{t['nome']} — {t['id']}" for t in times])
-
-if st.button("✨ Gerar Copa"):
-    if len(selected_teams) < 16:
-        st.error("❌ É preciso selecionar no mínimo 16 times.")
-        st.stop()
-    if len(selected_teams) > 20:
-        st.error("❌ O limite máximo são 20 times.")
-        st.stop()
-
-    time_ids = [t.split(" — ")[-1] for t in selected_teams]
-    fase = "oitavas"
-    confrontos = []
-    times_classificados = []
-
-    if len(time_ids) > 16:
-        num_jogos_pre = (len(time_ids) - 16)
-        fase = "preliminar"
-        st.info(f"⚠️ Criando fase preliminar com {num_jogos_pre * 2} times ({num_jogos_pre} confrontos)")
-
-        times_pre = random.sample(time_ids, num_jogos_pre * 2)
-        restantes = list(set(time_ids) - set(times_pre))
-        times_classificados = restantes.copy()
-
-        random.shuffle(times_pre)
-        for i in range(0, len(times_pre), 2):
-            confrontos.append({
-                "mandante_ida": times_pre[i],
-                "visitante_ida": times_pre[i+1],
-                "gols_ida_m": None,
-                "gols_ida_v": None,
-                "gols_volta_m": None,
-                "gols_volta_v": None
-            })
-    else:
-        random.shuffle(time_ids)
-        for i in range(0, len(time_ids), 2):
-            confrontos.append({
-                "mandante_ida": time_ids[i],
-                "visitante_ida": time_ids[i+1],
-                "gols_ida_m": None,
-                "gols_ida_v": None,
-                "gols_volta_m": None,
-                "gols_volta_v": None
-            })
-
-    supabase.table("copa_ligafut").insert({
-        "id": str(uuid.uuid4()),
-        "numero": 1,
-        "fase": fase,
-        "jogos": confrontos,
-        "classificados": [str(c) for c in times_classificados],
-        "data_criacao": datetime.utcnow().isoformat()
-    }).execute()
-
-    st.success("✅ Copa criada com sucesso!")
-    st.experimental_rerun()
-
-# 🗒️ Exibir confrontos + edição dos resultados
-res = supabase.table("copa_ligafut").select("id, numero, fase, jogos, classificados, data_criacao").order("data_criacao", desc=True).limit(1).execute()
-doc = res.data[0] if res.data else {}
-if not doc:
+# ⚡️ Verifica se é administrador
+email_usuario = dados_sessao.get("usuario", "")
+admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+if len(admin_ref.data) == 0:
+    st.warning("⛔️ Acesso restrito aos administradores.")
     st.stop()
 
-if "id" not in doc:
-    st.error("❌ Erro interno: documento da copa sem campo 'id'.")
+# ⏲️ Data da copa mais recente
+def buscar_data_recente():
+    res = supabase.table("copa_ligafut").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
+    return res.data[0]["data_criacao"] if res.data else None
+
+data_atual = buscar_data_recente()
+if not data_atual:
+    st.info("Nenhuma edição da copa encontrada.")
     st.stop()
 
-jogos = doc.get("jogos", [])
-fase = doc.get("fase", "")
-st.subheader(f"🗕️ Confrontos da Fase: {fase.upper()}")
+# 🔄 Buscar times (id e nome)
+def buscar_times():
+    res = supabase.table("times").select("id, nome").execute()
+    return {t["id"]: t["nome"] for t in res.data}
 
-classificados = doc.get("classificados", [])
+times = buscar_times()
 
-for i, jogo in enumerate(jogos):
-    id_m = jogo.get("mandante_ida")
-    id_v = jogo.get("visitante_ida")
-    nome_m = mapa_times.get(id_m, f"? ({id_m})")
-    nome_v = mapa_times.get(id_v, f"? ({id_v})")
+# 🔢 Buscar grupos
+res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data_atual).execute()
+grupo_data = res.data if res.data else []
 
-    st.markdown(f"### {nome_m} x {nome_v}")
-    col1, col2, col3, col4 = st.columns(4)
+if not grupo_data:
+    st.info("A fase de grupos ainda não foi gerada.")
+    st.stop()
+
+# 📈 Função para calcular classificação
+from collections import defaultdict
+
+def calcular_classificacao(jogos):
+    tabela = defaultdict(lambda: {"P": 0, "J": 0, "V": 0, "E": 0, "D": 0, "GP": 0, "GC": 0, "SG": 0})
+    for jogo in jogos:
+        m = jogo.get("mandante")
+        v = jogo.get("visitante")
+        gm = jogo.get("gols_mandante")
+        gv = jogo.get("gols_visitante")
+        if None in (m, v, gm, gv):
+            continue
+
+        tabela[m]["J"] += 1
+        tabela[v]["J"] += 1
+        tabela[m]["GP"] += gm
+        tabela[m]["GC"] += gv
+        tabela[v]["GP"] += gv
+        tabela[v]["GC"] += gm
+
+        if gm > gv:
+            tabela[m]["V"] += 1
+            tabela[v]["D"] += 1
+            tabela[m]["P"] += 3
+        elif gv > gm:
+            tabela[v]["V"] += 1
+            tabela[m]["D"] += 1
+            tabela[v]["P"] += 3
+        else:
+            tabela[m]["E"] += 1
+            tabela[v]["E"] += 1
+            tabela[m]["P"] += 1
+            tabela[v]["P"] += 1
+
+    for t in tabela:
+        tabela[t]["SG"] = tabela[t]["GP"] - tabela[t]["GC"]
+    return tabela
+
+# 🏋️ Interface para editar jogos por grupo
+grupos = sorted(set([g["grupo"] for g in grupo_data]))
+
+tab = st.selectbox("Escolha o grupo para editar resultados:", grupos)
+
+grupo_jogos = next((g for g in grupo_data if g["grupo"] == tab), None)
+if not grupo_jogos:
+    st.error("Grupo não encontrado.")
+    st.stop()
+
+jogos = grupo_jogos.get("jogos", [])
+
+st.markdown(f"### Jogos do Grupo {tab}")
+
+novo_resultado = []
+for idx, jogo in enumerate(jogos):
+    col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 3])
     with col1:
-        ida_m = st.number_input("Gols Ida (Mandante)", min_value=0, value=jogo.get("gols_ida_m") or 0, key=f"im_{i}")
+        mandante = times.get(jogo["mandante"], "?")
+        visitante = times.get(jogo["visitante"], "?")
+        st.write(mandante)
     with col2:
-        ida_v = st.number_input("Gols Ida (Visitante)", min_value=0, value=jogo.get("gols_ida_v") or 0, key=f"iv_{i}")
+        gols_m = st.number_input("Gols M", min_value=0, value=jogo.get("gols_mandante") or 0, key=f"gm_{idx}")
     with col3:
-        volta_m = st.number_input("Gols Volta (Visitante)", min_value=0, value=jogo.get("gols_volta_m") or 0, key=f"vm_{i}")
+        st.write("x")
     with col4:
-        volta_v = st.number_input("Gols Volta (Mandante)", min_value=0, value=jogo.get("gols_volta_v") or 0, key=f"vv_{i}")
+        gols_v = st.number_input("Gols V", min_value=0, value=jogo.get("gols_visitante") or 0, key=f"gv_{idx}")
+    with col5:
+        st.write(visitante)
 
-    total_m = ida_m + volta_v
-    total_v = ida_v + volta_m
-    resultado = f"{total_m} x {total_v}"
+    novo_resultado.append({
+        "mandante": jogo["mandante"],
+        "visitante": jogo["visitante"],
+        "gols_mandante": gols_m,
+        "gols_visitante": gols_v
+    })
 
-    if total_m > total_v:
-        st.success(f"✅ {nome_m} classificado ({resultado})")
-        if id_m not in classificados:
-            classificados.append(id_m)
-    elif total_v > total_m:
-        st.success(f"✅ {nome_v} classificado ({resultado})")
-        if id_v not in classificados:
-            classificados.append(id_v)
-    else:
-        st.warning(f"⚠️ Empate no agregado: {resultado} - Definir vencedor por pênaltis")
+if st.button("✅ Salvar Resultados"):
+    try:
+        supabase.table("copa_ligafut").update({"jogos": novo_resultado}).eq("grupo", tab).eq("fase", "grupos").eq("data_criacao", data_atual).execute()
+        st.success("Resultados atualizados com sucesso!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro ao salvar: {e}")
 
-    if st.button("📅 Salvar Resultado", key=f"btn_{i}"):
-        jogo.update({
-            "gols_ida_m": ida_m,
-            "gols_ida_v": ida_v,
-            "gols_volta_m": volta_m,
-            "gols_volta_v": volta_v
-        })
-        supabase.table("copa_ligafut").update({
-            "jogos": jogos,
-            "classificados": list(set(classificados))
-        }).eq("id", doc["id"]).execute()
-        st.success("✅ Resultado atualizado com sucesso!")
-        st.experimental_rerun()
+# 📊 Classificação
+st.markdown(f"### 📊 Classificação do Grupo {tab}")
+tabela = calcular_classificacao(novo_resultado)
 
-# ➔ Avançar de fase ou declarar campeão
-if all(j.get("gols_ida_m") is not None and j.get("gols_ida_v") is not None and 
-       j.get("gols_volta_m") is not None and j.get("gols_volta_v") is not None 
-       for j in jogos):
+import pandas as pd
 
-    if fase == "final":
-        nome_campeao = mapa_times.get(classificados[0], "Desconhecido")
-        st.success(f"🏆 CAMPEÃO DA COPA LIGAFUT: **{nome_campeao}**")
-    else:
-        if st.button("➡️ Avançar para próxima fase"):
-            nova_fase = {
-                "preliminar": "oitavas",
-                "oitavas": "quartas",
-                "quartas": "semifinal",
-                "semifinal": "final"
-            }.get(fase, "encerrado")
+df = pd.DataFrame.from_dict(tabela, orient="index")
+df["Time"] = df.index.map(lambda tid: times.get(tid, "?"))
+df = df[["Time", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
+df = df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
 
-            random.shuffle(classificados)
-            novos_jogos = []
-            for i in range(0, len(classificados), 2):
-                if i + 1 < len(classificados):
-                    novos_jogos.append({
-                        "mandante_ida": classificados[i],
-                        "visitante_ida": classificados[i+1],
-                        "gols_ida_m": None,
-                        "gols_ida_v": None,
-                        "gols_volta_m": None,
-                        "gols_volta_v": None
-                    })
-
-            supabase.table("copa_ligafut").insert({
-                "id": str(uuid.uuid4()),
-                "numero": doc["numero"] + 1,
-                "fase": nova_fase,
-                "jogos": novos_jogos,
-                "classificados": [],
-                "data_criacao": datetime.utcnow().isoformat()
-            }).execute()
-
-            st.success(f"✅ Fase '{nova_fase.upper()}' criada com sucesso!")
-            st.experimental_rerun()
-
+st.dataframe(df, use_container_width=True)
