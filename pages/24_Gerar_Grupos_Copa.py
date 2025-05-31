@@ -57,7 +57,7 @@ if st.button("⚙️ Gerar Grupos da Copa"):
     qtd_grupos = [6, 5, 5, 5] if len(times_escolhidos) >= 21 else [5] * 4
     idx = 0
     for i, qtd in enumerate(qtd_grupos):
-        grupos[nomes_grpos[i]] = times_escolhidos[idx:idx+qtd]
+        grupos[nomes_grupos[i]] = times_escolhidos[idx:idx+qtd]
         idx += qtd
 
     # 💾 Salvar grupos com data atual
@@ -81,5 +81,3 @@ if st.button("⚙️ Gerar Grupos da Copa"):
     for grupo, lista in grupos.items():
         nomes = [nome for nome, id_ in opcoes.items() if id_ in lista]
         st.markdown(f"**{grupo}**: {', '.join(nomes)}")
-
-
