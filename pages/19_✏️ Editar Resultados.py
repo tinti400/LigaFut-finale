@@ -17,16 +17,11 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 👑 Verifica se é admin pela tabela "admins"
+# 👑 Verifica se é admin
 email_usuario = st.session_state.get("usuario", "")
-try:
-    admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-    eh_admin = len(admin_ref.data) > 0
-    if not eh_admin:
-        st.error("🔒 Acesso restrito: somente administradores podem acessar esta página.")
-        st.stop()
-except Exception as e:
-    st.error(f"Erro ao verificar administrador: {e}")
+admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+if len(admin_ref.data) == 0:
+    st.error("🔒 Acesso restrito: somente administradores.")
     st.stop()
 
 # 🔹 Filtro de divisão
@@ -54,7 +49,7 @@ def gerar_rodadas_brasileirao(times):
     metade = n // 2
     rodadas = []
 
-    for turno in [0, 1]:  # 0 = ida, 1 = volta
+    for turno in [0, 1]:  # ida e volta
         lista = times[:]
         for i in range(n - 1):
             rodada = []
@@ -109,40 +104,40 @@ if rodadas_existentes:
     rodada_escolhida = st.selectbox("Selecione a rodada para editar", lista_numeros)
     rodada = next(r for r in rodadas_existentes if r["numero"] == rodada_escolhida)
 
-    for jogo in rodada["jogos"]:
+    for idx, jogo in enumerate(rodada["jogos"]):
         mandante = jogo["mandante"]
         visitante = jogo["visitante"]
-        gols_mandante = jogo.get("gols_mandante") or 0
-        gols_visitante = jogo.get("gols_visitante") or 0
-
         nome_m = times_map.get(mandante, "FOLGA" if mandante == "FOLGA" else "?")
         nome_v = times_map.get(visitante, "FOLGA" if visitante == "FOLGA" else "?")
 
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+        col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
         with col1:
             st.markdown(f"**{nome_m}**")
+        with col2:
+            gm = st.number_input(f"Gols {nome_m}", min_value=0,
+                                 value=jogo.get("gols_mandante") if jogo.get("gols_mandante") is not None else 0,
+                                 key=f"gm_{idx}")
         with col3:
-            st.markdown("**x**")
+            st.markdown("**X**")
+        with col4:
+            gv = st.number_input(f"Gols {nome_v}", min_value=0,
+                                 value=jogo.get("gols_visitante") if jogo.get("gols_visitante") is not None else 0,
+                                 key=f"gv_{idx}")
         with col5:
             st.markdown(f"**{nome_v}**")
 
         if "FOLGA" in [mandante, visitante]:
-            st.markdown("🚫 Este time folgou nesta rodada.")
-            continue
+            st.info("🚫 Este time folgou nesta rodada.")
+        else:
+            if st.button("💾 Salvar Resultado", key=f"salvar_{idx}"):
+                rodada["jogos"][idx]["gols_mandante"] = gm
+                rodada["jogos"][idx]["gols_visitante"] = gv
 
-        with col2:
-            gm = st.number_input(" ", min_value=0, value=gols_mandante, key=f"gm_{rodada_escolhida}_{mandante}")
-        with col4:
-            gv = st.number_input("  ", min_value=0, value=gols_visitante, key=f"gv_{rodada_escolhida}_{visitante}")
-
-        if st.button("📂 Salvar", key=f"salvar_{rodada_escolhida}_{mandante}_{visitante}"):
-            novos_jogos = []
-            for j in rodada["jogos"]:
-                if j["mandante"] == mandante and j["visitante"] == visitante:
-                    j["gols_mandante"] = gm
-                    j["gols_visitante"] = gv
-                novos_jogos.append(j)
-
-            supabase.table(nome_tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_escolhida).execute()
-            st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
-            st.rerun()
+                try:
+                    supabase.table(nome_tabela_rodadas).update({
+                        "jogos": rodada["jogos"]
+                    }).eq("numero", rodada_escolhida).execute()
+                    st.success(f"Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
