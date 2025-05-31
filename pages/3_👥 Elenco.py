@@ -33,34 +33,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 📥 Importar jogadores via planilha Excel
-st.subheader("📥 Importar jogadores via planilha Excel")
-arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, posicao, overall, valor", type="xlsx")
-
-if arquivo:
-    try:
-        df_importado = pd.read_excel(arquivo)
-
-        colunas_esperadas = {"nome", "posicao", "overall", "valor"}
-        if not colunas_esperadas.issubset(df_importado.columns):
-            st.error("❌ A planilha precisa ter as colunas: nome, posicao, overall, valor")
-        else:
-            jogadores = df_importado.to_dict(orient="records")
-
-            for jogador in jogadores:
-                supabase.table("elenco").insert({
-                    "id_time": id_time,
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": int(jogador["overall"]),
-                    "valor": int(jogador["valor"])
-                }).execute()
-
-            st.success(f"✅ {len(jogadores)} jogadores importados com sucesso!")
-            st.rerun()
-    except Exception as e:
-        st.error(f"Erro ao importar planilha: {e}")
-
 # 🛑 Verifica se o mercado está aberto
 try:
     res = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
