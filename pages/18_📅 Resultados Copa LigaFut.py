@@ -2,7 +2,8 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import random
+import pandas as pd
+from collections import defaultdict
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -43,7 +44,7 @@ def buscar_times():
 times = buscar_times()
 
 # 🔢 Buscar jogos da fase de grupos
-res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).execute()
+res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).eq("fase", "grupos").execute()
 grupo_data = res.data if res.data else []
 
 if not grupo_data:
@@ -51,8 +52,6 @@ if not grupo_data:
     st.stop()
 
 # 📈 Função para calcular classificação
-from collections import defaultdict
-
 def calcular_classificacao(jogos):
     tabela = defaultdict(lambda: {"P": 0, "J": 0, "V": 0, "E": 0, "D": 0, "GP": 0, "GC": 0, "SG": 0})
     for jogo in jogos:
@@ -90,7 +89,6 @@ def calcular_classificacao(jogos):
 
 # 🏋️ Interface para editar jogos por grupo
 grupos = sorted(set([g["grupo"] for g in grupo_data]))
-
 tab = st.selectbox("Escolha o grupo para editar resultados:", grupos)
 
 grupo_jogos = next((g for g in grupo_data if g["grupo"] == tab), None)
@@ -127,7 +125,8 @@ for idx, jogo in enumerate(jogos):
 
 if st.button("✅ Salvar Resultados"):
     try:
-        supabase.table("copa_ligafut").update({"jogos": novo_resultado}).eq("grupo", tab).eq("data_criacao", data_atual).execute()
+        supabase.table("copa_ligafut").update({"jogos": novo_resultado}) \
+            .eq("grupo", tab).eq("fase", "grupos").eq("data_criacao", data_atual).execute()
         st.success("Resultados atualizados com sucesso!")
         st.rerun()
     except Exception as e:
@@ -136,8 +135,6 @@ if st.button("✅ Salvar Resultados"):
 # 📊 Classificação
 st.markdown(f"### 📊 Classificação do Grupo {tab}")
 tabela = calcular_classificacao(novo_resultado)
-
-import pandas as pd
 
 df = pd.DataFrame.from_dict(tabela, orient="index")
 df["Time"] = df.index.map(lambda tid: times.get(tid, "?"))
