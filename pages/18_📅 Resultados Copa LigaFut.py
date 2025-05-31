@@ -92,4 +92,4 @@ for idx, jogo in enumerate(jogos):
         except Exception as e:
             st.error(f"Erro ao salvar resultado: {e}")
 
-    st.divider()
+    st.markdown("---")
