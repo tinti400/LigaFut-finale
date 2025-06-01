@@ -165,6 +165,7 @@ if ativo and fase == "acao":
                                 supabase.table("times").update({"saldo": saldo_p + valor // 2}).eq("id", time["id"]).execute()
 
                                 registrar_movimentacao(id_time, nome_j, "Roubo", "Compra", valor // 2)
+
                                 supabase.table("configuracoes").update({"roubos": roubos, "ja_perderam": ja_perderam}).eq("id", ID_CONFIG).execute()
                                 st.experimental_rerun()
 
