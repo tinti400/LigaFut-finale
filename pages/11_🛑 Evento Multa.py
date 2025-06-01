@@ -8,13 +8,13 @@ from utils import verificar_login, registrar_movimentacao
 
 st.set_page_config(page_title="Evento de Multa - LigaFut", layout="wide")
 
-# 🔐 Conexão com Supabase
+# 🔗 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Login
 verificar_login()
+
 id_usuario = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -38,7 +38,7 @@ concluidos = evento.get("concluidos", [])
 bloqueios = evento.get("bloqueios", {})
 ultimos_bloqueios = evento.get("ultimos_bloqueios", {})
 ja_perderam = evento.get("ja_perderam", {})
-roubos = evento.get("roubos", {})
+multas = evento.get("multas", {})
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
 if st.button("🔄 Atualizar Página"):
@@ -52,13 +52,12 @@ if eh_admin:
         random.shuffle(times_data)
         nova_ordem_ids = [t["id"] for t in times_data]
         supabase.table("configuracoes").update({
-            "id": ID_CONFIG,
             "ativo": True,
             "finalizado": False,
             "fase": "sorteio",
             "ordem": nova_ordem_ids,
             "vez": "0",
-            "roubos": {},
+            "multas": {},
             "bloqueios": {},
             "ultimos_bloqueios": bloqueios,
             "ja_perderam": {},
@@ -79,8 +78,10 @@ if ativo and fase == "bloqueio":
     bloqueios_atual = bloqueios.get(id_time, [])
     ultimos = ultimos_bloqueios.get(id_time, [])
     elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
+
     nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
-    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados and j["nome"] not in [b["nome"] for b in ultimos]]
+    nomes_ultimos = [j["nome"] for j in ultimos] if ultimos else []
+    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados and j["nome"] not in nomes_ultimos]
 
     if len(nomes_bloqueados) < limite_bloqueios:
         selecionado = st.selectbox("Selecione um jogador para proteger:", [""] + jogadores_disponiveis)
@@ -96,11 +97,7 @@ if ativo and fase == "bloqueio":
 
     if eh_admin:
         if st.button("👉 Iniciar Fase de Ação"):
-            supabase.table("configuracoes").update({
-                "fase": "acao",
-                "vez": "0",
-                "concluidos": []
-            }).eq("id", ID_CONFIG).execute()
+            supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
             st.rerun()
 
 # 🎯 Fase de ação
@@ -114,9 +111,9 @@ if ativo and fase == "acao":
         st.markdown(f"🟡 **Vez do time:** {nome_vez}")
 
         if id_time == ordem[vez]:
-            st.subheader("🔍 Escolha os jogadores para comprar por multa")
+            st.subheader("💰 Escolha os jogadores para pagar multa e comprar")
             times = supabase.table("times").select("id", "nome").execute().data
-            limite_alcancado = len(roubos.get(id_time, [])) >= 5
+            limite_alcancado = len(multas.get(id_time, [])) >= 5
 
             if limite_alcancado:
                 st.info("✅ Você já escolheu os 5 jogadores permitidos.")
@@ -134,19 +131,19 @@ if ativo and fase == "acao":
                         posicao = jogador["posicao"]
                         valor = jogador["valor"]
                         overall = jogador.get("overall", 0)
-                        ja_roubado = any(r.get("nome") == nome_j and r.get("de") == time["id"] for lista in roubos.values() for r in lista)
+                        ja_multiplicado = any(r.get("nome") == nome_j and r.get("de") == time["id"] for lista in multas.values() for r in lista)
                         bloqueado = nome_j in bloqueados
                         btn_id = f"{time['id']}_{nome_j}_{posicao}"
 
                         if bloqueado:
                             st.markdown(f"🔒 {nome_j} - {posicao} (R$ {valor:,.0f})")
-                        elif ja_roubado:
+                        elif ja_multiplicado:
                             st.markdown(f"❌ {nome_j} - já transferido")
                         else:
-                            if not limite_alcancado and st.button(f"Comprar {nome_j} (R$ {valor:,.0f})", key=btn_id):
+                            if not limite_alcancado and st.button(f"Pagar multa por {nome_j} (R$ {valor:,.0f})", key=btn_id):
                                 saldo_r = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
                                 if saldo_r < valor:
-                                    st.error("❌ Seu time não tem saldo suficiente para esta compra.")
+                                    st.error("❌ Seu time não tem saldo suficiente para este pagamento.")
                                     st.stop()
 
                                 saldo_p = supabase.table("times").select("saldo").eq("id", time["id"]).execute().data[0]["saldo"]
@@ -155,10 +152,10 @@ if ativo and fase == "acao":
                                 supabase.table("times").update({"saldo": saldo_r - valor}).eq("id", id_time).execute()
                                 supabase.table("times").update({"saldo": saldo_p + valor}).eq("id", time["id"]).execute()
 
-                                # Registra
-                                novo = roubos.get(id_time, [])
+                                # Registra multa
+                                novo = multas.get(id_time, [])
                                 novo.append({"nome": nome_j, "posicao": posicao, "valor": int(valor), "de": time["id"]})
-                                roubos[id_time] = novo
+                                multas[id_time] = novo
                                 ja_perderam[time["id"]] = ja_perderam.get(time["id"], 0) + 1
 
                                 # Transferência real
@@ -174,7 +171,7 @@ if ativo and fase == "acao":
                                 registrar_movimentacao(id_time, nome_j, "Multa", "Compra", valor)
 
                                 supabase.table("configuracoes").update({
-                                    "roubos": roubos,
+                                    "multas": multas,
                                     "ja_perderam": ja_perderam
                                 }).eq("id", ID_CONFIG).execute()
                                 st.rerun()
@@ -203,15 +200,15 @@ if evento.get("finalizado"):
     st.subheader("📋 Resumo das Transferências")
 
     resumo = []
-    for id_destino, lista in roubos.items():
+    for id_destino, lista in multas.items():
         nome_destino = supabase.table("times").select("nome").eq("id", id_destino).execute().data[0]["nome"]
         for jogador in lista:
             nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
             resumo.append({
-                "🏆 Time que Comprou": nome_destino,
+                "🏆 Time que Pagou": nome_destino,
                 "👤 Jogador": jogador["nome"],
                 "🎯 Posição": jogador["posicao"],
-                "💰 Valor Pago": f"R$ {jogador['valor']:,.0f}",
+                "💰 Valor Pago (100%)": f"R$ {jogador['valor']:,.0f}",
                 "❌ Time Anterior": nome_origem
             })
 
@@ -219,5 +216,6 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
 
 
