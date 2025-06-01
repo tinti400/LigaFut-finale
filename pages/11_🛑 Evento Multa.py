@@ -8,12 +8,13 @@ from utils import verificar_login, registrar_movimentacao
 
 st.set_page_config(page_title="Evento de Multa - LigaFut", layout="wide")
 
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# ✅ Login
 verificar_login()
-
 id_usuario = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -21,7 +22,7 @@ email_usuario = st.session_state["usuario"]
 
 st.title("🛑 Evento de Multa - LigaFut")
 
-ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"  # Utilize ID específico para evento multa
+ID_CONFIG = "evento_multa"
 
 admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = admin_ref.data and admin_ref.data[0]["administrador"]
@@ -51,6 +52,7 @@ if eh_admin:
         random.shuffle(times_data)
         nova_ordem_ids = [t["id"] for t in times_data]
         supabase.table("configuracoes").update({
+            "id": ID_CONFIG,
             "ativo": True,
             "finalizado": False,
             "fase": "sorteio",
@@ -75,9 +77,10 @@ if ativo and fase == "sorteio" and eh_admin:
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
     bloqueios_atual = bloqueios.get(id_time, [])
+    ultimos = ultimos_bloqueios.get(id_time, [])
     elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
     nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
-    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados]
+    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados and j["nome"] not in [b["nome"] for b in ultimos]]
 
     if len(nomes_bloqueados) < limite_bloqueios:
         selecionado = st.selectbox("Selecione um jogador para proteger:", [""] + jogadores_disponiveis)
@@ -93,7 +96,11 @@ if ativo and fase == "bloqueio":
 
     if eh_admin:
         if st.button("👉 Iniciar Fase de Ação"):
-            supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
+            supabase.table("configuracoes").update({
+                "fase": "acao",
+                "vez": "0",
+                "concluidos": []
+            }).eq("id", ID_CONFIG).execute()
             st.rerun()
 
 # 🎯 Fase de ação
@@ -144,11 +151,11 @@ if ativo and fase == "acao":
 
                                 saldo_p = supabase.table("times").select("saldo").eq("id", time["id"]).execute().data[0]["saldo"]
 
-                                # Atualiza saldos
+                                # Atualiza saldo
                                 supabase.table("times").update({"saldo": saldo_r - valor}).eq("id", id_time).execute()
                                 supabase.table("times").update({"saldo": saldo_p + valor}).eq("id", time["id"]).execute()
 
-                                # Registra compra
+                                # Registra
                                 novo = roubos.get(id_time, [])
                                 novo.append({"nome": nome_j, "posicao": posicao, "valor": int(valor), "de": time["id"]})
                                 roubos[id_time] = novo
@@ -183,7 +190,7 @@ if ativo and fase == "acao":
                 st.rerun()
 
             if vez + 1 >= len(ordem):
-                if st.button("🏁 Encerrar Evento e Transferir Jogadores"):
+                if st.button("🏁 Encerrar Evento"):
                     supabase.table("configuracoes").update({"finalizado": True, "ativo": False}).eq("id", ID_CONFIG).execute()
                     st.rerun()
 
@@ -204,12 +211,13 @@ if evento.get("finalizado"):
                 "🏆 Time que Comprou": nome_destino,
                 "👤 Jogador": jogador["nome"],
                 "🎯 Posição": jogador["posicao"],
-                "💰 Valor Pago (100%)": f"R$ {jogador['valor']:,.0f}",
-                "❌ Time de Origem": nome_origem
+                "💰 Valor Pago": f"R$ {jogador['valor']:,.0f}",
+                "❌ Time Anterior": nome_origem
             })
 
     if resumo:
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
 
