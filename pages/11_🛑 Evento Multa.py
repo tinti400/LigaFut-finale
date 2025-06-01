@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -42,7 +42,7 @@ multas = evento.get("multas", {})
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
 if st.button("🔄 Atualizar Página"):
-    st.experimental_rerun()
+    st.rerun()
 
 # 🔁 Reiniciar evento
 if eh_admin:
@@ -64,14 +64,14 @@ if eh_admin:
             "concluidos": [],
             "inicio": str(datetime.utcnow())
         }).eq("id", ID_CONFIG).execute()
-        st.experimental_rerun()
+        st.rerun()
 
 # 🔐 Fase de bloqueio
 if ativo and fase == "sorteio" and eh_admin:
     st.subheader("🛡️ Iniciar Fase de Bloqueio")
     if st.button("➡️ Começar Bloqueios"):
         supabase.table("configuracoes").update({"fase": "bloqueio"}).eq("id", ID_CONFIG).execute()
-        st.experimental_rerun()
+        st.rerun()
 
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
@@ -79,8 +79,8 @@ if ativo and fase == "bloqueio":
     ultimos = ultimos_bloqueios.get(id_time, [])
     elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
 
-    nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
-    nomes_ultimos = [j["nome"] for j in ultimos] if ultimos else []
+    nomes_bloqueados = [j["nome"] for j in (bloqueios_atual or [])]
+    nomes_ultimos = [j["nome"] for j in (ultimos or [])]
     jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados and j["nome"] not in nomes_ultimos]
 
     if len(nomes_bloqueados) < limite_bloqueios:
@@ -90,7 +90,7 @@ if ativo and fase == "bloqueio":
             bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
             bloqueios[id_time] = bloqueios_atual
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
-            st.experimental_rerun()
+            st.rerun()
     else:
         for j in bloqueios_atual:
             st.markdown(f"- 🔐 {j['nome']} ({j['posicao']})")
@@ -98,7 +98,7 @@ if ativo and fase == "bloqueio":
     if eh_admin:
         if st.button("👉 Iniciar Fase de Ação"):
             supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
-            st.experimental_rerun()
+            st.rerun()
 
 # 🎯 Fase de ação
 if ativo and fase == "acao":
@@ -131,34 +131,31 @@ if ativo and fase == "acao":
                         posicao = jogador["posicao"]
                         valor = jogador["valor"]
                         overall = jogador.get("overall", 0)
-                        ja_multiplicado = any(r.get("nome") == nome_j and r.get("de") == time["id"] for lista in multas.values() for r in lista)
+                        ja_transferido = any(r.get("nome") == nome_j and r.get("de") == time["id"] for lista in multas.values() for r in lista)
                         bloqueado = nome_j in bloqueados
                         btn_id = f"{time['id']}_{nome_j}_{posicao}"
 
                         if bloqueado:
                             st.markdown(f"🔒 {nome_j} - {posicao} (R$ {valor:,.0f})")
-                        elif ja_multiplicado:
+                        elif ja_transferido:
                             st.markdown(f"❌ {nome_j} - já transferido")
                         else:
                             if not limite_alcancado and st.button(f"Pagar multa por {nome_j} (R$ {valor:,.0f})", key=btn_id):
                                 saldo_r = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
                                 if saldo_r < valor:
-                                    st.error("❌ Seu time não tem saldo suficiente para este pagamento.")
+                                    st.error("❌ Seu time não tem saldo suficiente.")
                                     st.stop()
 
                                 saldo_p = supabase.table("times").select("saldo").eq("id", time["id"]).execute().data[0]["saldo"]
 
-                                # Atualiza saldo
                                 supabase.table("times").update({"saldo": saldo_r - valor}).eq("id", id_time).execute()
                                 supabase.table("times").update({"saldo": saldo_p + valor}).eq("id", time["id"]).execute()
 
-                                # Registra multa
                                 novo = multas.get(id_time, [])
                                 novo.append({"nome": nome_j, "posicao": posicao, "valor": int(valor), "de": time["id"]})
                                 multas[id_time] = novo
                                 ja_perderam[time["id"]] = ja_perderam.get(time["id"], 0) + 1
 
-                                # Transferência real
                                 supabase.table("elenco").delete().eq("id_time", time["id"]).eq("nome", nome_j).execute()
                                 supabase.table("elenco").insert({
                                     "id_time": id_time,
@@ -174,22 +171,22 @@ if ativo and fase == "acao":
                                     "multas": multas,
                                     "ja_perderam": ja_perderam
                                 }).eq("id", ID_CONFIG).execute()
-                                st.experimental_rerun()
+                                st.rerun()
 
             if st.button("✅ Finalizar minha participação"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
-                st.experimental_rerun()
+                st.rerun()
 
         if eh_admin:
             if st.button("⏭️ Avançar time (Admin)"):
                 supabase.table("configuracoes").update({"vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
-                st.experimental_rerun()
+                st.rerun()
 
             if vez + 1 >= len(ordem):
                 if st.button("🏁 Encerrar Evento"):
                     supabase.table("configuracoes").update({"finalizado": True, "ativo": False}).eq("id", ID_CONFIG).execute()
-                    st.experimental_rerun()
+                    st.rerun()
 
     except Exception as e:
         st.error(f"Erro ao buscar nome do time da vez: {e}")
@@ -216,7 +213,4 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
-
-
-
 
