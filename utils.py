@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from datetime import datetime
+from supabase import create_client
 
 # ✅ Verificação de login
 def verificar_login():
@@ -11,9 +12,13 @@ def verificar_login():
         st.warning("Informações do time não encontradas na sessão.")
         st.stop()
 
-# 💰 Registrar movimentação financeira
-def registrar_movimentacao(supabase, id_time, jogador, categoria, tipo, valor):
+# 💰 Registrar movimentação financeira (corrigido: sem precisar passar supabase)
+def registrar_movimentacao(id_time, jogador, categoria, tipo, valor):
     try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+        supabase = create_client(url, key)
+
         movimentacao = {
             "id_time": id_time,
             "jogador": jogador,
@@ -79,7 +84,6 @@ def atualizar_classificacao(supabase, divisao):
     times = supabase.table("times").select("id", "nome").execute().data
     times_map_all = {t["id"]: t["nome"] for t in times if t.get("id") and t.get("nome")}
 
-    # 🔴 Aqui está o ajuste: campo com acento
     usuarios_divisao = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {divisao}").execute().data
     time_ids_validos = [u["time_id"] for u in usuarios_divisao if u.get("time_id") in times_map_all]
     times_map = {tid: times_map_all[tid] for tid in time_ids_validos}
