@@ -2,224 +2,176 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import random
-from utils import registrar_movimentacao
+from utils import registrar_movimentacao, verificar_login
 
 st.set_page_config(page_title="Evento de Multa - LigaFut", layout="wide")
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado para acessar esta página.")
-    st.stop()
-
+# ✅ Login
+verificar_login()
 id_usuario = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
-usuario_email = st.session_state["usuario"]
-
+email_usuario = st.session_state["usuario"]
 st.title("🚨 Evento de Multa - LigaFut")
 
-# Verifica se é admin
-admin_data = supabase.table("usuarios").select("administrador").eq("usuario", usuario_email).execute().data
-eh_admin = admin_data and admin_data[0].get("administrador", False)
+# 🔍 Verifica se é admin
+admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+eh_admin = admin_ref.data and admin_ref.data[0].get("administrador", False)
 
-# ID fixo da configuração
-ID_CONFIG = "evento_multa"
-
-# 🔄 Busca configuração atual
-conf = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute().data
-conf = conf[0] if conf else {}
+# ⚙️ Configuração
+id_config = "evento_multa"
+conf_data = supabase.table("configuracoes").select("*").eq("id", id_config).execute().data
+conf = conf_data[0] if conf_data else {}
 
 ativo = conf.get("ativo", False)
 fase = conf.get("fase", "bloqueio")
 ordem = conf.get("ordem", [])
-vez = conf.get("vez", 0)
-bloqueios = conf.get("bloqueios", {})
-roubos = conf.get("roubos", {})
+vez = int(conf.get("vez", 0))
 concluidos = conf.get("concluidos", [])
+bloqueios = conf.get("bloqueios", {})
 ja_perderam = conf.get("ja_perderam", {})
 finalizado = conf.get("finalizado", False)
 
-# -------------------- ADMIN --------------------
+# ---------------------- ADMIN ----------------------
 if eh_admin:
     st.markdown("### 👑 Painel do Administrador")
-
     if not ativo:
         if st.button("🚀 Iniciar Evento de Multa"):
-            todos_times = supabase.table("times").select("id").execute().data
-            nova_ordem = [t["id"] for t in todos_times]
-            random.shuffle(nova_ordem)
-
+            times_ref = supabase.table("times").select("id").execute()
+            ordem = [doc["id"] for doc in times_ref.data]
+            import random; random.shuffle(ordem)
             supabase.table("configuracoes").upsert({
-                "id": ID_CONFIG,
+                "id": id_config,
                 "ativo": True,
+                "inicio": datetime.utcnow().isoformat(),
                 "fase": "bloqueio",
-                "ordem": nova_ordem,
-                "vez": 0,
+                "ordem": ordem,
                 "bloqueios": {},
-                "roubos": {},
+                "vez": 0,
                 "concluidos": [],
                 "ja_perderam": {},
                 "finalizado": False
             }).execute()
-            st.success("Evento de multa iniciado com sucesso.")
+            st.success("Evento iniciado com sucesso!")
             st.rerun()
     else:
         if st.button("🛑 Encerrar Evento"):
             supabase.table("configuracoes").upsert({
-                "id": ID_CONFIG,
+                "id": id_config,
                 "ativo": False,
                 "finalizado": True
             }).execute()
             st.success("Evento encerrado.")
             st.rerun()
 
-# -------------------- STATUS --------------------
-st.markdown("---")
-if ativo:
-    st.success(f"Evento ativo - Fase atual: {fase.upper()}")
+# ---------------------- BLOQUEIO ----------------------
+if ativo and fase == "bloqueio":
+    st.subheader("⛔ Bloqueie até 4 jogadores")
+    elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
+    elenco = elenco_ref.data if elenco_ref.data else []
+    bloqueados = bloqueios.get(id_time, [])
+    nomes_bloqueados = [f"{j['nome']} - {j['posicao']}" for j in bloqueados]
 
-    if fase == "bloqueio":
-        st.subheader("⛔ Bloqueie até 4 jogadores do seu elenco")
+    opcoes = [f"{j['nome']} - {j['posicao']}" for j in elenco if f"{j['nome']} - {j['posicao']}" not in nomes_bloqueados]
+    escolhidos = st.multiselect("Jogadores para bloquear:", opcoes, default=nomes_bloqueados, max_selections=4)
 
-        elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data
-        bloqueados = bloqueios.get(id_time, [])
-        nomes_bloqueados = [f"{j['nome']} - {j['posicao']}" for j in bloqueados]
+    if st.button("🔐 Salvar bloqueios"):
+        novos = [j for j in elenco if f"{j['nome']} - {j['posicao']}" in escolhidos]
+        bloqueios[id_time] = novos
+        supabase.table("configuracoes").upsert({"id": id_config, "bloqueios": bloqueios}).execute()
+        st.success("Bloqueios salvos.")
+        st.rerun()
 
-        opcoes = [f"{j['nome']} - {j['posicao']}" for j in elenco if f"{j['nome']} - {j['posicao']}" not in nomes_bloqueados]
+    if eh_admin and st.button("➡️ Avançar para Ação"):
+        supabase.table("configuracoes").upsert({"id": id_config, "fase": "acao"}).execute()
+        st.rerun()
 
-        escolhidos = st.multiselect("Jogadores para bloquear:", opcoes, default=nomes_bloqueados, max_selections=4)
+# ---------------------- AÇÃO ----------------------
+if ativo and fase == "acao":
+    st.subheader("🎯 Ordem Atual")
+    for i, tid in enumerate(ordem):
+        nome = supabase.table("times").select("nome").eq("id", tid).execute().data[0]["nome"]
+        if tid in concluidos:
+            st.markdown(f"🟢 {nome}")
+        elif i == vez:
+            st.markdown(f"🔷 {nome} (vez atual)")
+        else:
+            st.markdown(f"⚪ {nome}")
 
-        if st.button("🔐 Salvar bloqueios"):
-            novos = [j for j in elenco if f"{j['nome']} - {j['posicao']}" in escolhidos]
-            bloqueios[id_time] = novos
-            supabase.table("configuracoes").upsert({"id": ID_CONFIG, "bloqueios": bloqueios}).execute()
-            st.success("Bloqueios salvos.")
-            st.rerun()
+    if vez < len(ordem) and id_time == ordem[vez]:
+        st.success("🎯 É sua vez! Compre até 5 jogadores de outros times pagando multa.")
+        times_ref = supabase.table("times").select("id", "nome", "saldo").execute().data
 
-        if eh_admin and st.button("➡️ Avançar para Fase de Ação"):
-            supabase.table("configuracoes").upsert({"id": ID_CONFIG, "fase": "acao"}).execute()
-            st.success("Fase de ação iniciada.")
-            st.rerun()
+        for t in times_ref:
+            tid = t["id"]
+            if tid == id_time or ja_perderam.get(tid, 0) >= 4:
+                continue
 
-    elif fase == "acao":
-        st.subheader("🎯 Ordem de Vez")
-        for i, tid in enumerate(ordem):
-            nome = supabase.table("times").select("nome").eq("id", tid).execute().data[0]["nome"]
-            if tid in concluidos:
-                st.markdown(f"🟢 {nome}")
-            elif i == vez:
-                st.markdown(f"🔹 {nome} (vez atual)")
-            else:
-                st.markdown(f"⚪ {nome}")
+            elenco_ref = supabase.table("elenco").select("*").eq("id_time", tid).execute()
+            elenco_adv = elenco_ref.data
+            if not elenco_adv: continue
 
-        if vez < len(ordem) and ordem[vez] == id_time:
-            st.success("🏸 É sua vez! Você pode roubar até 5 jogadores.")
+            with st.expander(f"📂 {t['nome']}"):
+                for j in elenco_adv:
+                    nome_j = j["nome"]
+                    posicao = j["posicao"]
+                    valor = j["valor"]
+                    bloqueado = any(b["nome"] == nome_j for b in bloqueios.get(tid, []))
 
-            times = supabase.table("times").select("id", "nome", "saldo").execute().data
-            time_map = {t["id"]: t for t in times}
+                    if bloqueado:
+                        st.markdown(f"🔐 {nome_j} - {posicao} (R$ {valor:,.0f})")
+                    else:
+                        if st.button(f"💸 Comprar {nome_j} (R$ {valor:,.0f})", key=f"{tid}_{nome_j}"):
+                            comprador = [x for x in times_ref if x["id"] == id_time][0]
+                            vendedor = [x for x in times_ref if x["id"] == tid][0]
 
-            for tid, tinfo in time_map.items():
-                if tid == id_time or ja_perderam.get(tid, 0) >= 4:
-                    continue
-
-                elenco_adversario = supabase.table("elenco").select("*").eq("id_time", tid).execute().data
-                if not elenco_adversario:
-                    continue
-
-                with st.expander(f"🎯 {tinfo['nome']}"):
-                    for jogador in elenco_adversario:
-                        nome_jogador = jogador["nome"]
-                        posicao = jogador["posicao"]
-                        valor = jogador["valor"]
-
-                        bloqueado = any(j["nome"] == nome_jogador for j in bloqueios.get(tid, []))
-                        ja_roubado = any(nome_jogador == r.get("nome") and r.get("de") == tid
-                                         for rlist in roubos.values() for r in rlist)
-
-                        if bloqueado or ja_roubado:
-                            st.markdown(f"🔒 {nome_jogador} - {posicao} (R$ {valor:,.0f})")
-                            continue
-
-                        if st.button(f"💸 Pagar multa por {nome_jogador} - R$ {valor:,.0f}", key=f"{tid}_{nome_jogador}"):
-                            saldo_atual = time_map[id_time]["saldo"]
-                            if saldo_atual < valor:
-                                st.error("Saldo insuficiente.")
+                            if comprador["saldo"] < valor:
+                                st.error("❌ Saldo insuficiente.")
                                 st.stop()
 
-                            # Registrar no histórico
-                            novo = roubos.get(id_time, [])
-                            novo.append({"nome": nome_jogador, "posicao": posicao, "valor": valor, "de": tid})
-                            roubos[id_time] = novo
-
-                            # Atualiza saldo
-                            novo_saldo_comprador = saldo_atual - valor
-                            novo_saldo_vendedor = time_map[tid]["saldo"] + valor
-
-                            supabase.table("times").update({"saldo": novo_saldo_comprador}).eq("id", id_time).execute()
-                            supabase.table("times").update({"saldo": novo_saldo_vendedor}).eq("id", tid).execute()
-
-                            # Remover do time antigo
-                            supabase.table("elenco").delete().eq("id_time", tid).eq("nome", nome_jogador).execute()
-
-                            # Adicionar no novo time
+                            # 🔁 Transferência
+                            supabase.table("elenco").delete().eq("id_time", tid).eq("nome", nome_j).execute()
                             supabase.table("elenco").insert({
                                 "id_time": id_time,
-                                "nome": nome_jogador,
+                                "nome": nome_j,
                                 "posicao": posicao,
-                                "overall": jogador["overall"],
+                                "overall": j["overall"],
                                 "valor": valor
                             }).execute()
 
-                            # Atualiza contagem de perdas
+                            # 💰 Saldo
+                            novo_saldo_comprador = comprador["saldo"] - valor
+                            novo_saldo_vendedor = vendedor["saldo"] + valor
+                            supabase.table("times").update({"saldo": novo_saldo_comprador}).eq("id", id_time).execute()
+                            supabase.table("times").update({"saldo": novo_saldo_vendedor}).eq("id", tid).execute()
+
+                            # 🧾 Registro
+                            registrar_movimentacao(supabase, id_time, nome_j, "Multa", "compra", valor)
+                            registrar_movimentacao(supabase, tid, nome_j, "Multa", "venda", valor)
+
                             ja_perderam[tid] = ja_perderam.get(tid, 0) + 1
-
-                            # Movimentações
-                            registrar_movimentacao(supabase, id_time, nome_jogador, "Multa", "Saída", valor)
-                            registrar_movimentacao(supabase, tid, nome_jogador, "Multa", "Entrada", valor)
-
-                            # Salva no banco
                             supabase.table("configuracoes").upsert({
-                                "id": ID_CONFIG,
-                                "roubos": roubos,
+                                "id": id_config,
                                 "ja_perderam": ja_perderam
                             }).execute()
 
-                            st.success(f"{nome_jogador} comprado com sucesso!")
+                            st.success(f"{nome_j} comprado com sucesso!")
                             st.rerun()
 
-            if len(roubos.get(id_time, [])) >= 5:
-                st.info("Você já realizou as 5 compras permitidas.")
+        if st.button("✅ Finalizar minha vez"):
+            supabase.table("configuracoes").upsert({
+                "id": id_config,
+                "vez": vez + 1,
+                "concluidos": concluidos + [id_time]
+            }).execute()
+            st.success("Sua vez foi finalizada.")
+            st.rerun()
 
-            if st.button("✅ Finalizar minha vez"):
-                concluidos.append(id_time)
-                supabase.table("configuracoes").upsert({
-                    "id": ID_CONFIG,
-                    "concluidos": concluidos,
-                    "vez": vez + 1
-                }).execute()
-                st.success("Sua vez foi finalizada.")
-                st.rerun()
-
-        elif eh_admin and vez < len(ordem):
-            if st.button("⏩ Pular vez do time atual"):
-                supabase.table("configuracoes").upsert({"id": ID_CONFIG, "vez": vez + 1}).execute()
-                st.rerun()
-
-    elif finalizado:
-        st.success("✅ Evento finalizado. Veja o resumo:")
-
-        for tid, acoes in roubos.items():
-            nome_time = supabase.table("times").select("nome").eq("id", tid).execute().data[0]["nome"]
-            st.markdown(f"### 🔷 {nome_time}")
-            for j in acoes:
-                de_nome = supabase.table("times").select("nome").eq("id", j["de"]).execute().data[0]["nome"]
-                st.markdown(f"- {j['nome']} ({j['posicao']}) roubado do {de_nome}")
-
-else:
-    st.warning("⚠️ Evento de multa não está ativo.")
+# ---------------------- FINALIZADO ----------------------
+if finalizado:
+    st.success("✅ Evento finalizado.")
