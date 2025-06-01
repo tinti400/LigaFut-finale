@@ -45,7 +45,7 @@ limite_bloqueios = evento.get("limite_bloqueios", 4)
 
 # 🔁 Atualizar manualmente
 if st.button("🔄 Atualizar Página"):
-    st.rerun()
+    st.experimental_rerun()
 
 # 🔁 Reiniciar evento (admin)
 if eh_admin:
@@ -68,14 +68,14 @@ if eh_admin:
             "concluidos": [],
             "inicio": str(datetime.utcnow())
         }).eq("id", ID_CONFIG).execute()
-        st.rerun()
+        st.experimental_rerun()
 
 # 🔐 Começar bloqueios
 if ativo and fase == "sorteio" and eh_admin:
     st.subheader("🛡️ Iniciar Fase de Bloqueio")
     if st.button("➡️ Começar Bloqueios"):
         supabase.table("configuracoes").update({"fase": "bloqueio"}).eq("id", ID_CONFIG).execute()
-        st.rerun()
+        st.experimental_rerun()
 
 # 🔐 Fase de bloqueio
 if ativo and fase == "bloqueio":
@@ -99,7 +99,7 @@ if ativo and fase == "bloqueio":
                 })
                 bloqueios[id_time] = bloqueios_atual
                 supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
-                st.rerun()
+                st.experimental_rerun()
     else:
         for j in bloqueios_atual:
             st.markdown(f"- 🔐 {j['nome']} ({j['posicao']})")
@@ -107,7 +107,7 @@ if ativo and fase == "bloqueio":
     if eh_admin:
         if st.button("👉 Iniciar Fase de Ação"):
             supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
-            st.rerun()
+            st.experimental_rerun()
 
 # 🎯 Fase de ação
 if ativo and fase == "acao":
@@ -166,22 +166,22 @@ if ativo and fase == "acao":
 
                                 registrar_movimentacao(id_time, nome_j, "Roubo", "Compra", valor // 2)
                                 supabase.table("configuracoes").update({"roubos": roubos, "ja_perderam": ja_perderam}).eq("id", ID_CONFIG).execute()
-                                st.rerun()
+                                st.experimental_rerun()
 
             if st.button("✅ Finalizar minha participação"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
-                st.rerun()
+                st.experimental_rerun()
 
         if eh_admin:
             if st.button("⏭️ Avançar time (Admin)"):
                 supabase.table("configuracoes").update({"vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
-                st.rerun()
+                st.experimental_rerun()
 
             if vez + 1 >= len(ordem):
                 if st.button("🏁 Encerrar Evento e Transferir Jogadores"):
                     supabase.table("configuracoes").update({"finalizado": True, "ativo": False}).eq("id", ID_CONFIG).execute()
-                    st.rerun()
+                    st.experimental_rerun()
 
     except Exception as e:
         st.error(f"Erro ao buscar nome do time da vez: {e}")
