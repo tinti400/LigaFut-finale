@@ -21,7 +21,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
-st.title("🚨 Evento de Roubo - LigaFut")
+st.title("🕵️ Evento de Roubo - LigaFut")
 
 ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"
 
@@ -43,8 +43,9 @@ ja_perderam = evento.get("ja_perderam", {})
 roubos = evento.get("roubos", {})
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
-# 🔁 Atualizar
-st.button("🔄 Atualizar Página", on_click=st.rerun)
+# 🔁 Atualizar manualmente
+if st.button("🔄 Atualizar Página"):
+    st.rerun()
 
 # 🔁 Reiniciar evento (admin)
 if eh_admin:
