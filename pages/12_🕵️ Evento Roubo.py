@@ -58,7 +58,7 @@ if eh_admin:
             "vez": "0",
             "roubos": {},
             "bloqueios": {},
-            "ultimos_bloqueios": bloqueios,
+            "ultimos_bloqueios": bloqueios,  # Salva os bloqueios para a próxima edição
             "ja_perderam": {},
             "concluidos": [],
             "inicio": str(datetime.utcnow())
@@ -75,9 +75,15 @@ if ativo and fase == "sorteio" and eh_admin:
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
     bloqueios_atual = bloqueios.get(id_time, [])
-    elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
+    bloqueios_anteriores = ultimos_bloqueios.get(id_time, [])
     nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
-    jogadores_disponiveis = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados]
+    nomes_bloqueios_anteriores = [j["nome"] for j in bloqueios_anteriores]
+
+    elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
+    jogadores_disponiveis = [
+        j["nome"] for j in elenco
+        if j["nome"] not in nomes_bloqueados and j["nome"] not in nomes_bloqueios_anteriores
+    ]
 
     if len(nomes_bloqueados) < limite_bloqueios:
         selecionado = st.selectbox("Selecione um jogador para proteger:", [""] + jogadores_disponiveis)
@@ -136,7 +142,7 @@ if ativo and fase == "acao":
                         elif ja_roubado:
                             st.markdown(f"❌ {nome_j} - já roubado")
                         else:
-                            if not limite_alcancado and st.button(f"Roubar {nome_j} (R$ {valor/2:,.0f})", key=btn_id):
+                            if not limite_alcancado and st.button(f"Roubar {nome_j} (R$ {valor//2:,.0f})", key=btn_id):
                                 saldo_r = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
                                 if saldo_r < valor // 2:
                                     st.error("❌ Seu time não tem saldo suficiente para este roubo.")
@@ -212,5 +218,6 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
 
 
