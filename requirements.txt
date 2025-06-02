@@ -3,3 +3,4 @@ firebase-admin==5.2.0
 supabase==2.15.1
 altair==4.2.0  # Alterar para uma versão mais antiga, mas estável
 openpyxl
+streamlit-cookies-manager
