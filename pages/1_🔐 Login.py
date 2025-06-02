@@ -1,21 +1,15 @@
 import streamlit as st
 from supabase import create_client, Client
-from streamlit_cookies_manager import EncryptedCookieManager
+
+# ✅ Configuração da página
+st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🧁 Gerenciador de cookies
-cookies = EncryptedCookieManager(prefix="ligafut_", password=st.secrets["cookie_password"])
-if not cookies.ready():
-    st.stop()
-
-# ✅ Configuração da página
-st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
-
-# 🎨 Estilo com fundo e contraste ajustado
+# 🎨 Estilo com fundo escuro e card centralizado
 st.markdown(f"""
     <style>
     .stApp {{
@@ -43,28 +37,36 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# 🧠 Recuperar sessão pelos cookies, se disponíveis
-if "usuario" not in st.session_state and cookies.get("usuario_id"):
-    st.session_state["usuario_id"] = cookies.get("usuario_id")
-    st.session_state["usuario"] = cookies.get("usuario")
-    st.session_state["id_time"] = cookies.get("id_time")
-    st.session_state["divisao"] = cookies.get("divisao")
-    st.session_state["nome_time"] = cookies.get("nome_time")
+# 🌐 Login via URL (?usuario=adm)
+params = st.experimental_get_query_params()
+if "usuario" not in st.session_state and "usuario" in params:
+    try:
+        usuario_param = params["usuario"][0]
+        res = supabase.table("usuarios").select("*").ilike("usuario", usuario_param).execute()
+        if res.data:
+            user = res.data[0]
+            st.session_state["usuario"] = user["usuario"]
+            st.session_state["usuario_id"] = user["id"]
+            st.session_state["id_time"] = user["time_id"]
+            st.session_state["divisao"] = user.get("divisao", "Divisão 1")
+            time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
+            st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
+    except:
+        pass
 
-# 🔓 Já logado?
+# 🔓 Já está logado?
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
         for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao"]:
             st.session_state.pop(key, None)
-            cookies.delete(key)
-        cookies.save()
-        st.success("Sessão encerrada.")
+        st.experimental_set_query_params()
+        st.success("Sessão encerrada. Recarregue ou faça login.")
         st.stop()
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🧾 Formulário de login centralizado
+# 🧾 Formulário de login
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.markdown("<h2>🏟️ LigaFut</h2>", unsafe_allow_html=True)
@@ -88,15 +90,7 @@ with st.container():
                         st.session_state["divisao"] = user.get("divisao", "Divisão 1")
                         time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
                         st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
-
-                        # 🍪 Salvar nos cookies
-                        cookies["usuario"] = st.session_state["usuario"]
-                        cookies["usuario_id"] = st.session_state["usuario_id"]
-                        cookies["id_time"] = st.session_state["id_time"]
-                        cookies["divisao"] = st.session_state["divisao"]
-                        cookies["nome_time"] = st.session_state["nome_time"]
-                        cookies.save()
-
+                        st.experimental_set_query_params(usuario=user["usuario"])
                         st.success("✅ Login realizado com sucesso!")
                         st.rerun()
                     else:
@@ -135,3 +129,4 @@ with st.expander("🔒 Trocar Senha"):
 # ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
+
