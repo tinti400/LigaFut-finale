@@ -25,7 +25,7 @@ if not admin_ref.data:
 
 st.title("🧑‍⚖️ Administração de Leilões (Fila)")
 
-# 📝 Formulário para adicionar jogador na fila
+# 📝 Adicionar novo leilão manualmente
 with st.form("novo_leilao"):
     nome = st.text_input("Nome do Jogador").strip()
     posicao = st.selectbox("Posição", [
@@ -41,7 +41,9 @@ with st.form("novo_leilao"):
 
     if botao and nome:
         novo = {
-            "jogador": {"nome": nome, "posicao": posicao, "overall": overall},
+            "nome_jogador": nome,
+            "posicao_jogador": posicao,
+            "overall_jogador": overall,
             "valor_inicial": valor_inicial,
             "valor_atual": valor_inicial,
             "incremento_minimo": incremento,
@@ -51,27 +53,26 @@ with st.form("novo_leilao"):
             "finalizado": False
         }
         supabase.table("leiloes").insert(novo).execute()
-        st.success("Jogador adicionado à fila.")
+        st.success("✅ Jogador adicionado à fila.")
 
-# 🔄 Verifica leilão ativo
+# 🔄 Verificar e ativar leilão
 res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute()
 ativo = res.data[0] if res.data else None
 
 if ativo:
     st.subheader("🔴 Leilão Ativo")
-    st.markdown(f"**Jogador:** {ativo['jogador']['nome']}")
-    st.markdown(f"**Posição:** {ativo['jogador']['posicao']}")
+    st.markdown(f"**Jogador:** {ativo['nome_jogador']}")
+    st.markdown(f"**Posição:** {ativo['posicao_jogador']}")
     st.markdown(f"**Valor Atual:** R$ {ativo['valor_atual']:,.0f}".replace(",", "."))
+
     fim = datetime.fromisoformat(ativo["fim"])
     restante = fim - datetime.utcnow()
     if restante.total_seconds() <= 0:
         supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", ativo["id"]).execute()
         st.info("⏱️ Leilão finalizado automaticamente.")
     else:
-        st.info(f"⏳ Tempo restante: {restante}")
-
+        st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
 else:
-    # Ativar próximo da fila
     proximo = supabase.table("leiloes").select("*").eq("ativo", False).eq("finalizado", False).order("id").limit(1).execute()
     if proximo.data:
         leilao = proximo.data[0]
@@ -82,7 +83,7 @@ else:
             "inicio": agora.isoformat(),
             "fim": fim.isoformat()
         }).eq("id", leilao["id"]).execute()
-        st.success("✅ Novo leilão iniciado automaticamente. Recarregue a página.")
+        st.success("✅ Novo leilão iniciado automaticamente.")
         st.experimental_rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
