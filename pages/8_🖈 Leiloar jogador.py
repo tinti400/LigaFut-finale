@@ -54,11 +54,9 @@ if botao:
         fim = agora + timedelta(minutes=duracao)
 
         dados_leilao = {
-            "jogador": {
-                "nome": jogador_escolhido["nome"],
-                "posicao": jogador_escolhido["posicao"],
-                "overall": jogador_escolhido["overall"]
-            },
+            "nome_jogador": jogador_escolhido["nome"],
+            "posicao_jogador": jogador_escolhido["posicao"],
+            "overall_jogador": jogador_escolhido["overall"],
             "valor_inicial": valor_minimo,
             "valor_atual": valor_minimo,
             "incremento_minimo": incremento,
