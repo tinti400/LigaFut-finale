@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import pytz
 
 # 🔌 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -29,7 +30,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor):
     A função debita para 'compra' e credita para 'venda'.
     """
     try:
-        # Buscar saldo atual
+        # Buscar saldo atual do time
         res = supabase.table("times").select("saldo").eq("id", id_time).execute()
         if not res.data:
             st.error(f"❌ Time com ID {id_time} não encontrado.")
@@ -37,24 +38,30 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor):
 
         saldo_atual = res.data[0]["saldo"]
 
+        # Calcula novo saldo
         if categoria.lower() == "compra":
             novo_saldo = saldo_atual - valor
         elif categoria.lower() == "venda":
             novo_saldo = saldo_atual + valor
         else:
-            novo_saldo = saldo_atual  # nenhuma alteração se categoria for inválida
+            st.warning("Categoria inválida. Use 'compra' ou 'venda'.")
+            return
 
-        # Atualizar saldo
+        # Atualiza saldo no banco
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-        # Registrar movimentação
+        # Pega data e hora no fuso de Brasília
+        fuso_brasilia = pytz.timezone("America/Sao_Paulo")
+        agora = datetime.now(fuso_brasilia).isoformat()
+
+        # Registra movimentação
         registro = {
             "id_time": id_time,
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
             "valor": valor,
-            "data": datetime.now().isoformat()
+            "data": agora
         }
         supabase.table("movimentacoes").insert(registro).execute()
 

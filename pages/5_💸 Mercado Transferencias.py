@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -122,18 +123,15 @@ else:
         # ✅ Comprar
         if st.button(f"✅ Comprar {jogador['nome']}", key=f"comprar_{jogador['id']}"):
             try:
-                # 🧮 Verifica limite de jogadores no elenco
                 elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
                 if elenco_res.data and len(elenco_res.data) >= 35:
                     st.error("❌ Você já tem o número máximo de jogadores (35). Venda alguém para continuar.")
                     st.stop()
 
-                # 💵 Verifica saldo
                 if saldo_time < jogador.get("valor", 0):
                     st.error("❌ Saldo insuficiente.")
                     st.stop()
 
-                # 1. Adiciona ao elenco
                 jogador_data = {
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -142,15 +140,9 @@ else:
                     "id_time": id_time
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
-
-                # 2. Remove do mercado
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-
-                # 3. Atualiza saldo
                 novo_saldo = saldo_time - jogador["valor"]
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                # 4. Registra no BID
                 supabase.table("movimentacoes").insert({
                     "jogador": jogador["nome"],
                     "valor": jogador["valor"],
@@ -159,10 +151,8 @@ else:
                     "id_time": id_time,
                     "data": datetime.now().isoformat()
                 }).execute()
-
                 st.success(f"Você comprou {jogador['nome']} com sucesso!")
                 st.experimental_rerun()
-
             except Exception as e:
                 st.error(f"Erro ao comprar jogador: {e}")
 
