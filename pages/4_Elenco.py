@@ -1,153 +1,113 @@
-# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
 from datetime import datetime
+from utils import registrar_movimentacao
+
+st.set_page_config(page_title="Elenco - LigaFut", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="Elenco - LigaFut", layout="wide")
-
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
+# 📥 Dados do time logado
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🖼️ Logo no topo
-st.image("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/logos//wrexham.png", width=200)
+# 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>👥 Elenco do Técnico</h1><hr>", unsafe_allow_html=True)
 
-# 📥 Importar jogadores via planilha Excel
+# 📤 Upload de planilha para importar elenco
 st.subheader("📥 Importar jogadores via planilha Excel")
 arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, posicao, overall, valor", type="xlsx")
 
 if arquivo:
+    import pandas as pd
     try:
-        df_importado = pd.read_excel(arquivo)
-
-        # Verifica se as colunas obrigatórias existem
-        colunas_esperadas = {"nome", "posicao", "overall", "valor"}
-        if not colunas_esperadas.issubset(df_importado.columns):
-            st.error("❌ A planilha precisa ter as colunas: nome, posicao, overall, valor")
-        else:
-            jogadores = df_importado.to_dict(orient="records")
-
-            for jogador in jogadores:
-                supabase.table("elenco").insert({
-                    "id_time": id_time,
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": int(jogador["overall"]),
-                    "valor": int(jogador["valor"])
-                }).execute()
-
-            st.success(f"✅ {len(jogadores)} jogadores importados com sucesso!")
-            st.rerun()
+        df = pd.read_excel(arquivo)
+        for _, row in df.iterrows():
+            supabase.table("elenco").insert({
+                "nome": row["nome"],
+                "posicao": row["posicao"],
+                "overall": int(row["overall"]),
+                "valor": float(row["valor"]),
+                "id_time": id_time
+            }).execute()
+        st.success("Elenco importado com sucesso!")
+        st.experimental_rerun()
     except Exception as e:
-        st.error(f"Erro ao importar planilha: {e}")
+        st.error(f"Erro ao importar elenco: {e}")
 
-# 🛑 Verifica se o mercado está aberto
-try:
-    res = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
-    mercado_aberto = res.data[0]["mercado_aberto"] if res.data else False
-except Exception as e:
-    st.error(f"Erro ao verificar status do mercado: {e}")
-    mercado_aberto = False
+# 🔍 Filtro de busca
+filtro_posicao = st.selectbox("Filtrar por posição", ["Todos", "GL", "ZAG", "LD", "LE", "VOL", "MC", "MD", "ME", "PD", "PE", "SA", "CA"])
+filtro_nome = st.text_input("Buscar por nome").lower()
 
-# 🔢 Buscar elenco
+# 📥 Carrega elenco do time
 try:
-    elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
-    elenco = elenco_ref.data
+    response = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
+    elenco = response.data
 except Exception as e:
     st.error(f"Erro ao carregar elenco: {e}")
     elenco = []
 
-# 🎯 Filtros
-if elenco:
-    st.subheader("🎯 Filtros")
-    df_elenco = pd.DataFrame(elenco)
+# 🎯 Aplica filtros
+elenco_filtrado = []
+for jogador in elenco:
+    if filtro_posicao != "Todos" and jogador.get("posicao") != filtro_posicao:
+        continue
+    if filtro_nome and filtro_nome not in jogador.get("nome", "").lower():
+        continue
+    elenco_filtrado.append(jogador)
 
-    posicoes = sorted(df_elenco["posicao"].unique())
-    posicao_selecionada = st.selectbox("📌 Filtrar por posição:", ["Todas"] + posicoes)
-    nome_filtrado = st.text_input("🔍 Buscar por nome:")
-    overall_min = st.slider("⭐ Filtrar por Overall mínimo:", min_value=0, max_value=100, value=0)
+# 💰 Verifica saldo
+saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
-    # Aplicar filtros
-    df_filtrado = df_elenco.copy()
-    if posicao_selecionada != "Todas":
-        df_filtrado = df_filtrado[df_filtrado["posicao"] == posicao_selecionada]
-    if nome_filtrado:
-        df_filtrado = df_filtrado[df_filtrado["nome"].str.contains(nome_filtrado, case=False, na=False)]
-    df_filtrado = df_filtrado[df_filtrado["overall"] >= overall_min]
+# 📋 Exibe elenco
+st.markdown(f"### 💰 Saldo atual: **R$ {saldo:,.0f}**".replace(",", "."))
 
-    # Exibir resultado filtrado
-    if df_filtrado.empty:
-        st.info("Nenhum jogador encontrado com os filtros aplicados.")
-    else:
-        total_valor = df_filtrado["valor"].sum()
-        st.markdown(f"**👥 Jogadores filtrados:** `{len(df_filtrado)}`")
-        st.markdown(f"**💰 Valor total:** `R$ {total_valor:,.0f}`".replace(",", "."))
-
-        for _, jogador in df_filtrado.iterrows():
-            col1, col2, col3, col4, col5 = st.columns([2.5, 2.5, 1.5, 1.5, 2])
-            with col1:
-                st.markdown(f"**👤 Nome:** {jogador['nome']}")
-            with col2:
-                st.markdown(f"**📌 Posição:** {jogador['posicao']}")
-            with col3:
-                st.markdown(f"**⭐ Overall:** {jogador['overall']}")
-            with col4:
-                st.markdown(f"**💰 Valor:** R$ {jogador['valor']:,.0f}".replace(",", "."))
-            with col5:
-                if mercado_aberto:
-                    if st.button(f"❌ Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
-                        try:
-                            valor_jogador = jogador["valor"]
-                            valor_recebido = round(valor_jogador * 0.7)
-
-                            # Remove do elenco
-                            supabase.table("elenco").delete().eq("id_time", id_time).eq("id", jogador["id"]).execute()
-
-                            # Adiciona ao mercado
-                            supabase.table("mercado_transferencias").insert({
-                                "nome": jogador["nome"],
-                                "posicao": jogador["posicao"],
-                                "overall": jogador["overall"],
-                                "valor": jogador["valor"]
-                            }).execute()
-
-                            # Atualiza saldo
-                            saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-                            saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
-                            novo_saldo = saldo + valor_recebido
-                            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                            # Registra no BID
-                            supabase.table("movimentacoes").insert({
-                                "jogador": jogador["nome"],
-                                "valor": jogador["valor"],
-                                "tipo": "Venda",
-                                "categoria": "Mercado",
-                                "id_time": id_time,
-                                "data": datetime.now().isoformat()
-                            }).execute()
-
-                            st.success(f"✅ {jogador['nome']} vendido! Você recebeu R$ {valor_recebido:,.0f}".replace(",", "."))
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao vender jogador: {e}")
-                else:
-                    st.warning("🚫 Mercado fechado")
+if not elenco_filtrado:
+    st.info("Nenhum jogador encontrado com os filtros selecionados.")
 else:
-    st.info("📭 Seu elenco está vazio.")
+    for jogador in elenco_filtrado:
+        col1, col2, col3, col4, col5, col6 = st.columns([2, 3, 2, 2, 2, 2])
+        col1.markdown(f"**{jogador['nome']}**")
+        col2.markdown(f"**Posição:** {jogador['posicao']}")
+        col3.markdown(f"**Overall:** {jogador['overall']}")
+        col4.markdown(f"**Valor:** R$ {jogador['valor']:,.0f}".replace(",", "."))
 
-# 🔙 Voltar ao painel
-if st.button("🔙 Voltar ao Painel"):
-    st.session_state["pagina"] = "usuario"
-    st.rerun()
+        # Vender jogador
+        if st.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+            try:
+                valor_total = jogador["valor"]
+                valor_recebido = round(valor_total * 0.7)
+
+                # Atualiza saldo
+                novo_saldo = saldo + valor_recebido
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                # Remove do elenco
+                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+
+                # Insere no mercado (com id_time para rastrear origem)
+                supabase.table("mercado_transferencias").insert({
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "overall": jogador["overall"],
+                    "valor": jogador["valor"],
+                    "id_time": id_time,
+                    "time_origem": nome_time
+                }).execute()
+
+                # Registra movimentação
+                registrar_movimentacao(id_time=id_time, jogador=jogador["nome"], valor=valor_recebido, tipo="Venda", categoria="Mercado")
+
+                st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {valor_recebido:,.0f}".replace(",", "."))
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao vender jogador: {e}")
