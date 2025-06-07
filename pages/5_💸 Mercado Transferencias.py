@@ -16,7 +16,7 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.stop()
 
 # 📅 Dados do time logado
-time_id = st.session_state["id_time"]
+id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
 # 🛑 Verifica se o mercado está aberto
@@ -33,7 +33,7 @@ if not mercado_aberto:
 
 # 💰 Verifica saldo do time
 try:
-    saldo_res = supabase.table("times").select("saldo").eq("id", str(time_id)).execute()
+    saldo_res = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
     if saldo_res.data:
         saldo_time = saldo_res.data[0]["saldo"]
         st.markdown(f"### 💰 Saldo atual: **R$ {saldo_time:,.0f}**".replace(",", "."))
@@ -119,37 +119,44 @@ else:
         with col3:
             st.markdown(f"**💰 Valor:** R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
 
+        # ✅ Comprar
         if st.button(f"✅ Comprar {jogador['nome']}", key=f"comprar_{jogador['id']}"):
             try:
-                elenco_res = supabase.table("elenco").select("id").eq("time_id", time_id).execute()
+                # 🧮 Verifica limite de jogadores no elenco
+                elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
                 if elenco_res.data and len(elenco_res.data) >= 35:
                     st.error("❌ Você já tem o número máximo de jogadores (35). Venda alguém para continuar.")
                     st.stop()
 
+                # 💵 Verifica saldo
                 if saldo_time < jogador.get("valor", 0):
                     st.error("❌ Saldo insuficiente.")
                     st.stop()
 
+                # 1. Adiciona ao elenco
                 jogador_data = {
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
                     "overall": jogador["overall"],
                     "valor": jogador["valor"],
-                    "time_id": time_id
+                    "id_time": id_time
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
 
+                # 2. Remove do mercado
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
+                # 3. Atualiza saldo
                 novo_saldo = saldo_time - jogador["valor"]
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", time_id).execute()
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
+                # 4. Registra no BID
                 supabase.table("movimentacoes").insert({
                     "jogador": jogador["nome"],
                     "valor": jogador["valor"],
                     "tipo": "Compra",
                     "categoria": "Mercado",
-                    "time_id": time_id,
+                    "id_time": id_time,
                     "data": datetime.now().isoformat()
                 }).execute()
 
@@ -159,6 +166,7 @@ else:
             except Exception as e:
                 st.error(f"Erro ao comprar jogador: {e}")
 
+        # ❌ Excluir jogador do mercado
         if st.button(f"❌ Excluir {jogador['nome']} do Mercado", key=f"excluir_{jogador['id']}"):
             try:
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
