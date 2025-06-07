@@ -94,13 +94,13 @@ col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
 with col_nav1:
     if st.button("⏪ Anterior", disabled=pagina_atual <= 1):
         st.session_state["pagina_mercado"] -= 1
-        st.rerun()
+        st.experimental_rerun()
 with col_nav2:
     st.markdown(f"<p style='text-align: center;'>Página {pagina_atual} de {total_paginas}</p>", unsafe_allow_html=True)
 with col_nav3:
     if st.button("⏩ Próxima", disabled=pagina_atual >= total_paginas):
         st.session_state["pagina_mercado"] += 1
-        st.rerun()
+        st.experimental_rerun()
 
 # 📋 Exibição dos jogadores
 if not jogadores_pagina:
@@ -161,7 +161,7 @@ else:
                 }).execute()
 
                 st.success(f"Você comprou {jogador['nome']} com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
 
             except Exception as e:
                 st.error(f"Erro ao comprar jogador: {e}")
@@ -171,6 +171,6 @@ else:
             try:
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                 st.success(f"Jogador {jogador['nome']} foi excluído do mercado!")
-                st.rerun()
+                st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao excluir jogador: {e}")
