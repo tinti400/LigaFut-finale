@@ -69,17 +69,17 @@ try:
 
             if tipo.lower() == "compra":
                 entradas.append(linha)
-                total_entrada += valor
+                total_entrada += abs(valor)
             elif tipo.lower() == "venda":
                 saidas.append(linha)
-                total_saida += valor
+                total_saida += abs(valor)
 
         # 🧾 Exibição por aba
         if aba == "📥 Entradas":
-            st.dataframe(pd.DataFrame(entradas))
+            st.dataframe(pd.DataFrame(entradas), use_container_width=True)
 
         elif aba == "💸 Saídas":
-            st.dataframe(pd.DataFrame(saidas))
+            st.dataframe(pd.DataFrame(saidas), use_container_width=True)
 
         elif aba == "📊 Resumo":
             col1, col2, col3 = st.columns(3)
@@ -96,3 +96,4 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
