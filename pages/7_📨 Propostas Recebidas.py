@@ -1,106 +1,142 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao
+from datetime import datetime
+import json
+from utils import registrar_movimentacao  # 👈 Importa função utilitária
 
-# Conexão com Supabase
+st.set_page_config(page_title="📨 Propostas Recebidas - LigaFut", layout="wide")
+
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# Verifica login
-if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
-    st.error("⚠️ Você precisa estar logado para acessar esta página.")
+# ✅ Verifica login
+if "usuario_id" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
+id_time_logado = st.session_state["id_time"]
+nome_time_logado = st.session_state["nome_time"]
+
+# 🔒 Verifica se o mercado está aberto
+try:
+    status_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = status_ref.data[0]["mercado_aberto"] if status_ref.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
 
 st.title("📨 Propostas Recebidas")
+st.markdown(f"### Seu time: **{nome_time_logado}**")
 
-# Consulta propostas recebidas
-try:
-    res = supabase.table("propostas").select("*").eq("id_time_alvo", id_time).neq("status", "recusada").execute()
-    propostas = res.data
-except Exception as e:
-    st.error(f"Erro ao buscar propostas: {e}")
+if not mercado_aberto:
+    st.warning("🚫 O mercado está fechado no momento. Você não pode aceitar ou recusar propostas.")
     st.stop()
 
+# 🔍 Buscar apenas propostas pendentes
+res = supabase.table("negociacoes").select("*").eq("id_time_destino", id_time_logado).eq("status", "pendente").execute()
+propostas = res.data or []
+
 if not propostas:
-    st.info("Nenhuma proposta recebida no momento.")
+    st.info("Nenhuma proposta pendente no momento.")
     st.stop()
 
 for proposta in propostas:
-    with st.container():
-        st.subheader(f"Proposta de {proposta['nome_time_origem']} por {proposta['jogador_nome']} ({proposta['jogador_posicao']})")
-        st.write(f"💰 Valor oferecido: R$ {proposta['valor_oferecido']:,}".replace(",", "."))
-        if proposta.get("jogadores_oferecidos"):
-            st.write("🔁 Jogadores oferecidos:")
-            for jogador in proposta["jogadores_oferecidos"]:
-                st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']}) | {jogador['overall']} | R$ {jogador['valor']:,}".replace(",", "."))
+    st.markdown("---")
+    jogador_nome = proposta.get("jogador_desejado", "Desconhecido")
+    jogador_id = proposta.get("id_jogador")
+    tipo = proposta.get("tipo_negociacao", "N/A")
+    valor = proposta.get("valor_oferecido", 0)
+    time_origem_id = proposta.get("id_time_origem")
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
-                # Transferência do jogador
-                jogador = {
-                    "nome": proposta["jogador_nome"],
-                    "posicao": proposta["jogador_posicao"],
-                    "overall": proposta["jogador_overall"],
-                    "valor": proposta["jogador_valor"]
-                }
+    # 🔄 Conversão segura do campo jogador_oferecido
+    jogadores_oferecidos_ids = []
+    try:
+        brutos = proposta.get("jogador_oferecido", [])
+        if isinstance(brutos, str):
+            jogadores_oferecidos_ids = json.loads(brutos)
+        elif isinstance(brutos, list):
+            jogadores_oferecidos_ids = brutos
+    except Exception:
+        jogadores_oferecidos_ids = []
 
-                # Remover jogador do time alvo (quem está sendo comprado)
-                supabase.table("elencos").delete().eq("id_time", id_time).eq("nome", jogador["nome"]).execute()
+    # Buscar nome do time de origem
+    nome_time_origem = "Desconhecido"
+    res_time = supabase.table("times").select("nome").eq("id", time_origem_id).execute()
+    if res_time.data:
+        nome_time_origem = res_time.data[0]["nome"]
 
-                # Adicionar jogador ao time de origem (quem comprou)
-                supabase.table("elencos").insert({
-                    "id_time": proposta["id_time_origem"],
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": proposta["valor_oferecido"]
-                }).execute()
+    col1, col2 = st.columns([4, 2])
+    with col1:
+        st.markdown(f"**👤 Jogador Desejado:** {jogador_nome}")
+        st.markdown(f"**🏷️ Tipo de Negociação:** {tipo}")
+        st.markdown(f"**💰 Valor Oferecido:** R$ {valor:,.0f}")
+        st.markdown(f"**📤 Time Proponente:** {nome_time_origem}")
 
-                # Atualizar proposta como aceita
-                supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
+        if jogadores_oferecidos_ids:
+            st.markdown("**👥 Jogadores Oferecidos:**")
+            nomes = []
+            for id_j in jogadores_oferecidos_ids:
+                if isinstance(id_j, str) and id_j.strip() != "":
+                    try:
+                        res_jog = supabase.table("elenco").select("nome").eq("id", id_j).execute()
+                        if res_jog.data:
+                            nomes.append(res_jog.data[0]["nome"])
+                        else:
+                            nomes.append(f"(Jogador não encontrado: {id_j})")
+                    except Exception:
+                        nomes.append(f"(Erro ao buscar jogador: {id_j})")
+                else:
+                    nomes.append(f"(ID inválido: {id_j})")
+            for nome in nomes:
+                st.markdown(f"- {nome}")
 
-                # Atualizar saldos
-                supabase.table("times").rpc("atualizar_saldo_transferencia", {
-                    "id_time_origem": proposta["id_time_origem"],
-                    "id_time_alvo": proposta["id_time_alvo"],
-                    "valor": proposta["valor_oferecido"]
-                }).execute()
+        st.markdown(f"**📝 Status:** `PENDENTE`")
 
-                # Registrar no BID
-                supabase.table("bid").insert({
-                    "jogador": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "valor": proposta["valor_oferecido"],
-                    "origem": proposta["nome_time_origem"],
-                    "destino": proposta["nome_time_alvo"]
-                }).execute()
+    with col2:
+        if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
+            try:
+                if tipo == "Somente Dinheiro":
+                    supabase.table("elenco").update({
+                        "id_time": time_origem_id,
+                        "valor": valor
+                    }).eq("id", jogador_id).execute()
 
-                # Movimentação financeira
-                registrar_movimentacao(proposta["id_time_origem"], f"Compra de {jogador['nome']} do {proposta['nome_time_alvo']}", -proposta["valor_oferecido"])
-                registrar_movimentacao(proposta["id_time_alvo"], f"Venda de {jogador['nome']} para o {proposta['nome_time_origem']}", proposta["valor_oferecido"])
+                    registrar_movimentacao(supabase, time_origem_id, -valor, f"Compra de {jogador_nome}")
+                    registrar_movimentacao(supabase, id_time_logado, valor, f"Venda de {jogador_nome}")
+
+                else:
+                    supabase.table("elenco").update({
+                        "id_time": time_origem_id
+                    }).eq("id", jogador_id).execute()
+
+                    for id_j in jogadores_oferecidos_ids:
+                        if isinstance(id_j, str) and id_j.strip():
+                            supabase.table("elenco").update({
+                                "id_time": id_time_logado
+                            }).eq("id", id_j).execute()
+
+                    registrar_movimentacao(supabase, time_origem_id, 0, f"Troca por {jogador_nome}")
+                    registrar_movimentacao(supabase, id_time_logado, 0, f"Recebe {jogador_nome} em troca")
+
+                supabase.table("negociacoes").update({
+                    "status": "aceita",
+                    "valor_aceito": valor
+                }).eq("id", proposta["id"]).execute()
 
                 st.success("✅ Proposta aceita com sucesso!")
                 st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao aceitar a proposta: {e}")
 
-        with col2:
-            if st.button("❌ Recusar", key=f"recusar_{proposta['id']}"):
-                supabase.table("propostas").update({"status": "recusada"}).eq("id", proposta["id"]).execute()
-                st.warning("❌ Proposta recusada.")
-                st.experimental_rerun()
-
-        with col3:
-            nova_valor = st.number_input("Contra-proposta", min_value=1, value=proposta["valor_oferecido"], step=50000, key=f"contra_{proposta['id']}")
-            if st.button("📤 Enviar Contra-Proposta", key=f"enviar_contra_{proposta['id']}"):
-                supabase.table("propostas").update({
-                    "valor_oferecido": nova_valor,
-                    "status": "pendente"
+        if st.button("❌ Recusar", key=f"recusar_{proposta['id']}"):
+            try:
+                supabase.table("negociacoes").update({
+                    "status": "recusada"
                 }).eq("id", proposta["id"]).execute()
-                st.info("📤 Contra-proposta enviada.")
+                st.warning("🚫 Proposta recusada.")
                 st.experimental_rerun()
-
+            except Exception as e:
+                st.error(f"Erro ao recusar a proposta: {e}")
