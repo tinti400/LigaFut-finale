@@ -53,24 +53,24 @@ try:
             origem = m.get("origem", "")
             destino = m.get("destino", "")
             tipo = m.get("tipo", "").capitalize()
-            categoria = m.get("categoria", "")
+            categoria = m.get("categoria", "").lower()
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if tipo.lower() == "compra" else "🔴"
+            icone = "🟢" if categoria == "venda" else "🔴"
 
             linha = {
                 "Data": data_formatada,
                 "Jogador": f"{icone} {jogador}",
                 "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
                 "Tipo": tipo,
-                "Categoria": categoria,
+                "Categoria": categoria.capitalize(),
                 "Detalhes": detalhes
             }
 
-            if tipo.lower() == "compra":
+            if categoria == "venda":
                 entradas.append(linha)
                 total_entrada += valor
-            elif tipo.lower() == "venda":
+            elif categoria == "compra":
                 saidas.append(linha)
                 total_saida += valor
 
