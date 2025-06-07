@@ -32,7 +32,7 @@ st.title("📨 Propostas Recebidas")
 st.markdown(f"### Seu time: **{nome_time_logado}**")
 
 if not mercado_aberto:
-    st.warning("🛑 O mercado está fechado no momento. Você não pode aceitar ou recusar propostas.")
+    st.warning("🚫 O mercado está fechado no momento. Você não pode aceitar ou recusar propostas.")
     st.stop()
 
 # 🔍 Buscar apenas propostas pendentes
@@ -122,14 +122,9 @@ for proposta in propostas:
                     "valor_aceito": valor
                 }).eq("id", proposta["id"]).execute()
 
-                # 4️⃣ Registra movimentação
-                registrar_movimentacao(
-                    tipo="Compra por negociação",
-                    id_time_origem=time_origem_id,
-                    id_time_destino=id_time_logado,
-                    jogador=jogador_nome,
-                    valor=valor
-                )
+                # 4️⃣ Registrar movimentações
+                registrar_movimentacao(id_time=id_time_logado, tipo="Venda via Proposta", jogador=jogador_nome, valor=valor)
+                registrar_movimentacao(id_time=time_origem_id, tipo="Compra via Proposta", jogador=jogador_nome, valor=valor)
 
                 st.success("✅ Proposta aceita com sucesso!")
                 st.experimental_rerun()
@@ -141,7 +136,7 @@ for proposta in propostas:
                 supabase.table("negociacoes").update({
                     "status": "recusada"
                 }).eq("id", proposta["id"]).execute()
-                st.warning("🛑 Proposta recusada.")
+                st.warning("🚫 Proposta recusada.")
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao recusar a proposta: {e}")
