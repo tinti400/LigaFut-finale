@@ -38,69 +38,46 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-st.subheader("📥 Entradas no Caixa (Vendas)")
+st.subheader("📜 Últimas Movimentações (Entradas e Saídas)")
 
+# 📦 Processar movimentações
 try:
     movimentacoes = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(100).execute().data
+        .eq("id_time", id_time).order("data", desc=True).limit(50).execute().data
 
-    entradas = []
-    saidas = []
     total_entrada = 0
     total_saida = 0
 
-    for m in movimentacoes:
-        categoria = m.get("categoria", "")
-        data = parse(m["data"]).strftime("%d/%m %H:%M")
-        jogador = m.get("jogador", "Desconhecido")
-        valor = m.get("valor", 0)
-        origem = m.get("origem", "")
-        destino = m.get("destino", "")
+    if movimentacoes:
+        for m in movimentacoes:
+            categoria = m.get("categoria", "").lower()
+            data = parse(m["data"]).strftime("%d/%m %H:%M")
+            jogador = m.get("jogador", "Desconhecido")
+            valor = m.get("valor", 0)
+            origem = m.get("origem", "")
+            destino = m.get("destino", "")
 
-        # Entradas
-        if categoria.lower() == "venda":
-            total_entrada += valor
-            if destino.lower() == "mercado":
-                entradas.append(f"🟢 **{jogador}** vendido no **Mercado** por **R$ {valor:,.0f}** em {data}")
-            elif destino.lower() == "leilao":
-                entradas.append(f"🟢 **{jogador}** vendido via **Leilão** por **R$ {valor:,.0f}** em {data}")
-            elif destino:
-                entradas.append(f"🟢 **{jogador}** vendido para **{destino}** por **R$ {valor:,.0f}** em {data}")
+            if categoria == "venda":
+                icone = "🟢"
+                total_entrada += valor
+                origem_destino = f"para **{destino}**" if destino else ""
+            elif categoria == "compra":
+                icone = "🔴"
+                total_saida += valor
+                origem_destino = f"do **{origem}**" if origem else ""
             else:
-                entradas.append(f"🟢 **{jogador}** vendido por **R$ {valor:,.0f}** em {data}")
+                icone = "⚪️"
+                origem_destino = ""
 
-        # Saídas
-        elif categoria.lower() == "compra":
-            total_saida += valor
-            if origem.lower() == "mercado":
-                saidas.append(f"🔴 **{jogador}** comprado no **Mercado** por **R$ {valor:,.0f}** em {data}")
-            elif origem.lower() == "leilao":
-                saidas.append(f"🔴 **{jogador}** comprado via **Leilão** por **R$ {valor:,.0f}** em {data}")
-            elif origem:
-                saidas.append(f"🔴 **{jogador}** comprado do **{origem}** por **R$ {valor:,.0f}** em {data}")
-            else:
-                saidas.append(f"🔴 **{jogador}** comprado por **R$ {valor:,.0f}** em {data}")
+            st.markdown(f"{icone} **{jogador}** {origem_destino} por **R$ {valor:,.0f}** em {data}".replace(",", "."))
 
-    # Mostrar entradas
-    if entradas:
-        for entrada in entradas:
-            st.markdown(entrada.replace(",", "."))
     else:
-        st.info("Nenhuma entrada registrada ainda.")
+        st.info("Nenhuma movimentação registrada ainda.")
 
-    st.markdown("---")
-    st.subheader("📤 Saídas do Caixa (Compras)")
-
-    # Mostrar saídas
-    if saidas:
-        for saida in saidas:
-            st.markdown(saida.replace(",", "."))
-    else:
-        st.info("Nenhuma saída registrada ainda.")
-
-    # Resumo financeiro
+    # 📊 Resumo financeiro
     st.markdown("---")
     st.subheader("📊 Resumo Financeiro")
+
     col1, col2, col3 = st.columns(3)
     with col1:
         st.success(f"💰 Entradas: R$ {total_entrada:,.0f}".replace(",", "."))
@@ -114,3 +91,4 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
