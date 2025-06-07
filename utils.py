@@ -10,10 +10,30 @@ url = os.getenv("SUPABASE_URL") or st.secrets["supabase"]["url"]
 key = os.getenv("SUPABASE_KEY") or st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 💰 Registrar movimentação financeira
+# ✅ Verificação de login
+def verificar_login():
+    if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+        st.warning("Você precisa estar logado para acessar esta página.")
+        st.stop()
+    if "id_time" not in st.session_state or "nome_time" not in st.session_state:
+        st.warning("Informações do time não encontradas na sessão.")
+        st.stop()
+
+# 💰 Registrar movimentação financeira com atualização de saldo
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
+    """
+    Registra movimentações financeiras e atualiza saldo do time.
+
+    - tipo: Ex: "Transferência", "Leilão", "Mercado"
+    - categoria: "compra" ou "venda"
+    - valor: sempre positivo
+    - origem: time de onde veio o jogador (opcional)
+    - destino: time para onde foi o jogador (opcional)
+    """
     try:
-        # Buscar saldo atual do time
+        categoria = categoria.strip().lower()  # Normaliza entrada
+
+        # Buscar saldo atual
         res = supabase.table("times").select("saldo").eq("id", id_time).execute()
         if not res.data:
             st.error(f"❌ Time com ID {id_time} não encontrado.")
@@ -22,9 +42,9 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
         saldo_atual = res.data[0]["saldo"]
 
         # Calcula novo saldo
-        if categoria.lower() == "compra":
+        if categoria == "compra":
             novo_saldo = saldo_atual - valor
-        elif categoria.lower() == "venda":
+        elif categoria == "venda":
             novo_saldo = saldo_atual + valor
         else:
             st.warning("Categoria inválida. Use 'compra' ou 'venda'.")
@@ -53,5 +73,4 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação: {e}")
-
 
