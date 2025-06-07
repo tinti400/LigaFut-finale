@@ -12,13 +12,29 @@ def verificar_login():
         st.warning("Informações do time não encontradas na sessão.")
         st.stop()
 
-# 💰 Registrar movimentação financeira (corrigido: sem precisar passar supabase)
+# 💰 Registrar movimentação financeira com atualização de saldo
 def registrar_movimentacao(id_time, jogador, categoria, tipo, valor):
     try:
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["key"]
         supabase = create_client(url, key)
 
+        # 🔍 Buscar saldo atual
+        res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+        saldo_atual = res.data[0]["saldo"] if res.data else 0
+
+        # 🧮 Calcular novo saldo
+        if tipo.lower() in ["compra", "transferência"] and "compra" in categoria.lower():
+            novo_saldo = saldo_atual - valor
+        elif tipo.lower() in ["venda", "transferência"] and "venda" in categoria.lower():
+            novo_saldo = saldo_atual + valor
+        else:
+            novo_saldo = saldo_atual
+
+        # 💾 Atualizar saldo
+        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+        # 📝 Registrar movimentação
         movimentacao = {
             "id_time": id_time,
             "jogador": jogador,
@@ -28,6 +44,7 @@ def registrar_movimentacao(id_time, jogador, categoria, tipo, valor):
             "data": datetime.utcnow().isoformat()
         }
         supabase.table("movimentacoes").insert(movimentacao).execute()
+
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação financeira: {e}")
 
