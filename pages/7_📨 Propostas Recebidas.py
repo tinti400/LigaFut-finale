@@ -123,8 +123,21 @@ for proposta in propostas:
                 }).eq("id", proposta["id"]).execute()
 
                 # 4️⃣ Registrar movimentações
-                registrar_movimentacao(id_time=id_time_logado, tipo="Venda via Proposta", jogador=jogador_nome, valor=valor)
-                registrar_movimentacao(id_time=time_origem_id, tipo="Compra via Proposta", jogador=jogador_nome, valor=valor)
+                registrar_movimentacao(
+                    time_origem_id,
+                    jogador_nome,
+                    "Transferência",
+                    "Compra (entre clubes)",
+                    valor
+                )
+
+                registrar_movimentacao(
+                    id_time_logado,
+                    jogador_nome,
+                    "Transferência",
+                    "Venda (entre clubes)",
+                    valor
+                )
 
                 st.success("✅ Proposta aceita com sucesso!")
                 st.experimental_rerun()
