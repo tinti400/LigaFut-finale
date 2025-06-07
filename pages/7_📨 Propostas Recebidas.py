@@ -76,7 +76,16 @@ else:
                         registrar_movimentacao(id_time_origem, jogador_nome, "Transferência", "Compra", valor)
                         registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
 
+                    # Atualizar status da proposta aceita
                     supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
+
+                    # Cancelar outras propostas pendentes pelo mesmo jogador
+                    supabase.table("propostas").update({"status": "cancelada"}) \
+                        .eq("jogador_nome", jogador_nome) \
+                        .eq("destino_id", id_time) \
+                        .eq("status", "pendente") \
+                        .neq("id", proposta["id"]).execute()
+
                     st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
                     st.experimental_rerun()
 
