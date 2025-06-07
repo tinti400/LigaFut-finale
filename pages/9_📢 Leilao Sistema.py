@@ -30,9 +30,9 @@ fim = leilao.get("fim")
 valor_atual = leilao["valor_atual"]
 incremento = leilao["incremento_minimo"]
 id_time_vencedor = leilao.get("id_time_atual", "")
-nome_jogador = leilao["nome_jogador"]
-posicao_jogador = leilao["posicao_jogador"]
-overall_jogador = leilao["overall_jogador"]
+nome_jogador = leilao.get("nome_jogador", "Desconhecido")
+posicao_jogador = leilao.get("posicao_jogador", "-")
+overall_jogador = leilao.get("overall_jogador", "N/A")
 
 # ⏱️ Cronômetro
 fim_dt = datetime.fromisoformat(fim)
@@ -74,9 +74,9 @@ if tempo_restante == 0:
         registrar_movimentacao(
             id_time=id_time_vencedor,
             jogador=nome_jogador,
-            valor=-valor_atual,
-            tipo="compra",
             categoria="leilao",
+            tipo="compra",
+            valor=valor_atual,
             origem="Leilão"
         )
 
@@ -87,34 +87,32 @@ if tempo_restante == 0:
 # 📢 Dar lances
 if tempo_restante > 0:
     st.markdown("### 💥 Dar um Lance")
-    botoes = {
-        f"➕ R$ {incremento:,.0f}": incremento,
-        f"➕ R$ {incremento * 2:,.0f}": incremento * 2,
-        f"➕ R$ {incremento * 3:,.0f}": incremento * 3,
-    }
+    colunas = st.columns(5)
+    botoes = [(incremento * i) for i in range(1, 11)]
 
-    for label, aumento in botoes.items():
-        if st.button(label):
-            novo_lance = valor_atual + aumento
-            saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
-            saldo = saldo_ref.data[0]["saldo"]
+    for i, aumento in enumerate(botoes):
+        novo_lance = valor_atual + aumento
+        with colunas[i % 5]:
+            if st.button(f"➕ R$ {novo_lance:,.0f}".replace(",", "."), key=f"lance_{i}"):
+                saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
+                saldo = saldo_ref.data[0]["saldo"]
 
-            if novo_lance > saldo:
-                st.error("❌ Saldo insuficiente.")
-            else:
-                fim_estendido = datetime.utcnow()
-                if (fim_dt - fim_estendido).total_seconds() <= 15:
-                    fim_dt = fim_estendido + timedelta(seconds=15)
+                if novo_lance > saldo:
+                    st.error("❌ Saldo insuficiente.")
+                else:
+                    fim_estendido = datetime.utcnow()
+                    if (fim_dt - fim_estendido).total_seconds() <= 15:
+                        fim_dt = fim_estendido + timedelta(seconds=15)
 
-                supabase.table("leiloes").update({
-                    "valor_atual": novo_lance,
-                    "id_time_atual": id_time_usuario,
-                    "time_vencedor": nome_time_usuario,
-                    "fim": fim_dt.isoformat()
-                }).eq("id", leilao["id"]).execute()
+                    supabase.table("leiloes").update({
+                        "valor_atual": novo_lance,
+                        "id_time_atual": id_time_usuario,
+                        "time_vencedor": nome_time_usuario,
+                        "fim": fim_dt.isoformat()
+                    }).eq("id", leilao["id"]).execute()
 
-                st.success("✅ Lance enviado com sucesso!")
-                st.experimental_rerun()
+                    st.success("✅ Lance enviado com sucesso!")
+                    st.experimental_rerun()
 
 st.markdown("---")
 if st.button("🔄 Atualizar"):
