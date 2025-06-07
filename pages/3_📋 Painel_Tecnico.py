@@ -38,43 +38,44 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-st.subheader("📜 Últimas Movimentações (Entradas e Saídas)")
+st.subheader("📜 Todas as Movimentações")
 
-# 📦 Processar movimentações
 try:
     movimentacoes = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(50).execute().data
+        .eq("id_time", id_time).order("data", desc=True).limit(100).execute().data
 
     total_entrada = 0
     total_saida = 0
 
     if movimentacoes:
         for m in movimentacoes:
-            categoria = m.get("categoria", "").lower()
             data = parse(m["data"]).strftime("%d/%m %H:%M")
             jogador = m.get("jogador", "Desconhecido")
             valor = m.get("valor", 0)
             origem = m.get("origem", "")
             destino = m.get("destino", "")
 
-            if categoria == "venda":
+            # Determina se é entrada (valor positivo) ou saída (valor negativo)
+            if valor >= 0:
                 icone = "🟢"
                 total_entrada += valor
-                origem_destino = f"para **{destino}**" if destino else ""
-            elif categoria == "compra":
-                icone = "🔴"
-                total_saida += valor
-                origem_destino = f"do **{origem}**" if origem else ""
             else:
-                icone = "⚪️"
-                origem_destino = ""
+                icone = "🔴"
+                total_saida += abs(valor)  # soma absoluta para o total
 
-            st.markdown(f"{icone} **{jogador}** {origem_destino} por **R$ {valor:,.0f}** em {data}".replace(",", "."))
+            # Texto do destino/origem
+            detalhe = ""
+            if origem:
+                detalhe = f"do **{origem}**"
+            elif destino:
+                detalhe = f"para **{destino}**"
+
+            st.markdown(f"{icone} **{jogador}** {detalhe} por **R$ {abs(valor):,.0f}** em {data}".replace(",", "."))
 
     else:
         st.info("Nenhuma movimentação registrada ainda.")
 
-    # 📊 Resumo financeiro
+    # 📊 Resumo
     st.markdown("---")
     st.subheader("📊 Resumo Financeiro")
 
@@ -91,4 +92,5 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
 
