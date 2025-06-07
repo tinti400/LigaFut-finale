@@ -22,7 +22,7 @@ nome_time_usuario = st.session_state.get("nome_time", "")
 # 🔍 Buscar leilao ativo
 res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).limit(1).execute()
 if not res.data:
-    st.warning("⚠️ Nenhum leilao ativo no momento.")
+    st.warning("⚠️ Nenhum leilão ativo no momento.")
     st.stop()
 
 leilao = res.data[0]
@@ -66,6 +66,7 @@ if tempo_restante == 0:
         }
 
         supabase.table("elenco").insert(jogador).execute()
+
         saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
         saldo = saldo_ref.data[0]["saldo"]
         novo_saldo = saldo - valor_atual
@@ -74,13 +75,14 @@ if tempo_restante == 0:
         registrar_movimentacao(
             id_time=id_time_vencedor,
             jogador=nome_jogador,
-            categoria="leilao",
-            tipo="compra",
+            tipo="leilao",
+            categoria="compra",
             valor=valor_atual,
             origem="leilao"
         )
 
-        st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!")
+        st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!".replace(",", "."))
+
     supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", leilao["id"]).execute()
     st.stop()
 
@@ -88,7 +90,7 @@ if tempo_restante == 0:
 if tempo_restante > 0:
     st.markdown("### 💥 Dar um Lance")
     colunas = st.columns(5)
-    botoes = [(incremento * i) for i in range(1, 11)]
+    botoes = [(incremento * i) for i in range(1, 11)]  # 10 valores
 
     for i, aumento in enumerate(botoes):
         novo_lance = valor_atual + aumento
