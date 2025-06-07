@@ -38,31 +38,40 @@ with col2:
     st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
 st.markdown("---")
-st.subheader("📊 Histórico de Movimentações")
+st.subheader("📥 Entradas no Caixa (Vendas)")
 
-# 🔍 Buscar todas as movimentações do time
+# 🔍 Buscar movimentações
 try:
     movimentacoes = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(30).execute().data
+        .eq("id_time", id_time).order("data", desc=True).limit(50).execute().data
 
-    if movimentacoes:
-        for m in movimentacoes:
+    entradas = [m for m in movimentacoes if m.get("categoria") == "Venda"]
+    saidas = [m for m in movimentacoes if m.get("categoria") == "Compra"]
+
+    # 🔵 Entradas
+    if entradas:
+        for m in entradas:
             data = parse(m["data"]).strftime("%d/%m %H:%M")
-            categoria = m.get("categoria", "Movimentação")
             jogador = m.get("jogador", "Desconhecido")
             valor = m.get("valor", 0)
-
-            if categoria == "Compra":
-                origem = m.get("origem", "Mercado")
-                st.markdown(f"✅ **{jogador}** comprado por **R$ {valor:,.0f}** em {data} (_{origem}_)".replace(",", "."))
-
-            elif categoria == "Venda":
-                destino = m.get("destino", "Mercado")
-                st.markdown(f"📤 **{jogador}** vendido por **R$ {valor:,.0f}** em {data} (_{destino}_)".replace(",", "."))
-
-            else:
-                st.markdown(f"🔁 **{jogador}** - {categoria} - **R$ {valor:,.0f}** em {data}".replace(",", "."))
+            destino = m.get("destino", "Mercado")
+            st.markdown(f"📤 **{jogador}** vendido por **R$ {valor:,.0f}** em {data} (_{destino}_)".replace(",", "."))
     else:
-        st.info("Nenhuma movimentação registrada ainda.")
+        st.info("Nenhuma venda registrada ainda.")
+
+    st.markdown("---")
+    st.subheader("📤 Saídas do Caixa (Compras)")
+
+    # 🔴 Saídas
+    if saidas:
+        for m in saidas:
+            data = parse(m["data"]).strftime("%d/%m %H:%M")
+            jogador = m.get("jogador", "Desconhecido")
+            valor = m.get("valor", 0)
+            origem = m.get("origem", "Mercado")
+            st.markdown(f"✅ **{jogador}** comprado por **R$ {valor:,.0f}** em {data} (_{origem}_)".replace(",", "."))
+    else:
+        st.info("Nenhuma compra registrada ainda.")
+
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
