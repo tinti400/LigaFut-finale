@@ -3,50 +3,56 @@
 import streamlit as st
 from datetime import datetime
 import pytz
-
-# 🔐 Conexão com Supabase (evita duplicar isso se já estiver fora da função)
 from supabase import create_client
+
+# 🔐 Conexão com Supabase (apenas se ainda não estiver configurado fora)
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
-    Registra movimentações financeiras e atualiza saldo do time.
+    Registra movimentações financeiras no Firestore e atualiza saldo do time.
 
-    - tipo: Ex: "transferência", "leilao", "mercado", "proposta"
-    - categoria: "compra" ou "venda"
-    - valor: sempre positivo
+    Parâmetros:
+    - id_time: ID do time
+    - jogador: Nome do jogador
+    - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
+    - categoria: 'compra' ou 'venda' (case-insensitive)
+    - valor: Valor positivo
+    - origem: time de onde o jogador veio (opcional)
+    - destino: time para onde o jogador foi (opcional)
     """
 
     try:
-        categoria = categoria.lower().strip()
+        categoria = categoria.strip().lower()
+        tipo = tipo.strip().lower()
 
         if categoria not in ["compra", "venda"]:
-            st.warning("Categoria inválida. Use 'compra' ou 'venda'.")
+            st.warning("⚠️ Categoria inválida. Use 'compra' ou 'venda'.")
             return
 
-        # Buscar saldo atual
+        # Verifica o saldo atual
         res = supabase.table("times").select("saldo").eq("id", id_time).execute()
         if not res.data:
-            st.error(f"❌ Time com ID {id_time} não encontrado.")
+            st.error(f"❌ Time com ID '{id_time}' não encontrado.")
             return
 
         saldo_atual = res.data[0]["saldo"]
 
-        # Calcular novo saldo
+        # Calcula o novo saldo
         if categoria == "compra":
             novo_saldo = saldo_atual - valor
-        else:  # venda
+        else:
             novo_saldo = saldo_atual + valor
 
-        # Atualizar saldo
+        # Atualiza o saldo no banco
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-        # Data e hora no fuso de Brasília
+        # Data atual no fuso de Brasília
         agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
 
-        # Registro da movimentação
+        # Monta registro da movimentação
         registro = {
             "id_time": id_time,
             "jogador": jogador,
@@ -58,6 +64,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             "destino": destino
         }
 
+        # Salva no Supabase
         supabase.table("movimentacoes").insert(registro).execute()
 
     except Exception as e:
