@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -14,7 +15,7 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 📥 Dados do time logado
+# 📅 Dados do time logado
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
@@ -58,7 +59,7 @@ except Exception as e:
     st.error(f"Erro ao carregar o mercado de transferências: {e}")
     mercado = []
 
-# 🎯 Aplica filtros
+# 🌟 Aplica filtros
 jogadores_filtrados = []
 for j in mercado:
     if filtro_nome and filtro_nome not in j["nome"].lower():
@@ -128,7 +129,7 @@ else:
                         "posicao": jogador["posicao"],
                         "overall": jogador["overall"],
                         "valor": jogador["valor"],
-                        "id_time": id_time
+                        "time_id": id_time  # <-- Correção aqui
                     }
                     supabase.table("elenco").insert(jogador_data).execute()
 
@@ -145,7 +146,7 @@ else:
                         "valor": jogador["valor"],
                         "tipo": "Compra",
                         "categoria": "Mercado",
-                        "id_time": id_time,
+                        "time_id": id_time,
                         "data": datetime.now().isoformat()
                     }).execute()
 
