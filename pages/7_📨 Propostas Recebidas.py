@@ -63,8 +63,8 @@ else:
                         # ➕ Inserir jogador no elenco do comprador
                         supabase.table("elenco").insert(jogador).execute()
 
-                        # 💸 Movimentações financeiras
-                        registrar_movimentacao(id_time_origem, proposta["jogador_nome"], "Transferência", "Compra", -valor)
+                        # 💸 Movimentações financeiras (corrigido: sem sinal negativo)
+                        registrar_movimentacao(id_time_origem, proposta["jogador_nome"], "Transferência", "Compra", valor)
                         registrar_movimentacao(id_time_destino, proposta["jogador_nome"], "Transferência", "Venda", valor)
 
                         # ✅ Atualizar status
