@@ -114,8 +114,8 @@ if tempo_restante > 0:
                 }).eq("id", leilao["id"]).execute()
 
                 st.success(f"✅ Lance enviado com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
 
 st.markdown("---")
 if st.button("🔄 Atualizar"):
-    st.rerun()
+    st.experimental_rerun()
