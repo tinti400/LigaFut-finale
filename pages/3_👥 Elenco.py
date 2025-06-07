@@ -4,7 +4,6 @@ from supabase import create_client
 from datetime import datetime
 import pandas as pd
 from utils import registrar_movimentacao
-from collections import defaultdict
 
 st.set_page_config(page_title="Elenco - LigaFut", layout="wide")
 
@@ -41,7 +40,7 @@ if arquivo:
                 "id_time": id_time
             }).execute()
         st.success("Elenco importado com sucesso!")
-        st.experimental_rerun()
+        st.rerun()
     except Exception as e:
         st.error(f"Erro ao importar elenco: {e}")
 
@@ -50,7 +49,7 @@ filtro_posicao = st.selectbox("Filtrar por posição", ["Todos", "GL", "ZAG", "L
 filtro_nome = st.text_input("Buscar por nome").lower()
 
 if st.button("🔄 Limpar filtros"):
-    st.experimental_rerun()
+    st.rerun()
 
 # 📝 Carrega elenco do time
 try:
@@ -100,7 +99,7 @@ else:
         if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
                 valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)
+                valor_recebido = round(valor_total * 0.7)  # ✅ time recebe 70% do valor
                 novo_saldo = saldo + valor_recebido
 
                 # Atualiza saldo
@@ -109,27 +108,28 @@ else:
                 # Remove do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Adiciona ao mercado
+                # Adiciona ao mercado com valor cheio
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
                     "overall": jogador["overall"],
-                    "valor": jogador["valor"],
+                    "valor": jogador["valor"],  # valor cheio
                     "id_time": id_time,
                     "time_origem": nome_time
                 }).execute()
 
-                # Movimentação
+                # Registra movimentação
                 registrar_movimentacao(
+                    supabase=supabase,
                     id_time=id_time,
                     jogador=jogador["nome"],
                     valor=valor_recebido,
-                    tipo="mercado",
-                    categoria="venda",
-                    origem=nome_time
+                    tipo="venda",
+                    categoria="mercado",
+                    destino="Mercado"
                 )
 
                 st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {valor_recebido:,.0f}".replace(",", "."))
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
