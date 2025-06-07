@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -41,7 +41,10 @@ st.markdown("---")
 st.subheader("📈 Últimas Compras")
 
 try:
-    compras = supabase.table("movimentacoes").select("*").eq("id_time", id_time).eq("tipo", "Compra").order("data", desc=True).limit(10).execute().data
+    compras = supabase.table("movimentacoes").select("*") \
+        .eq("id_time", id_time).eq("categoria", "Compra") \
+        .order("data", desc=True).limit(10).execute().data
+
     if compras:
         for c in compras:
             data = parse(c["data"]).strftime("%d/%m %H:%M")
@@ -55,7 +58,10 @@ st.markdown("---")
 st.subheader("📤 Últimas Vendas")
 
 try:
-    vendas = supabase.table("movimentacoes").select("*").eq("id_time", id_time).eq("tipo", "Venda").order("data", desc=True).limit(10).execute().data
+    vendas = supabase.table("movimentacoes").select("*") \
+        .eq("id_time", id_time).eq("categoria", "Venda") \
+        .order("data", desc=True).limit(10).execute().data
+
     if vendas:
         for v in vendas:
             data = parse(v["data"]).strftime("%d/%m %H:%M")
