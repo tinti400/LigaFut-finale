@@ -38,12 +38,14 @@ if not movimentacoes:
 else:
     for mov in movimentacoes:
         jogador = mov.get("jogador", "Desconhecido")
-        tipo = mov.get("tipo", "N/A")
-        categoria = mov.get("categoria", "N/A")
+        tipo = mov.get("tipo", "N/A").capitalize()
+        categoria = mov.get("categoria", "N/A").capitalize()
         valor = mov.get("valor", 0)
         data = mov.get("data", "")
         id_time = mov.get("id_time", "")
         nome_time = times_map.get(id_time, "Desconhecido")
+        destino = mov.get("destino", "")
+        origem = mov.get("origem", "")
 
         # Data formatada
         try:
@@ -54,20 +56,28 @@ else:
         # Valor formatado
         valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
-        # Determina se é entrada ou saída
-        if valor >= 0:
-            icone = "<span style='font-size:28px;color:green'>🟢</span>"
+        # Determina o ícone
+        if categoria.lower() == "leilao":
+            icone = "📢"
+        elif categoria.lower() == "proposta":
+            icone = "📤"
+        elif valor >= 0:
+            icone = "🟢"
         else:
-            icone = "<span style='font-size:28px;color:red'>🔴</span>"
+            icone = "🔴"
 
         # Exibição formatada
         with st.container():
             st.markdown("---")
             col1, col2 = st.columns([1, 6])
             with col1:
-                st.markdown(icone, unsafe_allow_html=True)
+                st.markdown(f"<span style='font-size:28px'>{icone}</span>", unsafe_allow_html=True)
             with col2:
                 st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
                 st.markdown(f"**👤 Jogador:** {jogador}")
                 st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
                 st.markdown(f"**💰 Valor:** {valor_str}")
+                if origem:
+                    st.markdown(f"**↩️ Origem:** {origem}")
+                if destino:
+                    st.markdown(f"**➡️ Destino:** {destino}")
