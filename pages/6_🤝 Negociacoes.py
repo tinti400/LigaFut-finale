@@ -54,10 +54,10 @@ for id_time_adv, nome_adv in times.items():
         else:
             for jogador in elenco_adv:
                 st.markdown("---")
-                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
-                st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")
-                st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")
-                st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")
+                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")                
+                st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")                
+                st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")                
+                st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")                
                 valor_jogador = jogador.get("valor", 0)
                 st.markdown(f"**💰 Valor:** R$ {valor_jogador:,.0f}")
 
@@ -74,7 +74,6 @@ for id_time_adv, nome_adv in times.items():
                 if tipo == "Somente Dinheiro":
                     valor_proposta = st.number_input(
                         "💵 Valor da Proposta (R$)",
-                        min_value=valor_jogador,
                         step=500_000,
                         value=valor_jogador,
                         key=f"valor_dinheiro_{jogador['id']}"
@@ -99,7 +98,6 @@ for id_time_adv, nome_adv in times.items():
                     jogadores_oferecidos = [meu_elenco[opcoes.index(s)] for s in selecao]
                     valor_proposta = st.number_input(
                         "💰 Valor adicional em dinheiro (R$)",
-                        min_value=0,
                         step=500_000,
                         key=f"valor_composta_{jogador['id']}"
                     )
@@ -107,8 +105,6 @@ for id_time_adv, nome_adv in times.items():
                 if st.button("📩 Enviar Proposta", key=f"btn_proposta_{jogador['id']}"):
                     if tipo != "Somente Dinheiro" and not jogadores_oferecidos:
                         st.warning("Selecione ao menos um jogador do seu elenco para a troca.")
-                    elif tipo == "Somente Dinheiro" and valor_proposta < valor_jogador:
-                        st.warning(f"O valor deve ser igual ou superior a R$ {valor_jogador:,.0f}")
                     else:
                         proposta = {
                             "id": str(uuid.uuid4()),
@@ -131,11 +127,8 @@ for id_time_adv, nome_adv in times.items():
                             resp = supabase.table("propostas").insert(proposta).execute()
                             if resp and resp.data:
                                 st.success("✅ Proposta enviada com sucesso!")
-                                st.rerun()
+                                st.experimental_rerun()
                             else:
                                 st.error("Erro ao enviar proposta: resposta vazia.")
                         except Exception as e:
                             st.error(f"Erro: {e}")
-
-
-
