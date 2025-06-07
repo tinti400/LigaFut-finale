@@ -47,7 +47,7 @@ with col2: st.subheader(nome_jogador)
 with col3: st.metric("⭐ Overall", overall_jogador)
 with col4: st.metric("💰 Lance Atual", f"R$ {valor_atual:,.0f}".replace(",", "."))
 
-# 🏷️ Último lance
+# 🏧 Último lance
 if id_time_vencedor:
     nome_time = supabase.table("times").select("nome").eq("id", id_time_vencedor).execute().data[0]["nome"]
     st.info(f"🏷️ Último Lance: {nome_time}")
@@ -72,11 +72,12 @@ if tempo_restante == 0:
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
 
         registrar_movimentacao(
+            supabase=supabase,
             id_time=id_time_vencedor,
             jogador=nome_jogador,
-            valor=valor_atual,
+            categoria="Leilão",
             tipo="Compra",
-            categoria="Leilão"
+            valor=valor_atual
         )
 
         st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!")
@@ -112,10 +113,11 @@ if tempo_restante > 0:
                     "fim": fim_dt.isoformat()
                 }).eq("id", leilao["id"]).execute()
 
-                st.success(f"✅ Lance enviado com sucesso!")
-                st.rerun()
+                st.success("✅ Lance enviado com sucesso!")
+                st.experimental_rerun()
 
 st.markdown("---")
 if st.button("🔄 Atualizar"):
-    st.rerun()
+    st.experimental_rerun()
+
 
