@@ -72,12 +72,12 @@ if tempo_restante == 0:
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
 
         registrar_movimentacao(
-            supabase=supabase,
             id_time=id_time_vencedor,
             jogador=nome_jogador,
-            categoria="Leilão",
-            tipo="Compra",
-            valor=valor_atual
+            valor=-valor_atual,
+            tipo="compra",
+            categoria="leilao",
+            origem="Leilão"
         )
 
         st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!")
@@ -119,5 +119,3 @@ if tempo_restante > 0:
 st.markdown("---")
 if st.button("🔄 Atualizar"):
     st.experimental_rerun()
-
-
