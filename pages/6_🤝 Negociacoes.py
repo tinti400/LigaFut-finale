@@ -55,8 +55,6 @@ for id_time_adv, nome_adv in times.items():
                 st.markdown("---")
                 st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
                 st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")
-                st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")
-                st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")
                 valor_jogador = jogador.get("valor", 0)
                 st.markdown(f"**💰 Valor:** R$ {valor_jogador:,.0f}")
 
@@ -111,22 +109,26 @@ for id_time_adv, nome_adv in times.items():
                         st.warning(f"O valor deve ser igual ou superior a R$ {valor_jogador:,.0f}")
                     else:
                         proposta = {
+                            "id": jogador["id"] + "_" + id_time,  # ID único
                             "id_time_origem": id_time,
-                            "id_time_destino": id_time_adv,
-                            "jogador_desejado": jogador["nome"],
-                            "id_jogador": jogador["id"],
-                            "jogador_oferecido": jogador_oferecido,
-                            "valor_oferecido": valor_proposta,
-                            "tipo_negociacao": tipo,
+                            "nome_time_origem": nome_time,
+                            "destino_id": id_time_adv,
+                            "nome_time_alvo": nome_adv,
+                            "jogador_nome": jogador["nome"],
+                            "jogador_posicao": jogador["posicao"],
+                            "jogador_overall": jogador["overall"],
+                            "jogador_valor": jogador["valor"],
+                            "valor_oferecido": int(valor_proposta),
+                            "jogadores_oferecidos": jogador_oferecido,
                             "status": "pendente",
-                            "data": datetime.utcnow().isoformat()
+                            "created_at": datetime.now().isoformat()
                         }
                         try:
-                            resp = supabase.table("negociacoes").insert(proposta).execute()
-                            if resp and resp.data:
+                            resp = supabase.table("propostas").insert(proposta).execute()
+                            if resp.data:
                                 st.success("✅ Proposta enviada com sucesso!")
                                 st.rerun()
                             else:
-                                st.error("Erro ao enviar proposta: resposta vazia.")
+                                st.error("Erro ao enviar proposta.")
                         except Exception as e:
                             st.error(f"Erro: {e}")
