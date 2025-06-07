@@ -21,7 +21,7 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🛑 Verifica se o mercado está aberto
+# 🛡️ Verifica se o mercado está aberto
 try:
     status_res = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
     mercado_aberto = status_res.data[0]["mercado_aberto"] if status_res.data else False
@@ -142,7 +142,15 @@ else:
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                registrar_movimentacao(id_time, jogador["nome"], tipo="Mercado", categoria="compra", valor=abs(jogador["valor"]))
+
+                registrar_movimentacao(
+                    supabase,
+                    id_time,
+                    jogador["nome"],
+                    tipo="compra",
+                    categoria="mercado",
+                    valor=-abs(jogador["valor"])
+                )
 
                 st.success(f"Você comprou {jogador['nome']} com sucesso!")
                 st.rerun()
