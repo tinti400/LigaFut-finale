@@ -122,7 +122,18 @@ for proposta in propostas:
                     "valor_aceito": valor
                 }).eq("id", proposta["id"]).execute()
 
-                # 4️⃣ Registrar movimentações
+                # 4️⃣ Atualiza saldo dos times
+                if tipo == "Somente Dinheiro" or tipo == "Troca Composta":
+                    # Debita do comprador
+                    supabase.table("times").update({
+                        "saldo": f"saldo - {valor}"
+                    }, count='exact').eq("id", time_origem_id).execute()
+                    # Credita para o vendedor
+                    supabase.table("times").update({
+                        "saldo": f"saldo + {valor}"
+                    }, count='exact').eq("id", id_time_logado).execute()
+
+                # 5️⃣ Registrar movimentações
                 registrar_movimentacao(
                     time_origem_id,
                     jogador_nome,
