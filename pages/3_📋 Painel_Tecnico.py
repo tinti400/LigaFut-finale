@@ -53,33 +53,33 @@ try:
             origem = m.get("origem", "")
             destino = m.get("destino", "")
             tipo = m.get("tipo", "").capitalize()
-            categoria = m.get("categoria", "").lower()
+            categoria = m.get("categoria", "")
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if categoria == "venda" else "🔴"
+            icone = "🟢" if tipo.lower() == "compra" else "🔴"
 
             linha = {
                 "Data": data_formatada,
                 "Jogador": f"{icone} {jogador}",
                 "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
                 "Tipo": tipo,
-                "Categoria": categoria.capitalize(),
+                "Categoria": categoria,
                 "Detalhes": detalhes
             }
 
-            if categoria == "venda":
+            if tipo.lower() == "compra":
                 entradas.append(linha)
                 total_entrada += valor
-            elif categoria == "compra":
+            elif tipo.lower() == "venda":
                 saidas.append(linha)
                 total_saida += valor
 
         # 🧾 Exibição por aba
         if aba == "📥 Entradas":
-            st.dataframe(pd.DataFrame(entradas), use_container_width=True)
+            st.dataframe(pd.DataFrame(entradas))
 
         elif aba == "💸 Saídas":
-            st.dataframe(pd.DataFrame(saidas), use_container_width=True)
+            st.dataframe(pd.DataFrame(saidas))
 
         elif aba == "📊 Resumo":
             col1, col2, col3 = st.columns(3)
