@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -77,13 +78,11 @@ saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
 saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
 # 📈 Exibe stats
-st.markdown(f"""
-### 💰 Saldo atual: **R$ {saldo:,.0f}**
-### 📅 Jogadores no elenco: {len(elenco_filtrado)} / {len(elenco)}
-### 📊 Estatísticas:
-- Média de Overall: **{media_overall}**
-- Valor total do elenco: **R$ {valor_total:,.0f}**
-""".replace(",", "."))
+st.markdown("### 💰 Saldo atual: **R$ {:,.0f}**".format(saldo).replace(",", "."))
+st.markdown("### 📅 Jogadores no elenco: {} / {}".format(len(elenco_filtrado), len(elenco)))
+st.markdown("### 📊 Estatísticas:")
+st.markdown("- Média de Overall: **{}**".format(media_overall))
+st.markdown("- Valor total do elenco: **R$ {:,.0f}**".format(valor_total).replace(",", "."))
 
 # 📊 Exibe elenco
 if not elenco_filtrado:
@@ -94,21 +93,17 @@ else:
         col1.markdown(f"**{jogador['nome']}**")
         col2.markdown(f"**Posição:** {jogador['posicao']}")
         col3.markdown(f"**Overall:** {jogador['overall']}")
-        col4.markdown(f"**Valor:** R$ {jogador['valor']:,.0f}".replace(",", "."))
+        col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
         if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
                 valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)  # recebe 70%
+                valor_recebido = round(valor_total * 0.7)
                 novo_saldo = saldo + valor_recebido
 
-                # Atualiza saldo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                # Remove do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Adiciona ao mercado
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -118,17 +113,16 @@ else:
                     "time_origem": nome_time
                 }).execute()
 
-                # Registrar movimentação
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
                     valor=valor_recebido,
-                    tipo="venda",
-                    categoria="mercado",
+                    tipo="Mercado",
+                    categoria="Venda",
                     destino="Mercado"
                 )
 
-                st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {valor_recebido:,.0f}".replace(",", "."))
+                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
