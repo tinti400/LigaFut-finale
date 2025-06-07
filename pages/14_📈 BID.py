@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
 
-st.set_page_config(page_title="BID da LigaFut", layout="wide")
+st.set_page_config(page_title="📋 BID da LigaFut", layout="wide")
 st.title("📋 BID da LigaFut")
 
 # 🔐 Conexão com Supabase
@@ -15,9 +16,9 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 🔄 Recupera últimas 100 movimentações (qualquer time)
+# 🔄 Recupera movimentações
 try:
-    mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).limit(100).execute()
+    mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).limit(200).execute()
     movimentacoes = mov_ref.data
 except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
@@ -31,38 +32,42 @@ except Exception as e:
     st.error(f"Erro ao buscar nomes dos times: {e}")
     times_map = {}
 
-# 📋 Exibe histórico
+# 📋 Exibe todas as movimentações com ícone
 if not movimentacoes:
     st.info("Nenhuma movimentação registrada ainda.")
 else:
     for mov in movimentacoes:
         jogador = mov.get("jogador", "Desconhecido")
-        categoria = mov.get("categoria", "N/A")  # Ex: "Roubo", "Proposta", "Leilão", "Multa"
-        tipo = mov.get("tipo", "N/A")            # Ex: "Compra", "Venda"
+        tipo = mov.get("tipo", "N/A")
+        categoria = mov.get("categoria", "N/A")
         valor = mov.get("valor", 0)
         data = mov.get("data", "")
         id_time = mov.get("id_time", "")
         nome_time = times_map.get(id_time, "Desconhecido")
 
-        # Formata data
+        # Data formatada
         try:
             data_formatada = datetime.fromisoformat(data).strftime('%d/%m/%Y %H:%M')
         except:
             data_formatada = "Data inválida"
 
-        # Formata valor
-        valor_str = f"R$ {valor:,.0f}".replace(",", ".")
+        # Valor formatado
+        valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
-        # Exibição
-        st.markdown("###")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"📅 **Data:** {data_formatada}")
-        with col2:
-            st.markdown(f"🏷️ **Time:** {nome_time}")
+        # Determina se é entrada ou saída
+        if valor >= 0:
+            icone = "<span style='font-size:28px;color:green'>🟢</span>"
+        else:
+            icone = "<span style='font-size:28px;color:red'>🔴</span>"
 
-        st.markdown(f"**👤 Jogador:** {jogador}")
-        st.markdown(f"**📂 Categoria:** {categoria}")
-        st.markdown(f"**💬 Tipo:** {tipo}")
-        st.markdown(f"**💰 Valor:** {valor_str}")
-        st.markdown("---")
+        # Exibição formatada
+        with st.container():
+            st.markdown("---")
+            col1, col2 = st.columns([1, 6])
+            with col1:
+                st.markdown(icone, unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
+                st.markdown(f"**👤 Jogador:** {jogador}")
+                st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
+                st.markdown(f"**💰 Valor:** {valor_str}")
