@@ -26,10 +26,16 @@ try:
         st.info("Nenhum leilão finalizado até o momento.")
     else:
         for leilao in leiloes:
-            jogador = leilao.get("jogador", {})
-            nome_jogador = jogador.get("nome", "Desconhecido")
-            posicao = jogador.get("posicao", "-")
-            overall = jogador.get("overall", "N/A")
+            jogador = leilao.get("jogador")
+            if jogador is None:
+                nome_jogador = "Desconhecido"
+                posicao = "-"
+                overall = "N/A"
+            else:
+                nome_jogador = jogador.get("nome", "Desconhecido")
+                posicao = jogador.get("posicao", "-")
+                overall = jogador.get("overall", "N/A")
+
             valor = leilao.get("valor_atual", 0)
             time_vencedor = leilao.get("time_vencedor", "Sem vencedor")
             fim = leilao.get("fim")
