@@ -1,33 +1,13 @@
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-from datetime import datetime
-import pytz
-
-# 🔌 Conexão com Supabase
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
-
-# ✅ Verificação de login
-def verificar_login():
-    if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-        st.warning("Você precisa estar logado para acessar esta página.")
-        st.stop()
-    if "id_time" not in st.session_state or "nome_time" not in st.session_state:
-        st.warning("Informações do time não encontradas na sessão.")
-        st.stop()
-
 # 💰 Registrar movimentação financeira com atualização de saldo
-def registrar_movimentacao(id_time, jogador, tipo, categoria, valor):
+def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
     Registra movimentações financeiras e atualiza saldo do time.
 
     - tipo: Ex: "Transferência", "Leilão", "Mercado"
     - categoria: "Compra" ou "Venda"
     - valor: sempre positivo
-
-    A função debita para 'compra' e credita para 'venda'.
+    - origem: time de onde veio o jogador (opcional)
+    - destino: time para onde foi o jogador (opcional)
     """
     try:
         # Buscar saldo atual do time
@@ -47,22 +27,25 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor):
             st.warning("Categoria inválida. Use 'compra' ou 'venda'.")
             return
 
-        # Atualiza saldo no banco
+        # Atualiza saldo
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-        # Pega data e hora no fuso de Brasília
+        # Data e hora no fuso de Brasília
         fuso_brasilia = pytz.timezone("America/Sao_Paulo")
         agora = datetime.now(fuso_brasilia).isoformat()
 
-        # Registra movimentação
+        # Registro da movimentação
         registro = {
             "id_time": id_time,
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
             "valor": valor,
-            "data": agora
+            "data": agora,
+            "origem": origem,
+            "destino": destino
         }
+
         supabase.table("movimentacoes").insert(registro).execute()
 
     except Exception as e:

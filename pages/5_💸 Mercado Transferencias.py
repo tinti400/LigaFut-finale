@@ -1,8 +1,9 @@
-
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import pytz
+from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Mercado de Transferências - LigaFut", layout="wide")
 
@@ -95,13 +96,13 @@ col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
 with col_nav1:
     if st.button("⏪ Anterior", disabled=pagina_atual <= 1):
         st.session_state["pagina_mercado"] -= 1
-        st.experimental_rerun()
+        st.rerun()
 with col_nav2:
     st.markdown(f"<p style='text-align: center;'>Página {pagina_atual} de {total_paginas}</p>", unsafe_allow_html=True)
 with col_nav3:
     if st.button("⏩ Próxima", disabled=pagina_atual >= total_paginas):
         st.session_state["pagina_mercado"] += 1
-        st.experimental_rerun()
+        st.rerun()
 
 # 📋 Exibição dos jogadores
 if not jogadores_pagina:
@@ -141,18 +142,10 @@ else:
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                novo_saldo = saldo_time - jogador["valor"]
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                supabase.table("movimentacoes").insert({
-                    "jogador": jogador["nome"],
-                    "valor": jogador["valor"],
-                    "tipo": "Compra",
-                    "categoria": "Mercado",
-                    "id_time": id_time,
-                    "data": datetime.now().isoformat()
-                }).execute()
+                registrar_movimentacao(id_time, jogador["nome"], tipo="Mercado", categoria="compra", valor=abs(jogador["valor"]))
+
                 st.success(f"Você comprou {jogador['nome']} com sucesso!")
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao comprar jogador: {e}")
 
@@ -161,6 +154,6 @@ else:
             try:
                 supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                 st.success(f"Jogador {jogador['nome']} foi excluído do mercado!")
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao excluir jogador: {e}")
