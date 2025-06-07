@@ -19,10 +19,10 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 id_time_usuario = st.session_state["id_time"]
 nome_time_usuario = st.session_state.get("nome_time", "")
 
-# 🔍 Buscar leilão ativo
+# 🔍 Buscar leilao ativo
 res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).limit(1).execute()
 if not res.data:
-    st.warning("⚠️ Nenhum leilão ativo no momento.")
+    st.warning("⚠️ Nenhum leilao ativo no momento.")
     st.stop()
 
 leilao = res.data[0]
@@ -77,7 +77,7 @@ if tempo_restante == 0:
             categoria="leilao",
             tipo="compra",
             valor=valor_atual,
-            origem="Leilão"
+            origem="leilao"
         )
 
         st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!")
