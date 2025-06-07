@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import uuid
 
 st.set_page_config(page_title="Propostas Enviadas - LigaFut", layout="wide")
 
@@ -15,62 +16,75 @@ if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.stop()
 
 # Dados do time logado
-id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
+id_time_origem = st.session_state["id_time"]
+nome_time_origem = st.session_state["nome_time"]
 
 st.title("📤 Propostas Enviadas")
 
-# 🚫 Verifica status do mercado
-try:
-    status_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
-    mercado_aberto = status_ref.data[0]["mercado_aberto"] if status_ref.data else False
-except Exception as e:
-    st.error(f"Erro ao verificar status do mercado: {e}")
-    mercado_aberto = False
+# 🧠 Buscar todos os times (para enviar proposta)
+times_ref = supabase.table("times").select("id", "nome").neq("id", id_time_origem).execute()
+times_disponiveis = times_ref.data or []
 
-if not mercado_aberto:
-    st.warning("⚠️ O mercado está fechado. As propostas enviadas ainda estão visíveis, mas não podem ser aceitas ou recusadas no momento.")
+nomes_times = {t["nome"]: t["id"] for t in times_disponiveis}
+nome_time_alvo = st.selectbox("Escolha o time para enviar proposta:", list(nomes_times.keys()))
 
-# 🔎 Buscar propostas enviadas
+# Buscar elenco do time escolhido
+id_time_alvo = nomes_times[nome_time_alvo]
+elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time_alvo).execute()
+elenco_disponivel = elenco_ref.data or []
+
+jogadores_alvo = [f'{j["nome"]} ({j["posicao"]})' for j in elenco_disponivel]
+jogador_escolhido = st.selectbox("Escolha o jogador desejado:", jogadores_alvo)
+
+# Dados do jogador alvo
+jogador_data = next((j for j in elenco_disponivel if f'{j["nome"]} ({j["posicao"]})' == jogador_escolhido), None)
+
+# Valor da proposta
+valor_oferecido = st.number_input("Valor oferecido (R$):", min_value=0, step=100000)
+
+if st.button("📩 Enviar proposta"):
+    if jogador_data:
+        try:
+            nova_proposta = {
+                "id": str(uuid.uuid4()),
+                "id_time_origem": id_time_origem,
+                "nome_time_origem": nome_time_origem,
+                "id_time_alvo": id_time_alvo,
+                "nome_time_alvo": nome_time_alvo,
+                "jogador_nome": jogador_data["nome"],
+                "jogador_posicao": jogador_data["posicao"],
+                "jogador_overall": jogador_data["overall"],
+                "jogador_valor": jogador_data["valor"],
+                "valor_oferecido": valor_oferecido,
+                "status": "pendente",
+                "created_at": datetime.now().isoformat()
+            }
+            supabase.table("propostas").insert(nova_proposta).execute()
+            st.success("✅ Proposta enviada com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao enviar proposta: {e}")
+    else:
+        st.warning("Jogador não encontrado!")
+
+# 🔎 Ver propostas enviadas
+st.subheader("📜 Suas propostas enviadas")
 try:
-    propostas_ref = supabase.table("negociacoes") \
+    propostas_ref = supabase.table("propostas") \
         .select("*") \
-        .eq("id_time_origem", id_time) \
-        .order("data", desc=True) \
+        .eq("id_time_origem", id_time_origem) \
+        .order("created_at", desc=True) \
         .execute()
 
-    propostas = propostas_ref.data
-
+    propostas = propostas_ref.data or []
     if not propostas:
         st.info("Você ainda não enviou nenhuma proposta.")
     else:
-        for proposta in propostas:
-            jogador = proposta.get("jogador_desejado", "Desconhecido")
-            tipo = proposta.get("tipo_negociacao", "N/A")
-            status = proposta.get("status", "pendente")
-            valor = proposta.get("valor_oferecido", 0)
-            jogadores_oferecidos = proposta.get("jogador_oferecido", None)
-            data = proposta.get("data")
-
-            # Trata data (ISO)
-            if data:
-                try:
-                    data_obj = datetime.fromisoformat(data)
-                    data_str = data_obj.strftime('%d/%m/%Y %H:%M')
-                except:
-                    data_str = "Data inválida"
-            else:
-                data_str = "Data não disponível"
-
+        for p in propostas:
             st.markdown("---")
-            st.markdown(f"**🎯 Jogador Alvo:** {jogador}")
-            st.markdown(f"**📌 Tipo de Proposta:** {tipo.capitalize()}")
-            st.markdown(f"**💬 Status:** {status.capitalize()}")
-            st.markdown(f"**💰 Valor Oferecido:** R$ {valor:,.0f}".replace(",", "."))
-
-            if jogadores_oferecidos:
-                st.markdown(f"**👥 Jogador Oferecido na Troca:** {jogadores_oferecidos}")
-
-            st.markdown(f"**📅 Enviada em:** {data_str}")
+            st.markdown(f"**🎯 Jogador Alvo:** {p['jogador_nome']} ({p['jogador_posicao']})")
+            st.markdown(f"**🎽 Time Alvo:** {p['nome_time_alvo']}")
+            st.markdown(f"**💰 Valor Oferecido:** R$ {p['valor_oferecido']:,.0f}".replace(",", "."))
+            st.markdown(f"**📅 Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
+            st.markdown(f"**📌 Status:** {p['status'].capitalize()}")
 except Exception as e:
-    st.error(f"Erro ao carregar propostas: {e}")
+    st.error(f"Erro ao buscar propostas enviadas: {e}")
