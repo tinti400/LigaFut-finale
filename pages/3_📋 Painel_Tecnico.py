@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 from dateutil.parser import parse
+import pandas as pd
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -30,77 +31,68 @@ except Exception as e:
 
 # 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>🧑‍💼 Painel do Técnico</h1><hr>", unsafe_allow_html=True)
+st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown(f"### 🏷️ Time: {nome_time}")
-with col2:
-    st.markdown(f"### 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
-
-st.markdown("---")
-st.subheader("📥 Compras (Entradas)")
+# 🔄 Tabs com movimentações
+aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
 
 try:
-    movimentacoes = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(100).execute().data
+    dados = supabase.table("movimentacoes").select("*") \
+        .eq("id_time", id_time).order("data", desc=True).limit(200).execute().data
 
-    total_entrada = 0
-    total_saida = 0
-    compras = []
-    vendas = []
+    if not dados:
+        st.info("Nenhuma movimentação registrada ainda.")
+    else:
+        entradas, saidas = [], []
+        total_entrada, total_saida = 0, 0
 
-    if movimentacoes:
-        for m in movimentacoes:
-            data = parse(m["data"]).strftime("%d/%m %H:%M")
+        for m in dados:
+            data_formatada = parse(m["data"]).strftime("%d/%m %H:%M") if m.get("data") else "Data inválida"
             jogador = m.get("jogador", "Desconhecido")
             valor = m.get("valor", 0)
             origem = m.get("origem", "")
             destino = m.get("destino", "")
+            tipo = m.get("tipo", "").capitalize()
             categoria = m.get("categoria", "")
-            tipo = m.get("tipo", "")
 
-            detalhe = ""
-            if origem:
-                detalhe = f"do **{origem}**"
-            elif destino:
-                detalhe = f"para **{destino}**"
+            detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
+            icone = "🟢" if tipo.lower() == "compra" else "🔴"
 
-            texto = f"🟢 **{jogador}** {detalhe} por **R$ {abs(valor):,.0f}** em {data}".replace(",", ".")
+            linha = {
+                "Data": data_formatada,
+                "Jogador": f"{icone} {jogador}",
+                "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
+                "Tipo": tipo,
+                "Categoria": categoria,
+                "Detalhes": detalhes
+            }
+
             if tipo.lower() == "compra":
-                compras.append(texto)
+                entradas.append(linha)
                 total_entrada += valor
             elif tipo.lower() == "venda":
-                texto = texto.replace("🟢", "🔴")
-                vendas.append(texto)
+                saidas.append(linha)
                 total_saida += valor
 
-        for linha in compras:
-            st.markdown(linha)
+        # 🧾 Exibição por aba
+        if aba == "📥 Entradas":
+            st.dataframe(pd.DataFrame(entradas), use_container_width=True)
 
-        st.markdown("---")
-        st.subheader("💸 Vendas (Saídas)")
-        for linha in vendas:
-            st.markdown(linha)
-    else:
-        st.info("Nenhuma movimentação registrada ainda.")
+        elif aba == "💸 Saídas":
+            st.dataframe(pd.DataFrame(saidas), use_container_width=True)
 
-    # 📊 Resumo
-    st.markdown("---")
-    st.subheader("📊 Resumo Financeiro")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.success(f"💰 Entradas: R$ {total_entrada:,.0f}".replace(",", "."))
-    with col2:
-        st.error(f"💸 Saídas: R$ {total_saida:,.0f}".replace(",", "."))
-    with col3:
-        resultado = total_entrada - total_saida
-        cor = "success" if resultado >= 0 else "error"
-        texto = f"📈 Lucro: R$ {resultado:,.0f}" if resultado >= 0 else f"📉 Prejuízo: R$ {abs(resultado):,.0f}"
-        getattr(st, cor)(texto.replace(",", "."))
+        elif aba == "📊 Resumo":
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.success(f"💰 Total Entradas\n\nR$ {total_entrada:,.0f}".replace(",", "."))
+            with col2:
+                st.error(f"💸 Total Saídas\n\nR$ {total_saida:,.0f}".replace(",", "."))
+            with col3:
+                saldo_liquido = total_entrada - total_saida
+                if saldo_liquido >= 0:
+                    st.success(f"📈 Lucro\n\nR$ {saldo_liquido:,.0f}".replace(",", "."))
+                else:
+                    st.error(f"📉 Prejuízo\n\nR$ {abs(saldo_liquido):,.0f}".replace(",", "."))
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
-
-
-
