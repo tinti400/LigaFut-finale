@@ -3,7 +3,7 @@ import os
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import pytz
+
 
 # 🔐 Conexão com Supabase
 url = os.getenv("SUPABASE_URL") or st.secrets["supabase"]["url"]
