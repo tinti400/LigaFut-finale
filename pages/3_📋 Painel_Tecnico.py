@@ -40,38 +40,77 @@ with col2:
 st.markdown("---")
 st.subheader("📥 Entradas no Caixa (Vendas)")
 
-# 🔍 Buscar movimentações
 try:
     movimentacoes = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(50).execute().data
+        .eq("id_time", id_time).order("data", desc=True).limit(100).execute().data
 
-    entradas = [m for m in movimentacoes if m.get("categoria") == "Venda"]
-    saidas = [m for m in movimentacoes if m.get("categoria") == "Compra"]
+    entradas = []
+    saidas = []
+    total_entrada = 0
+    total_saida = 0
 
-    # 🔵 Entradas
+    for m in movimentacoes:
+        categoria = m.get("categoria", "")
+        data = parse(m["data"]).strftime("%d/%m %H:%M")
+        jogador = m.get("jogador", "Desconhecido")
+        valor = m.get("valor", 0)
+        origem = m.get("origem", "")
+        destino = m.get("destino", "")
+
+        # Entradas
+        if categoria.lower() == "venda":
+            total_entrada += valor
+            if destino.lower() == "mercado":
+                entradas.append(f"🟢 **{jogador}** vendido no **Mercado** por **R$ {valor:,.0f}** em {data}")
+            elif destino.lower() == "leilao":
+                entradas.append(f"🟢 **{jogador}** vendido via **Leilão** por **R$ {valor:,.0f}** em {data}")
+            elif destino:
+                entradas.append(f"🟢 **{jogador}** vendido para **{destino}** por **R$ {valor:,.0f}** em {data}")
+            else:
+                entradas.append(f"🟢 **{jogador}** vendido por **R$ {valor:,.0f}** em {data}")
+
+        # Saídas
+        elif categoria.lower() == "compra":
+            total_saida += valor
+            if origem.lower() == "mercado":
+                saidas.append(f"🔴 **{jogador}** comprado no **Mercado** por **R$ {valor:,.0f}** em {data}")
+            elif origem.lower() == "leilao":
+                saidas.append(f"🔴 **{jogador}** comprado via **Leilão** por **R$ {valor:,.0f}** em {data}")
+            elif origem:
+                saidas.append(f"🔴 **{jogador}** comprado do **{origem}** por **R$ {valor:,.0f}** em {data}")
+            else:
+                saidas.append(f"🔴 **{jogador}** comprado por **R$ {valor:,.0f}** em {data}")
+
+    # Mostrar entradas
     if entradas:
-        for m in entradas:
-            data = parse(m["data"]).strftime("%d/%m %H:%M")
-            jogador = m.get("jogador", "Desconhecido")
-            valor = m.get("valor", 0)
-            destino = m.get("destino", "Mercado")
-            st.markdown(f"📤 **{jogador}** vendido por **R$ {valor:,.0f}** em {data} (_{destino}_)".replace(",", "."))
+        for entrada in entradas:
+            st.markdown(entrada.replace(",", "."))
     else:
-        st.info("Nenhuma venda registrada ainda.")
+        st.info("Nenhuma entrada registrada ainda.")
 
     st.markdown("---")
     st.subheader("📤 Saídas do Caixa (Compras)")
 
-    # 🔴 Saídas
+    # Mostrar saídas
     if saidas:
-        for m in saidas:
-            data = parse(m["data"]).strftime("%d/%m %H:%M")
-            jogador = m.get("jogador", "Desconhecido")
-            valor = m.get("valor", 0)
-            origem = m.get("origem", "Mercado")
-            st.markdown(f"✅ **{jogador}** comprado por **R$ {valor:,.0f}** em {data} (_{origem}_)".replace(",", "."))
+        for saida in saidas:
+            st.markdown(saida.replace(",", "."))
     else:
-        st.info("Nenhuma compra registrada ainda.")
+        st.info("Nenhuma saída registrada ainda.")
+
+    # Resumo financeiro
+    st.markdown("---")
+    st.subheader("📊 Resumo Financeiro")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.success(f"💰 Entradas: R$ {total_entrada:,.0f}".replace(",", "."))
+    with col2:
+        st.error(f"💸 Saídas: R$ {total_saida:,.0f}".replace(",", "."))
+    with col3:
+        resultado = total_entrada - total_saida
+        cor = "success" if resultado >= 0 else "error"
+        texto = f"📈 Lucro: R$ {resultado:,.0f}" if resultado >= 0 else f"📉 Prejuízo: R$ {abs(resultado):,.0f}"
+        getattr(st, cor)(texto.replace(",", "."))
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
