@@ -120,10 +120,16 @@ else:
                 }).execute()
 
                 # Movimentação
-                registrar_movimentacao(id_time=id_time, jogador=jogador["nome"], valor=valor_recebido, tipo="Venda", categoria="Mercado")
+                registrar_movimentacao(
+                    id_time=id_time,
+                    jogador=jogador["nome"],
+                    valor=valor_recebido,
+                    tipo="mercado",
+                    categoria="venda",
+                    origem=nome_time
+                )
 
                 st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {valor_recebido:,.0f}".replace(",", "."))
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
-
