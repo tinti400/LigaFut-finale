@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -13,9 +12,16 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+# ✅ Verifica login e sessão única
+if "usuario_id" not in st.session_state or "session_id" not in st.session_state:
     st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+res = supabase.table("usuarios").select("session_id").eq("id", st.session_state["usuario_id"]).execute()
+if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
+    st.error("⚠️ Sua sessão foi encerrada em outro dispositivo.")
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     st.stop()
 
 # 📅 Dados do time logado
