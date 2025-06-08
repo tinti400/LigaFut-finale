@@ -18,6 +18,26 @@ def verificar_login():
         st.warning("Você precisa estar logado para acessar esta página.")
         st.stop()
 
+def verificar_sessao():
+    """
+    Verifica se a sessão do usuário é válida (sessão única).
+    Se outro login tiver ocorrido, desconecta automaticamente.
+    """
+    if "usuario_id" not in st.session_state or "session_id" not in st.session_state:
+        st.warning("Você precisa estar logado.")
+        st.stop()
+
+    try:
+        res = supabase.table("usuarios").select("session_id").eq("id", st.session_state["usuario_id"]).execute()
+        if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
+            st.error("⚠️ Sua sessão foi encerrada em outro dispositivo.")
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.stop()
+    except Exception as e:
+        st.error(f"Erro ao verificar sessão: {e}")
+        st.stop()
+
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
     Registra movimentações financeiras no Supabase e atualiza saldo do time.
@@ -26,7 +46,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
     - id_time: ID do time
     - jogador: Nome do jogador
     - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
-    - categoria: 'compra' ou 'venda' (case-insensitive)
+    - categoria: 'compra' ou 'venda'
     - valor: Valor positivo
     - origem: time de onde o jogador veio (opcional)
     - destino: time para onde o jogador foi (opcional)
