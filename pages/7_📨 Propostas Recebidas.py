@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from supabase import create_client
-from utils import verificar_login, registrar_movimentacao
+from utils import verificar_sessao, registrar_movimentacao
 
 st.set_page_config(page_title="📨 Propostas Recebidas", layout="wide")
 
-verificar_login()
+# ✅ Verifica sessão única
+verificar_sessao()
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -43,6 +40,7 @@ else:
                     st.write(f"- {j['nome']} (OVR {j['overall']}) - {j['posicao']}")
 
             col1, col2 = st.columns(2)
+
             if col1.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
                 try:
                     valor = proposta["valor_oferecido"]
@@ -77,13 +75,13 @@ else:
 
                     # Registrar movimentações financeiras
                     if valor > 0:
-                        registrar_movimentacao(id_time_origem, jogador_nome, "proposta", "compra", valor)
-                        registrar_movimentacao(id_time_destino, jogador_nome, "proposta", "venda", valor)
+                        registrar_movimentacao(id_time_origem, jogador_nome, "Transferência", "Compra", valor)
+                        registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
 
                     # Atualizar status da proposta aceita
                     supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
 
-                    # Cancelar outras propostas pendentes pelo mesmo jogador
+                    # Cancelar outras propostas pelo mesmo jogador
                     supabase.table("propostas").update({"status": "cancelada"}) \
                         .eq("jogador_nome", jogador_nome) \
                         .eq("destino_id", id_time) \
@@ -91,7 +89,7 @@ else:
                         .neq("id", proposta["id"]).execute()
 
                     st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
-                    st.rerun()
+                    st.experimental_rerun()
 
                 except Exception as e:
                     st.error(f"Erro ao aceitar a proposta: {e}")
@@ -100,6 +98,6 @@ else:
                 try:
                     supabase.table("propostas").update({"status": "recusada"}).eq("id", proposta["id"]).execute()
                     st.warning("❌ Proposta recusada.")
-                    st.rerun()
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao recusar a proposta: {e}")

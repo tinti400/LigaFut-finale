@@ -1,19 +1,18 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import uuid
+from utils import verificar_sessao  # ✅ Sessão única
 
-st.set_page_config(page_title="Propostas Enviadas - LigaFut", layout="wide")
+st.set_page_config(page_title="📤 Propostas Enviadas - LigaFut", layout="wide")
+
+verificar_sessao()  # ✅ Aplicação de sessão única
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
-
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
-    st.warning("Você precisa estar logado para acessar esta página.")
-    st.stop()
 
 # Dados do time logado
 id_time_origem = st.session_state["id_time"]
@@ -80,11 +79,21 @@ try:
         st.info("Você ainda não enviou nenhuma proposta.")
     else:
         for p in propostas:
-            st.markdown("---")
-            st.markdown(f"**🎯 Jogador Alvo:** {p['jogador_nome']} ({p['jogador_posicao']})")
-            st.markdown(f"**🎽 Time Alvo:** {p['nome_time_alvo']}")
-            st.markdown(f"**💰 Valor Oferecido:** R$ {p['valor_oferecido']:,.0f}".replace(",", "."))
-            st.markdown(f"**📅 Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
-            st.markdown(f"**📌 Status:** {p['status'].capitalize()}")
+            with st.container():
+                st.markdown("---")
+                st.markdown(f"**🎯 Jogador Alvo:** {p['jogador_nome']} ({p['jogador_posicao']})")
+                st.markdown(f"**🎽 Time Alvo:** {p['nome_time_alvo']}")
+                st.markdown(f"**💰 Valor Oferecido:** R$ {p['valor_oferecido']:,.0f}".replace(",", "."))
+                st.markdown(f"**📅 Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
+                st.markdown(f"**📌 Status:** {p['status'].capitalize()}")
+
+                if p["status"] == "pendente":
+                    if st.button("❌ Cancelar proposta", key=f"cancelar_{p['id']}"):
+                        try:
+                            supabase.table("propostas").update({"status": "cancelada"}).eq("id", p["id"]).execute()
+                            st.warning("❌ Proposta cancelada.")
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao cancelar proposta: {e}")
 except Exception as e:
     st.error(f"Erro ao buscar propostas enviadas: {e}")
