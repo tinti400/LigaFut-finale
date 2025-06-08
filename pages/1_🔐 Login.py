@@ -46,11 +46,17 @@ if "usuario" not in st.session_state and "usuario" in params:
         res = supabase.table("usuarios").select("*").ilike("usuario", usuario_param).execute()
         if res.data:
             user = res.data[0]
+
+            # ✅ Atualiza session_id mesmo no login via URL
+            novo_session_id = str(uuid.uuid4())
+            supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
+
             st.session_state["usuario"] = user["usuario"]
             st.session_state["usuario_id"] = user["id"]
             st.session_state["id_time"] = user["time_id"]
             st.session_state["divisao"] = user.get("divisao", "Divisão 1")
-            st.session_state["session_id"] = user.get("session_id", "")
+            st.session_state["session_id"] = novo_session_id
+
             time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
             st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
     except:
