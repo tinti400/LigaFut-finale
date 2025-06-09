@@ -15,35 +15,34 @@ st.title("📋 Painel de Times")
 res_times = supabase.table("times").select("id, nome, saldo").execute()
 times = res_times.data
 
-dados = []
+# ✅ Garante que vamos montar apenas listas simples
+nomes = []
+saldos = []
+qtds = []
 
-if times:
-    for time in times:
-        id_time = time.get("id")
-        nome = time.get("nome") or "Sem nome"
-        saldo = time.get("saldo") or 0
+for time in times:
+    id_time = time.get("id")
+    nome = str(time.get("nome") or "Sem nome")
+    saldo = int(time.get("saldo") or 0)
 
-        # Buscar jogadores no elenco
-        elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-        qtd_jogadores = len(elenco_res.data) if elenco_res.data else 0
+    # Buscar jogadores no elenco
+    elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+    qtd_jogadores = len(elenco.data) if elenco.data else 0
 
-        dados.append({
-            "Time": nome,
-            "Saldo": saldo,
-            "Jogadores": qtd_jogadores
-        })
+    nomes.append(nome)
+    saldos.append(saldo)
+    qtds.append(qtd_jogadores)
 
-    # Criar DataFrame
-    df = pd.DataFrame(dados)
+# Criar DataFrame a partir de listas simples
+df = pd.DataFrame({
+    "Time": nomes,
+    "Saldo": saldos,
+    "Jogadores": qtds
+})
 
-    # Exibir somente se tiver dados
-    if not df.empty:
-        df = df.sort_values("Time")
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.warning("Nenhum dado disponível para exibir.")
-else:
-    st.warning("Nenhum time encontrado no banco de dados.")
+# Ordenar e exibir
+df = df.sort_values("Time")
+st.dataframe(df, use_container_width=True)
 
 
 
