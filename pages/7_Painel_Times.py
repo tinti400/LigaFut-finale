@@ -13,7 +13,7 @@ st.set_page_config(page_title="Painel de Times - LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>📊 Painel Geral dos Times</h1><hr>", unsafe_allow_html=True)
 
 # 🔍 Buscar todos os times
-res_times = supabase.table("times").select("id, nome, saldo, logo_url").execute()
+res_times = supabase.table("times").select("id, nome, saldo").execute()
 times = res_times.data
 
 linhas = []
@@ -23,7 +23,6 @@ for time in times:
     id_time = time["id"]
     nome = time.get("nome", "Desconhecido")
     saldo = time.get("saldo", 0)
-    logo_url = time.get("logo_url", "")
 
     # Buscar elenco
     elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
@@ -37,12 +36,10 @@ for time in times:
     else:
         cor = "#ffffff"  # branco (normal)
 
-    # Montar HTML com estilo de linha
+    # Montar HTML da linha
     linha = f"""
     <tr style="background-color:{cor};">
-        <td style='padding:8px; display:flex; align-items:center; gap:10px;'>
-            <img src='{logo_url}' width='30'> <b>{nome}</b>
-        </td>
+        <td style='padding:8px;'><b>{nome}</b></td>
         <td style='padding:8px;'>R$ {saldo:,.0f}</td>
         <td style='padding:8px;'>{qtd_jogadores}</td>
     </tr>
