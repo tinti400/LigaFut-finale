@@ -9,7 +9,6 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Painel de Times - LigaFut", layout="wide")
-
 st.title("📋 Painel de Times")
 
 # 🔍 Buscar todos os times
@@ -19,24 +18,28 @@ times = res_times.data
 dados = []
 
 for time in times:
-    id_time = time["id"]
-    nome = time.get("nome", "Desconhecido")
-    saldo = time.get("saldo", 0)
+    id_time = time.get("id")
+    nome = time.get("nome") or "Sem nome"
+    saldo = time.get("saldo") or 0
 
-    # Buscar elenco
-    elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-    qtd_jogadores = len(elenco.data)
+    # Buscar jogadores no elenco
+    elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+    qtd_jogadores = len(elenco_res.data)
 
     dados.append({
-        "Nome do Time": nome,
+        "Time": nome,
         "Saldo": saldo,
-        "Qtd. Jogadores": qtd_jogadores
+        "Jogadores": qtd_jogadores
     })
 
-# Criar DataFrame estilo Excel
+# Garantir que o DataFrame foi criado corretamente
 df = pd.DataFrame(dados)
 
-# Exibir em formato planilha simples
-st.dataframe(df.sort_values("Nome do Time"), use_container_width=True)
+# Ordenar por nome do time, se a coluna existir
+if "Time" in df.columns:
+    df = df.sort_values("Time")
+
+# Exibir tabela estilo Excel
+st.dataframe(df, use_container_width=True)
 
 
