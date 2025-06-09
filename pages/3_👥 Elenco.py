@@ -99,9 +99,40 @@ else:
         col3.markdown(f"**Overall:** {jogador['overall']}")
         col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
-        if not mercado_aberto:
-            col5.button("Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
-        elif col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+        if mercado_aberto:
+        if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+            try:
+                valor_total = jogador["valor"]
+                valor_recebido = round(valor_total * 0.7)
+                novo_saldo = saldo + valor_recebido
+
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+
+                supabase.table("mercado_transferencias").insert({
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "overall": jogador["overall"],
+                    "valor": jogador["valor"],
+                    "id_time": id_time,
+                    "time_origem": nome_time
+                }).execute()
+
+                registrar_movimentacao(
+                    id_time=id_time,
+                    jogador=jogador["nome"],
+                    valor=valor_recebido,
+                    tipo="Mercado",
+                    categoria="Venda",
+                    destino="Mercado"
+                )
+
+                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao vender jogador: {e}")
+else:
+        col5.button(f"Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
             valor_total = jogador["valor"]
             valor_recebido = round(valor_total * 0.7)
             novo_saldo = saldo + valor_recebido
