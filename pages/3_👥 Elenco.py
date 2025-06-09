@@ -100,7 +100,7 @@ else:
         col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
         if mercado_aberto:
-        if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+    if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
                 valor_jogador = jogador["valor"]
                 valor_venda = round(valor_jogador * 0.7)
@@ -200,6 +200,7 @@ else:
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
 
 
 
