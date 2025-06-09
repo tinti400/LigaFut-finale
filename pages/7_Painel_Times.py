@@ -17,29 +17,33 @@ times = res_times.data
 
 dados = []
 
-for time in times:
-    id_time = time.get("id")
-    nome = time.get("nome") or "Sem nome"
-    saldo = time.get("saldo") or 0
+if times:
+    for time in times:
+        id_time = time.get("id")
+        nome = time.get("nome") or "Sem nome"
+        saldo = time.get("saldo") or 0
 
-    # Buscar jogadores no elenco
-    elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-    qtd_jogadores = len(elenco_res.data)
+        # Buscar jogadores no elenco
+        elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+        qtd_jogadores = len(elenco_res.data) if elenco_res.data else 0
 
-    dados.append({
-        "Time": nome,
-        "Saldo": saldo,
-        "Jogadores": qtd_jogadores
-    })
+        dados.append({
+            "Time": nome,
+            "Saldo": saldo,
+            "Jogadores": qtd_jogadores
+        })
 
-# Garantir que o DataFrame foi criado corretamente
-df = pd.DataFrame(dados)
+    # Criar DataFrame
+    df = pd.DataFrame(dados)
 
-# Ordenar por nome do time, se a coluna existir
-if "Time" in df.columns:
-    df = df.sort_values("Time")
+    # Exibir somente se tiver dados
+    if not df.empty:
+        df = df.sort_values("Time")
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.warning("Nenhum dado disponível para exibir.")
+else:
+    st.warning("Nenhum time encontrado no banco de dados.")
 
-# Exibir tabela estilo Excel
-st.dataframe(df, use_container_width=True)
 
 
