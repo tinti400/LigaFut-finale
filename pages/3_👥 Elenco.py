@@ -75,8 +75,12 @@ st.markdown("- Média de Overall: **{}**".format(media_overall))
 st.markdown("- Valor total do elenco: **R$ {:,.0f}**".format(valor_total).replace(",", "."))
 
 # ⚠️ Verifica se mercado está aberto
-config = supabase.table("configuracoes").select("aberto").eq("id", "estado_mercado").single().execute()
-mercado_aberto = config.data["aberto"] if config.data else False
+try:
+    config = supabase.table("configuracoes").select("aberto").eq("id", "estado_mercado").single().execute()
+    mercado_aberto = config.data.get("aberto", False) if config.data else False
+except Exception as e:
+    st.error(f"Erro ao verificar status do mercado: {e}")
+    mercado_aberto = False
 
 if not mercado_aberto:
     st.warning("🚫 O mercado está fechado no momento. Você não pode vender jogadores.")
@@ -131,6 +135,7 @@ else:
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
 
 
 
