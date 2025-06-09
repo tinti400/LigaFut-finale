@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -9,6 +8,8 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Painel de Times - LigaFut", layout="wide")
+
+# 🎯 Título
 st.markdown("<h1 style='text-align:center;'>📊 Painel Geral dos Times</h1><hr>", unsafe_allow_html=True)
 
 # 🔍 Buscar todos os times
@@ -17,14 +18,15 @@ times = res_times.data
 
 linhas_html = []
 
+# 🔄 Para cada time, buscar elenco e exibir com destaque
 for time in times:
     id_time = time["id"]
-    nome = time["nome"]
+    nome = time.get("nome", "Desconhecido")
     saldo = time.get("saldo", 0)
 
-    # 🔎 Buscar quantidade de jogadores no elenco
-    elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-    qtd_jogadores = len(elenco_res.data)
+    # 👥 Buscar jogadores no elenco
+    elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+    qtd_jogadores = len(elenco.data)
 
     # 🎨 Cores de destaque
     if qtd_jogadores < 18:
@@ -32,8 +34,9 @@ for time in times:
     elif qtd_jogadores > 26:
         cor_fundo = "#fff5cc"  # amarelo claro
     else:
-        cor_fundo = "#ffffff"  # normal
+        cor_fundo = "#ffffff"  # branco
 
+    # 🧱 Linha da tabela
     linha = f"""
     <tr style="background-color:{cor_fundo};">
         <td style='padding:8px;'><b>{nome}</b></td>
@@ -43,11 +46,11 @@ for time in times:
     """
     linhas_html.append(linha)
 
-# Montar tabela final
+# 🧩 Montar tabela final
 tabela_html = f"""
 <table style='width:100%; border-collapse:collapse; font-family:sans-serif;'>
     <thead>
-        <tr style='background-color:#222; color:white;'>
+        <tr style='background-color:#111; color:white;'>
             <th style='text-align:left; padding:8px;'>🛡️ Time</th>
             <th style='text-align:left; padding:8px;'>💰 Saldo</th>
             <th style='text-align:left; padding:8px;'>👥 Qtd. Jogadores</th>
@@ -59,4 +62,6 @@ tabela_html = f"""
 </table>
 """
 
+# ✅ Exibir tabela final (sem mostrar o HTML bruto)
 st.markdown(tabela_html, unsafe_allow_html=True)
+
