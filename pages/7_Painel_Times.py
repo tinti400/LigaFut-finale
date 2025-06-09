@@ -9,44 +9,41 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Painel de Times - LigaFut", layout="wide")
-
 st.markdown("<h1 style='text-align:center;'>📊 Painel Geral dos Times</h1><hr>", unsafe_allow_html=True)
 
 # 🔍 Buscar todos os times
 res_times = supabase.table("times").select("id, nome, saldo").execute()
 times = res_times.data
 
-linhas = []
+linhas_html = []
 
-# 📥 Para cada time, contar jogadores no elenco
 for time in times:
     id_time = time["id"]
-    nome = time.get("nome", "Desconhecido")
+    nome = time["nome"]
     saldo = time.get("saldo", 0)
 
-    # Buscar elenco
-    elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-    qtd_jogadores = len(elenco.data)
+    # 🔎 Buscar quantidade de jogadores no elenco
+    elenco_res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+    qtd_jogadores = len(elenco_res.data)
 
-    # Verificar situação do elenco
+    # 🎨 Cores de destaque
     if qtd_jogadores < 18:
-        cor = "#ffcccc"  # vermelho claro
+        cor_fundo = "#ffcccc"  # vermelho claro
     elif qtd_jogadores > 26:
-        cor = "#fff5cc"  # amarelo claro
+        cor_fundo = "#fff5cc"  # amarelo claro
     else:
-        cor = "#ffffff"  # branco (normal)
+        cor_fundo = "#ffffff"  # normal
 
-    # Montar HTML da linha
     linha = f"""
-    <tr style="background-color:{cor};">
+    <tr style="background-color:{cor_fundo};">
         <td style='padding:8px;'><b>{nome}</b></td>
         <td style='padding:8px;'>R$ {saldo:,.0f}</td>
         <td style='padding:8px;'>{qtd_jogadores}</td>
     </tr>
     """
-    linhas.append(linha)
+    linhas_html.append(linha)
 
-# Montar HTML da tabela
+# Montar tabela final
 tabela_html = f"""
 <table style='width:100%; border-collapse:collapse; font-family:sans-serif;'>
     <thead>
@@ -57,7 +54,7 @@ tabela_html = f"""
         </tr>
     </thead>
     <tbody>
-        {''.join(linhas)}
+        {''.join(linhas_html)}
     </tbody>
 </table>
 """
