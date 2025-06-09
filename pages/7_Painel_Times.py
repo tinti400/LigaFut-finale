@@ -8,6 +8,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🔧 Configuração da página
 st.set_page_config(page_title="Painel de Times - LigaFut", layout="wide")
 st.title("📋 Painel de Times")
 
@@ -15,17 +16,18 @@ st.title("📋 Painel de Times")
 res_times = supabase.table("times").select("id, nome, saldo").execute()
 times = res_times.data
 
-# ✅ Garante que vamos montar apenas listas simples
+# 🧱 Inicializar listas simples
 nomes = []
 saldos = []
 qtds = []
 
+# 🔄 Montar os dados
 for time in times:
     id_time = time.get("id")
     nome = str(time.get("nome") or "Sem nome")
     saldo = int(time.get("saldo") or 0)
 
-    # Buscar jogadores no elenco
+    # Buscar jogadores do elenco
     elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
     qtd_jogadores = len(elenco.data) if elenco.data else 0
 
@@ -33,16 +35,27 @@ for time in times:
     saldos.append(saldo)
     qtds.append(qtd_jogadores)
 
-# Criar DataFrame a partir de listas simples
-df = pd.DataFrame({
-    "Time": nomes,
-    "Saldo": saldos,
-    "Jogadores": qtds
-})
+# ✅ Criar DataFrame a partir de listas puras
+try:
+    df = pd.DataFrame({
+        "Time": nomes,
+        "Saldo": saldos,
+        "Jogadores": qtds
+    })
 
-# Ordenar e exibir
-df = df.sort_values("Time")
-st.dataframe(df, use_container_width=True)
+    # ✅ Tentar ordenar
+    if "Time" in df.columns:
+        try:
+            df = df.sort_values("Time")
+        except Exception as e:
+            st.warning(f"Erro ao ordenar por 'Time': {e}")
+    else:
+        st.warning("Coluna 'Time' não encontrada no DataFrame.")
 
+    # ✅ Exibir como planilha simples
+    st.dataframe(df, use_container_width=True)
+
+except Exception as e:
+    st.error(f"Erro ao montar a tabela: {e}")
 
 
