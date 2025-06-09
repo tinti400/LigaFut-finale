@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import random
+import pandas as pd
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -97,6 +98,11 @@ if rodadas_existentes:
     rodada_escolhida = st.selectbox("Escolha a rodada", numeros)
     rodada = next(r for r in rodadas_existentes if r["numero"] == rodada_escolhida)
 
+    # 🔍 Filtro por equipe (dentro da rodada)
+    times_disponiveis = list({j["mandante"] for j in rodada["jogos"]} | {j["visitante"] for j in rodada["jogos"]})
+    nomes_times_filtrados = {id_: nome for id_, nome in times_map.items() if id_ in times_disponiveis}
+    nome_filtrado = st.selectbox("🔎 Filtrar por equipe da rodada", ["Todos"] + list(nomes_times_filtrados.values()))
+
     for idx, jogo in enumerate(rodada["jogos"]):
         mandante = jogo["mandante"]
         visitante = jogo["visitante"]
@@ -105,6 +111,9 @@ if rodadas_existentes:
 
         nome_m = times_map.get(mandante, "FOLGA" if mandante == "FOLGA" else "?")
         nome_v = times_map.get(visitante, "FOLGA" if visitante == "FOLGA" else "?")
+
+        if nome_filtrado != "Todos" and nome_filtrado not in [nome_m, nome_v]:
+            continue
 
         col1, col2, col3, col4, col5 = st.columns([2, 1.5, 0.5, 1.5, 2])
         with col1:
@@ -134,4 +143,36 @@ if rodadas_existentes:
             st.success(f"✅ Resultado salvo: {nome_m} {gm} x {gv} {nome_v}")
             st.experimental_rerun()
 
+# 📍 Filtro global de jogos por equipe
+st.subheader("🔎 Buscar Jogos de uma Equipe (todas as rodadas)")
 
+nomes_ordenados = {v: k for k, v in times_map.items()}
+time_selecionado = st.selectbox("Selecione o time", sorted(nomes_ordenados.keys()))
+
+if time_selecionado:
+    id_time = nomes_ordenados[time_selecionado]
+    jogos_encontrados = []
+
+    for rodada in rodadas_existentes:
+        numero = rodada["numero"]
+        for jogo in rodada["jogos"]:
+            if id_time in [jogo["mandante"], jogo["visitante"]]:
+                nome_m = times_map.get(jogo["mandante"], "?")
+                nome_v = times_map.get(jogo["visitante"], "?")
+                g_m = jogo.get("gols_mandante")
+                g_v = jogo.get("gols_visitante")
+
+                placar = f"{g_m} x {g_v}" if g_m is not None and g_v is not None else "⚠️ Sem resultado"
+
+                jogos_encontrados.append({
+                    "Rodada": numero,
+                    "Mandante": nome_m,
+                    "Visitante": nome_v,
+                    "Placar": placar
+                })
+
+    if jogos_encontrados:
+        df = pd.DataFrame(jogos_encontrados).sort_values("Rodada")
+        st.table(df)
+    else:
+        st.info("❌ Nenhum jogo encontrado para esse time.")
