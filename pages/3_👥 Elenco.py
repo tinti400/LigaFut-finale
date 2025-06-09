@@ -99,7 +99,9 @@ else:
         col3.markdown(f"**Overall:** {jogador['overall']}")
         col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
-        if mercado_aberto and col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+        if not mercado_aberto:
+            col5.button("Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
+        elif col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             valor_total = jogador["valor"]
             valor_recebido = round(valor_total * 0.7)
             novo_saldo = saldo + valor_recebido
