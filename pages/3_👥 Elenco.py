@@ -60,7 +60,7 @@ media_overall = round(sum(j["overall"] for j in elenco_filtrado) / len(elenco_fi
 valor_total = sum(j["valor"] for j in elenco_filtrado)
 
 # 💰 Verifica saldo com cache
-@st.cache_data(ttl=30)
+@st.cache(ttl=30)
 def carregar_saldo(id_time):
     res = supabase.table("times").select("saldo").eq("id", id_time).execute()
     return res.data[0]["saldo"] if res.data else 0
@@ -131,3 +131,4 @@ else:
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
