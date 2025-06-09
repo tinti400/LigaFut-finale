@@ -1,4 +1,4 @@
-# -*- coding# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -102,9 +102,9 @@ else:
         if mercado_aberto:
     if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)
-                novo_saldo = saldo + valor_recebido
+                valor_jogador = jogador["valor"]
+                valor_venda = round(valor_jogador * 0.7)  # 30% de perda
+                novo_saldo = saldo + valor_venda
 
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
@@ -113,7 +113,7 @@ else:
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
                     "overall": jogador["overall"],
-                    "valor": valor_total,
+                    "valor": valor_jogador,
                     "id_time": id_time,
                     "time_origem": nome_time
                 }).execute()
@@ -121,14 +121,16 @@ else:
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
-                    valor=valor_recebido,
+                    valor=valor_venda,
                     tipo="Mercado",
                     categoria="Venda",
                     destino="Mercado"
                 )
 
-                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
+                st.success(f"{jogador['nome']} foi vendido por R$ {valor_venda:,.0f}".replace(",", "."))
                 st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao vender jogador: {e}")
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
             except Exception as e:
@@ -202,6 +204,7 @@ else:
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
 
 
 
