@@ -52,10 +52,11 @@ try:
     else:
         st.warning("Coluna 'Time' não encontrada no DataFrame.")
 
-    # ✅ Exibir como planilha simples
-    st.dataframe(df, use_container_width=True)
+    # ✅ Exibir planilha simples (sem use_container_width)
+    st.dataframe(df)
 
 except Exception as e:
     st.error(f"Erro ao montar a tabela: {e}")
+
 
 
