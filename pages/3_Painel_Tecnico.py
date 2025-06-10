@@ -47,7 +47,11 @@ try:
         total_entrada, total_saida = 0, 0
 
         for m in dados:
-            data_formatada = parse(m["data"]).strftime("%d/%m %H:%M") if m.get("data") else "Data inválida"
+            try:
+                data_formatada = parse(m["data"]).strftime("%d/%m %H:%M") if m.get("data") else "Data inválida"
+            except:
+                data_formatada = "Data inválida"
+
             jogador = m.get("jogador", "Desconhecido")
             valor = m.get("valor", 0)
             origem = m.get("origem", "")
@@ -74,19 +78,32 @@ try:
                 saidas.append(linha)
                 total_saida += valor
 
+        # 📅 Última movimentação registrada
+        try:
+            ultima_data = parse(dados[0]["data"]).strftime('%d/%m/%Y %H:%M')
+        except:
+            ultima_data = "—"
+        st.caption(f"📅 Última movimentação registrada: {ultima_data}")
+
         # 🧾 Exibição por aba
         if aba == "📥 Entradas":
-            st.dataframe(pd.DataFrame(entradas))
+            st.markdown("#### 📋 Movimentações de Entrada")
+            st.dataframe(pd.DataFrame(entradas), use_container_width=True)
 
         elif aba == "💸 Saídas":
-            st.dataframe(pd.DataFrame(saidas))
+            st.markdown("#### 📋 Movimentações de Saída")
+            st.dataframe(pd.DataFrame(saidas), use_container_width=True)
 
         elif aba == "📊 Resumo":
+            st.markdown("💡 **Resumo mostra o total de entradas e saídas registradas neste painel.**")
             col1, col2, col3 = st.columns(3)
+
             with col1:
                 st.success(f"💰 Total Entradas\n\nR$ {total_entrada:,.0f}".replace(",", "."))
+
             with col2:
                 st.error(f"💸 Total Saídas\n\nR$ {total_saida:,.0f}".replace(",", "."))
+
             with col3:
                 saldo_liquido = total_entrada - total_saida
                 if saldo_liquido >= 0:
@@ -96,5 +113,3 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
-
-
