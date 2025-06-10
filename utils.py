@@ -10,74 +10,47 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🌎 Timezone Brasil
-fuso_brasilia = pytz.timezone("America/Sao_Paulo")
-
-
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
-    Registra uma movimentação financeira e atualiza o saldo do time.
-
+    Registra movimentações financeiras no Supabase.
+    
     Parâmetros:
-    - id_time (str): ID do time
-    - jogador (str): Nome do jogador envolvido
-    - tipo (str): Tipo da movimentação (leilao, mercado, proposta, etc)
-    - categoria (str): 'compra' ou 'venda'
-    - valor (float): Valor positivo da movimentação
-    - origem (str): Nome do time de origem (opcional)
-    - destino (str): Nome do time de destino (opcional)
+    - id_time: ID do time
+    - jogador: Nome do jogador
+    - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
+    - categoria: 'compra' ou 'venda'
+    - valor: Valor POSITIVO
+    - origem: time de onde o jogador veio (opcional)
+    - destino: time para onde o jogador foi (opcional)
     """
-
     try:
-        categoria = categoria.strip().lower()
-        tipo = tipo.strip().lower()
+        # Garantir formato consistente
+        categoria = categoria.lower().strip()
+        tipo = tipo.lower().strip()
 
-        # ✅ Ajusta valor
-        if categoria == "compra":
-            valor_final = -abs(valor)
-        elif categoria == "venda":
-            valor_final = abs(valor)
-        else:
-            raise ValueError("Categoria inválida. Use 'compra' ou 'venda'.")
+        if not id_time or not jogador or not tipo or not categoria:
+            raise ValueError("Dados obrigatórios ausentes para registrar movimentação.")
 
-        # 🔄 Atualiza saldo
-        saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-        saldo_atual = saldo_res.data[0]["saldo"] if saldo_res.data else 0
-        novo_saldo = saldo_atual + valor_final
+        # Data e hora com fuso horário de Brasília
+        fuso_brasilia = pytz.timezone("America/Sao_Paulo")
+        agora = datetime.now(fuso_brasilia)
 
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-        # 📝 Registrar movimentação
-        agora = datetime.now(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S")
-        supabase.table("movimentacoes").insert({
+        # Monta objeto da movimentação
+        movimentacao = {
             "id_time": id_time,
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
-            "valor": valor_final,
-            "data": agora,
+            "valor": valor,
             "origem": origem,
-            "destino": destino
-        }).execute()
+            "destino": destino,
+            "data_hora": agora.isoformat()
+        }
+
+        # Insere no banco
+        supabase.table("movimentacoes").insert(movimentacao).execute()
 
     except Exception as e:
         st.error(f"Erro ao registrar movimentação: {e}")
-
-
-def verificar_sessao():
-    """
-    Verifica se a sessão atual é válida e ainda ativa.
-    Encerra automaticamente se a sessão foi invalidada no banco.
-    """
-    if "usuario_id" not in st.session_state or "session_id" not in st.session_state:
-        st.warning("Você precisa estar logado para acessar esta página.")
-        st.stop()
-
-    res = supabase.table("usuarios").select("session_id").eq("id", st.session_state["usuario_id"]).execute()
-    if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
-        st.error("⚠️ Sua sessão foi encerrada em outro dispositivo.")
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.stop()
 
 
