@@ -10,8 +10,6 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verificação de sessão única
-verificar_sessao()
 
 # 📌 Dados do time
 id_time = st.session_state["id_time"]
