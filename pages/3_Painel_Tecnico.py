@@ -37,7 +37,7 @@ st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo:
 aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
 
 try:
-    # 📦 Carrega todas as movimentações (não filtra por id_time)
+    # 📦 Carrega todas as movimentações
     dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
 
     if not dados:
@@ -46,9 +46,16 @@ try:
         entradas, saidas = [], []
         total_entrada, total_saida = 0, 0
 
+        nome_time_norm = nome_time.strip().lower()
+
         for m in dados:
-            # ✅ Considera movimentações onde o time está envolvido como dono, origem ou destino
-            if m.get("id_time") != id_time and m.get("origem") != nome_time and m.get("destino") != nome_time:
+            origem = m.get("origem", "")
+            destino = m.get("destino", "")
+            origem_norm = origem.strip().lower()
+            destino_norm = destino.strip().lower()
+
+            # ✅ Verifica se o time está envolvido
+            if m.get("id_time") != id_time and origem_norm != nome_time_norm and destino_norm != nome_time_norm:
                 continue
 
             try:
@@ -58,15 +65,13 @@ try:
 
             jogador = m.get("jogador", "Desconhecido")
             valor = m.get("valor", 0)
-            origem = m.get("origem", "")
-            destino = m.get("destino", "")
             tipo = m.get("tipo", "")
-            tipo_lower = tipo.lower()
             categoria = m.get("categoria", "")
+            tipo_lower = tipo.lower()
             categoria_lower = categoria.lower()
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if nome_time in [destino] else "🔴"
+            icone = "🟢" if destino_norm == nome_time_norm else "🔴"
 
             linha = {
                 "Data": data_formatada,
@@ -77,11 +82,10 @@ try:
                 "Detalhes": detalhes
             }
 
-            # ✅ Decide se é entrada ou saída para esse time
-            if destino == nome_time:
+            if destino_norm == nome_time_norm:
                 entradas.append(linha)
                 total_entrada += valor
-            elif origem == nome_time:
+            elif origem_norm == nome_time_norm:
                 saidas.append(linha)
                 total_saida += valor
 
