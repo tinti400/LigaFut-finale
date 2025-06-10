@@ -31,8 +31,6 @@ nome_time = st.session_state["nome_time"]
 # 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>👥 Elenco do Técnico</h1><hr>", unsafe_allow_html=True)
 
-# 🧹 Removido o upload via Excel
-
 # 🔍 Filtro de busca
 filtro_posicao = st.selectbox("Filtrar por posição", ["Todos", "GL", "ZAG", "LD", "LE", "VOL", "MC", "MD", "ME", "PD", "PE", "SA", "CA"])
 filtro_nome = st.text_input("Buscar por nome").lower()
@@ -85,13 +83,10 @@ else:
 
         if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)
-                novo_saldo = saldo + valor_recebido
-
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                # Remove jogador do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
+                # Insere no mercado com valor cheio
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -101,18 +96,18 @@ else:
                     "time_origem": nome_time
                 }).execute()
 
+                # Registra movimentação no histórico (sem alterar saldo)
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
-                    valor=valor_recebido,
+                    valor=round(jogador["valor"] * 0.7),  # valor que o time teria recebido
                     tipo="Mercado",
                     categoria="Venda",
                     destino="Mercado"
                 )
 
-                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
+                st.success(f"{jogador['nome']} foi vendido para o mercado (sem crédito de valor).")
                 st.experimental_rerun()
+
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
-
-
