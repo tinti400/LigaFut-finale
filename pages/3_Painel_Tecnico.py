@@ -37,8 +37,8 @@ st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo:
 aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
 
 try:
-    dados = supabase.table("movimentacoes").select("*") \
-        .eq("id_time", id_time).order("data", desc=True).limit(200).execute().data
+    # 📦 Carrega todas as movimentações (não filtra por id_time)
+    dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
 
     if not dados:
         st.info("Nenhuma movimentação registrada ainda.")
@@ -47,6 +47,10 @@ try:
         total_entrada, total_saida = 0, 0
 
         for m in dados:
+            # ✅ Considera movimentações onde o time está envolvido como dono, origem ou destino
+            if m.get("id_time") != id_time and m.get("origem") != nome_time and m.get("destino") != nome_time:
+                continue
+
             try:
                 data_formatada = parse(m["data"]).strftime("%d/%m %H:%M") if m.get("data") else "Data inválida"
             except:
@@ -59,9 +63,10 @@ try:
             tipo = m.get("tipo", "")
             tipo_lower = tipo.lower()
             categoria = m.get("categoria", "")
+            categoria_lower = categoria.lower()
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if "compra" in tipo_lower else "🔴"
+            icone = "🟢" if nome_time in [destino] else "🔴"
 
             linha = {
                 "Data": data_formatada,
@@ -72,10 +77,11 @@ try:
                 "Detalhes": detalhes
             }
 
-            if "compra" in tipo_lower:
+            # ✅ Decide se é entrada ou saída para esse time
+            if destino == nome_time:
                 entradas.append(linha)
                 total_entrada += valor
-            elif any(saida in tipo_lower for saida in ["venda", "leilão", "multa", "roubo"]):
+            elif origem == nome_time:
                 saidas.append(linha)
                 total_saida += valor
 
@@ -132,4 +138,5 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
 
