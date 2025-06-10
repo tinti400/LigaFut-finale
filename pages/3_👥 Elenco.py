@@ -35,7 +35,7 @@ filtro_nome = st.text_input("Buscar por nome").lower()
 if st.button("🔄 Limpar filtros"):
     st.experimental_rerun()
 
-# 🧮 Verifica mercado
+# 🔒 Verifica status do mercado
 try:
     config = supabase.table("configuracoes").select("aberto").eq("id", "estado_mercado").single().execute()
     mercado_aberto = config.data.get("aberto", False) if config.data else False
@@ -54,7 +54,7 @@ except Exception as e:
     st.error(f"Erro ao carregar elenco: {e}")
     elenco = []
 
-# 🔍 Filtros aplicados
+# 🔍 Aplica filtros
 elenco_filtrado = []
 for jogador in elenco:
     if filtro_posicao != "Todos" and jogador.get("posicao") != filtro_posicao:
@@ -67,18 +67,18 @@ for jogador in elenco:
 media_overall = round(sum(j["overall"] for j in elenco_filtrado) / len(elenco_filtrado), 1) if elenco_filtrado else 0
 valor_total = sum(j["valor"] for j in elenco_filtrado)
 
-# 💰 Saldo ATUAL (sem cache)
+# 💰 Saldo atual (sem cache)
 saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
 saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
-# 📈 Exibe info
+# 📈 Exibe dados do time
 st.markdown("### 💰 Saldo atual: **R$ {:,.0f}**".format(saldo).replace(",", "."))
 st.markdown("### 📅 Jogadores no elenco: {} / {}".format(len(elenco_filtrado), len(elenco)))
 st.markdown("### 📊 Estatísticas:")
 st.markdown("- Média de Overall: **{}**".format(media_overall))
 st.markdown("- Valor total do elenco: **R$ {:,.0f}**".format(valor_total).replace(",", "."))
 
-# 📋 Lista de jogadores
+# 📋 Exibe jogadores
 if not elenco_filtrado:
     st.info("Nenhum jogador encontrado com os filtros selecionados.")
 else:
@@ -92,16 +92,25 @@ else:
         if mercado_aberto:
             if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
                 try:
-                    valor_venda = round(jogador["valor"] * 0.7)
+                    # 🔄 Recarrega saldo atualizado antes de calcular novo
+                    saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+                    saldo_atual = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
-                    novo_saldo = saldo + valor_venda
+                    valor_venda = round(jogador["valor"] * 0.7)
+                    novo_saldo = saldo_atual + valor_venda
                     limite = 5_000_000_000
+
                     if novo_saldo > limite:
-                        st.error("⚠️ Saldo máximo atingido.")
+                        st.error("⚠️ Saldo máximo permitido: R$ 5.000.000.000")
                         st.stop()
 
+                    # Atualiza saldo
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                    # Remove do elenco
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+
+                    # Adiciona ao mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -111,6 +120,7 @@ else:
                         "time_origem": nome_time
                     }).execute()
 
+                    # Registra movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
@@ -127,3 +137,4 @@ else:
                     st.error(f"Erro ao vender jogador: {e}")
         else:
             col5.button("Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
+
