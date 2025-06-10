@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao, verificar_sessao
+from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Mercado de Transferências - LigaFut", layout="wide")
 
