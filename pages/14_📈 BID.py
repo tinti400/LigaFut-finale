@@ -25,19 +25,12 @@ except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
     todas_movs = []
 
-# 🎨 Estilo para destacar tipos
-cores = {
-    "leilao": "#a200ff",
-    "mercado": "#f39c12",
-    "proposta": "#2ecc71"
-}
-
 # 📰 Exibe BID
 if not todas_movs:
     st.info("Nenhuma movimentação registrada ainda.")
 else:
     for mov in todas_movs:
-        tipo = mov.get("tipo", "outros").lower()
+        tipo = mov.get("tipo", "outros").upper()
         categoria = mov.get("categoria", "").capitalize()
         jogador = mov.get("jogador", "Jogador desconhecido")
         valor = mov.get("valor", 0)
@@ -51,17 +44,15 @@ else:
         except:
             data_formatada = ""
 
-        cor = cores.get(tipo, "#3498db")
+        st.markdown(f"""
+            <div style='padding:10px; border-radius:8px; margin-bottom:10px; background-color:#f0f2f6;'>
+                <b>{categoria} - {tipo}</b><br>
+                <small>{data_formatada}</small><br>
+                <b>{jogador}</b><br>
+                {origem} ⟶ {destino}<br>
+                💰 R$ {valor:,.0f}
+            </div>
+        """, unsafe_allow_html=True)
 
-        with st.container():
-            st.markdown(f"""
-                <div style='background-color:{cor}; padding:10px; border-radius:8px; margin-bottom:10px; color:white;'>
-                    <b>{categoria} - {tipo.upper()}</b><br>
-                    <small>{data_formatada}</small><br>
-                    <b>{jogador}</b><br>
-                    {origem} ⟶ {destino}<br>
-                    💰 R$ {valor:,.0f}
-                </div>
-            """, unsafe_allow_html=True)
 
 
