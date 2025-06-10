@@ -46,13 +46,11 @@ try:
         entradas, saidas = [], []
         total_entrada, total_saida = 0, 0
 
-        nome_time_norm = nome_time.strip().lower()
+        nome_time_norm = str(nome_time or "").strip().lower()
 
         for m in dados:
-            origem = m.get("origem", "")
-            destino = m.get("destino", "")
-            origem_norm = origem.strip().lower()
-            destino_norm = destino.strip().lower()
+            origem_norm = str(m.get("origem", "") or "").strip().lower()
+            destino_norm = str(m.get("destino", "") or "").strip().lower()
 
             # ✅ Verifica se o time está envolvido
             if m.get("id_time") != id_time and origem_norm != nome_time_norm and destino_norm != nome_time_norm:
@@ -69,6 +67,8 @@ try:
             categoria = m.get("categoria", "")
             tipo_lower = tipo.lower()
             categoria_lower = categoria.lower()
+            origem = m.get("origem", "")
+            destino = m.get("destino", "")
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
             icone = "🟢" if destino_norm == nome_time_norm else "🔴"
@@ -142,5 +142,6 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
 
 
