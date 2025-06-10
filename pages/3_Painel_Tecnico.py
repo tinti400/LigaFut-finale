@@ -88,11 +88,11 @@ try:
         # 🧾 Exibição por aba
         if aba == "📥 Entradas":
             st.markdown("#### 📋 Movimentações de Entrada")
-            st.dataframe(pd.DataFrame(entradas), use_container_width=True)
+            st.dataframe(pd.DataFrame(entradas))
 
         elif aba == "💸 Saídas":
             st.markdown("#### 📋 Movimentações de Saída")
-            st.dataframe(pd.DataFrame(saidas), use_container_width=True)
+            st.dataframe(pd.DataFrame(saidas))
 
         elif aba == "📊 Resumo":
             st.markdown("💡 **Resumo mostra o total de entradas e saídas registradas neste painel.**")
