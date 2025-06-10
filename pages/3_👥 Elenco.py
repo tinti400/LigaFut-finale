@@ -83,17 +83,10 @@ else:
 
         if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)
-                novo_saldo = saldo + valor_recebido
-
-                # Atualiza saldo
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
                 # Remove jogador do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Insere no mercado
+                # Insere no mercado com valor cheio
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -103,18 +96,17 @@ else:
                     "time_origem": nome_time
                 }).execute()
 
-                # Registra movimentação com origem e destino
+                # Registra movimentação no histórico (sem alterar saldo)
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
-                    valor=valor_recebido,
-                    tipo="venda",
-                    categoria="mercado",
-                    origem=nome_time,
+                    valor=round(jogador["valor"] * 0.7),  # valor que o time teria recebido
+                    tipo="Mercado",
+                    categoria="Venda",
                     destino="Mercado"
                 )
 
-                st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {valor_recebido:,.0f}".replace(",", "."))
+                st.success(f"{jogador['nome']} foi vendido para o mercado (sem crédito de valor).")
                 st.experimental_rerun()
 
             except Exception as e:
