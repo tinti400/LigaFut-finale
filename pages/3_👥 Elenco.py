@@ -46,7 +46,7 @@ except Exception as e:
 if not mercado_aberto:
     st.warning("🚫 O mercado está fechado no momento. Você não pode vender jogadores.")
 
-# 📥 Carrega elenco
+# 📅 Carrega elenco
 try:
     response = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
     elenco = response.data
@@ -92,7 +92,6 @@ else:
         if mercado_aberto:
             if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
                 try:
-                    # 🔄 Recarrega saldo atualizado antes de calcular novo
                     saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
                     saldo_atual = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
@@ -104,13 +103,8 @@ else:
                         st.error("⚠️ Saldo máximo permitido: R$ 5.000.000.000")
                         st.stop()
 
-                    # Atualiza saldo
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                    # Remove do elenco
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-
-                    # Adiciona ao mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -120,13 +114,13 @@ else:
                         "time_origem": nome_time
                     }).execute()
 
-                    # Registra movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
                         valor=valor_venda,
                         tipo="Mercado",
                         categoria="Venda",
+                        origem=nome_time,
                         destino="Mercado"
                     )
 
@@ -137,4 +131,5 @@ else:
                     st.error(f"Erro ao vender jogador: {e}")
         else:
             col5.button("Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
+
 
