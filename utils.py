@@ -1,8 +1,6 @@
 # utils.py
-
 import streamlit as st
 from datetime import datetime
-import pytz
 from supabase import create_client
 
 # 🔐 Conexão com Supabase
@@ -17,36 +15,33 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
     Parâmetros:
     - id_time: ID do time
     - jogador: Nome do jogador
-    - tipo: Tipo da movimentação (ex: 'mercado', 'leilão', 'proposta')
+    - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
     - categoria: 'compra' ou 'venda'
-    - valor: Valor positivo (em reais)
-    - origem: time de onde o jogador veio (opcional)
-    - destino: time para onde o jogador foi (opcional)
+    - valor: valor inteiro (não string com ponto)
+    - origem: time de onde saiu (opcional)
+    - destino: time que recebeu (opcional)
     """
     try:
-        # 🔁 Converte para lowercase e garante valor inteiro
-        tipo = tipo.strip().lower()
-        categoria = categoria.strip().lower()
-        valor = int(valor)
+        # 🕒 Timestamp atual
+        data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 📅 Data com fuso horário
-        tz = pytz.timezone("America/Sao_Paulo")
-        data_movimentacao = datetime.now(tz).isoformat()
+        # 🧮 Garante que o valor seja inteiro
+        valor_int = int(round(float(valor)))
 
-        # 📦 Registro da movimentação
-        registro = {
+        # 📦 Dados da movimentação
+        movimentacao = {
             "id_time": id_time,
             "jogador": jogador,
-            "tipo": tipo,
-            "categoria": categoria,
-            "valor": valor,
+            "tipo": tipo.lower(),
+            "categoria": categoria.lower(),
+            "valor": valor_int,
+            "data": data,
             "origem": origem,
-            "destino": destino,
-            "data": data_movimentacao
+            "destino": destino
         }
 
-        # 📝 Insere no Supabase
-        supabase.table("movimentacoes").insert(registro).execute()
+        # 🚀 Envia para Supabase
+        supabase.table("movimentacoes").insert(movimentacao).execute()
 
     except Exception as e:
         st.error(f"Erro ao registrar movimentação: {e}")
