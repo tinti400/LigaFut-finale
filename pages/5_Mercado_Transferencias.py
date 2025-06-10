@@ -34,7 +34,7 @@ st.markdown("### 🔍 Filtros de Pesquisa")
 filtro_nome = st.text_input("Nome do jogador").strip().lower()
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
 
-# 📥 Carrega jogadores do mercado
+# 📅 Carrega jogadores do mercado
 res = supabase.table("mercado_transferencias").select("*").execute()
 mercado = res.data if res.data else []
 
@@ -84,6 +84,7 @@ for jogador in jogadores_pagina:
                 st.error("❌ Saldo insuficiente.")
             else:
                 try:
+                    # 1. Adiciona ao elenco
                     supabase.table("elenco").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -92,12 +93,18 @@ for jogador in jogadores_pagina:
                         "id_time": id_time
                     }).execute()
 
+                    # 2. Remove do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
+                    # 3. Atualiza saldo do time
+                    novo_saldo = saldo_time - jogador["valor"]
+                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                    # 4. Registra movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
-                        tipo="Mercado",
+                        tipo="mercado",
                         categoria="compra",
                         valor=jogador["valor"],
                         origem=jogador.get("time_origem"),
@@ -106,6 +113,7 @@ for jogador in jogadores_pagina:
 
                     st.success(f"{jogador['nome']} comprado com sucesso!")
                     st.experimental_rerun()
+
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
 
