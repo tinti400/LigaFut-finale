@@ -10,7 +10,6 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-
 # 📌 Dados do time
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -94,11 +93,7 @@ for jogador in jogadores_pagina:
                     # 2. Remove do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                    # 3. Atualiza saldo do time
-                    novo_saldo = saldo_time - jogador["valor"]
-                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                    # 4. Registra movimentação
+                    # 3. Registra movimentação (saldo será atualizado internamente)
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
