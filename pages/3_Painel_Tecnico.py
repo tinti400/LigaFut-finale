@@ -56,25 +56,26 @@ try:
             valor = m.get("valor", 0)
             origem = m.get("origem", "")
             destino = m.get("destino", "")
-            tipo = m.get("tipo", "").capitalize()
+            tipo = m.get("tipo", "")
+            tipo_lower = tipo.lower()
             categoria = m.get("categoria", "")
 
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if tipo.lower() == "compra" else "🔴"
+            icone = "🟢" if "compra" in tipo_lower else "🔴"
 
             linha = {
                 "Data": data_formatada,
                 "Jogador": f"{icone} {jogador}",
                 "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
-                "Tipo": tipo,
+                "Tipo": tipo.capitalize(),
                 "Categoria": categoria,
                 "Detalhes": detalhes
             }
 
-            if tipo.lower() == "compra":
+            if "compra" in tipo_lower:
                 entradas.append(linha)
                 total_entrada += valor
-            elif tipo.lower() == "venda":
+            elif any(saida in tipo_lower for saida in ["venda", "leilão", "multa", "roubo"]):
                 saidas.append(linha)
                 total_saida += valor
 
@@ -88,11 +89,29 @@ try:
         # 🧾 Exibição por aba
         if aba == "📥 Entradas":
             st.markdown("#### 📋 Movimentações de Entrada")
-            st.dataframe(pd.DataFrame(entradas))
+            for entrada in entradas:
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    col1.markdown(f"🟢 **{entrada['Jogador']}**")
+                    col2.markdown(f"**{entrada['Categoria']}** — {entrada['Detalhes']}")
+                    col3.markdown(
+                        f"📅 {entrada['Data']}  \n💰 **<span style='color:green'>{entrada['Valor (R$)']}</span>**",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("---")
 
         elif aba == "💸 Saídas":
             st.markdown("#### 📋 Movimentações de Saída")
-            st.dataframe(pd.DataFrame(saidas))
+            for saida in saidas:
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    col1.markdown(f"🔴 **{saida['Jogador']}**")
+                    col2.markdown(f"**{saida['Categoria']}** — {saida['Detalhes']}")
+                    col3.markdown(
+                        f"📅 {saida['Data']}  \n💸 **<span style='color:red'>{saida['Valor (R$)']}</span>**",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("---")
 
         elif aba == "📊 Resumo":
             st.markdown("💡 **Resumo mostra o total de entradas e saídas registradas neste painel.**")
@@ -113,3 +132,4 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
