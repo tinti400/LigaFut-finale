@@ -31,25 +31,7 @@ nome_time = st.session_state["nome_time"]
 # 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>👥 Elenco do Técnico</h1><hr>", unsafe_allow_html=True)
 
-# 📄 Upload de planilha para importar elenco
-st.subheader("📅 Importar jogadores via planilha Excel")
-arquivo = st.file_uploader("Selecione um arquivo .xlsx com as colunas: nome, posicao, overall, valor", type="xlsx")
-
-if arquivo:
-    try:
-        df = pd.read_excel(arquivo)
-        for _, row in df.iterrows():
-            supabase.table("elenco").insert({
-                "nome": row["nome"],
-                "posicao": row["posicao"],
-                "overall": int(row["overall"]),
-                "valor": float(row["valor"]),
-                "id_time": id_time
-            }).execute()
-        st.success("Elenco importado com sucesso!")
-        st.experimental_rerun()
-    except Exception as e:
-        st.error(f"Erro ao importar elenco: {e}")
+# 🧹 Removido o upload via Excel
 
 # 🔍 Filtro de busca
 filtro_posicao = st.selectbox("Filtrar por posição", ["Todos", "GL", "ZAG", "LD", "LE", "VOL", "MC", "MD", "ME", "PD", "PE", "SA", "CA"])
@@ -103,10 +85,13 @@ else:
 
         if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # Remover do elenco
+                valor_total = jogador["valor"]
+                valor_recebido = round(valor_total * 0.7)
+                novo_saldo = saldo + valor_recebido
+
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Inserir no mercado
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -116,17 +101,16 @@ else:
                     "time_origem": nome_time
                 }).execute()
 
-                # Registrar movimentação (saldo atualizado no utils)
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
-                    valor=jogador["valor"],
+                    valor=valor_recebido,
                     tipo="Mercado",
                     categoria="Venda",
                     destino="Mercado"
                 )
 
-                st.success(f"{jogador['nome']} foi vendido para o mercado por R$ {int(jogador['valor'] * 0.7):,}".replace(",", "."))
+                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
