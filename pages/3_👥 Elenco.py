@@ -103,13 +103,13 @@ else:
                     "time_origem": nome_time
                 }).execute()
 
-                # ✅ Registra movimentação corretamente
+                # Registra movimentação com origem e destino
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
-                    tipo="mercado",
-                    categoria="venda",
                     valor=valor_recebido,
+                    tipo="venda",
+                    categoria="mercado",
                     origem=nome_time,
                     destino="Mercado"
                 )
