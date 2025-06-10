@@ -10,34 +10,6 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-def verificar_login():
-    """
-    Verifica se o usuário está logado. Caso não esteja, bloqueia o acesso à página.
-    """
-    if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-        st.warning("Você precisa estar logado para acessar esta página.")
-        st.stop()
-
-def verificar_sessao():
-    """
-    Verifica se a sessão do usuário é válida (sessão única).
-    Se outro login tiver ocorrido, desconecta automaticamente.
-    """
-    if "usuario_id" not in st.session_state or "session_id" not in st.session_state:
-        st.warning("Você precisa estar logado.")
-        st.stop()
-
-    try:
-        res = supabase.table("usuarios").select("session_id").eq("id", st.session_state["usuario_id"]).execute()
-        if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
-            st.error("⚠️ Sua sessão foi encerrada em outro dispositivo.")
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.stop()
-    except Exception as e:
-        st.error(f"Erro ao verificar sessão: {e}")
-        st.stop()
-
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
     Registra movimentações financeiras no Supabase e atualiza saldo do time.
@@ -47,37 +19,35 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
     - jogador: Nome do jogador
     - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
     - categoria: 'compra' ou 'venda'
-    - valor: Valor positivo
+    - valor: Valor positivo (R$)
     - origem: time de onde o jogador veio (opcional)
     - destino: time para onde o jogador foi (opcional)
     """
     try:
-        categoria = categoria.strip().lower()
-        tipo = tipo.strip().lower()
+        categoria = categoria.lower().strip()
+        tipo = tipo.lower().strip()
 
         if categoria not in ["compra", "venda"]:
-            st.warning("⚠️ Categoria inválida. Use 'compra' ou 'venda'.")
-            return
+            raise ValueError("Categoria deve ser 'compra' ou 'venda'.")
 
-        # Verifica o saldo atual
+        # 🔄 Buscar saldo atual do time
         res = supabase.table("times").select("saldo").eq("id", id_time).execute()
         if not res.data:
-            st.error(f"❌ Time com ID '{id_time}' não encontrado.")
-            return
-
+            raise Exception("Time não encontrado.")
         saldo_atual = res.data[0]["saldo"]
 
-        # Calcula o novo saldo
-        novo_saldo = saldo_atual - valor if categoria == "compra" else saldo_atual + valor
+        # ➕ ou ➖ saldo
+        if categoria == "compra":
+            novo_saldo = saldo_atual - valor
+        elif categoria == "venda":
+            novo_saldo = saldo_atual + valor
 
-        # Atualiza o saldo no banco
+        # 📝 Atualizar saldo
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-        # Data atual no fuso de Brasília
+        # 📦 Registrar a movimentação
         agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
-
-        # Monta registro da movimentação
-        registro = {
+        supabase.table("movimentacoes").insert({
             "id_time": id_time,
             "jogador": jogador,
             "tipo": tipo,
@@ -86,10 +56,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             "data": agora,
             "origem": origem,
             "destino": destino
-        }
-
-        # Salva no Supabase
-        supabase.table("movimentacoes").insert(registro).execute()
+        }).execute()
 
     except Exception as e:
-        st.error(f"❌ Erro ao registrar movimentação: {e}")
+        st.error(f"Erro ao registrar movimentação: {e}")
