@@ -91,7 +91,7 @@ if not elenco_filtrado:
 else:
     for jogador in elenco_filtrado:
         if jogador.get("id_time") != id_time:
-            continue  # Segurança extra
+            continue
 
         col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
         col1.markdown(f"**{jogador['nome']}**")
@@ -100,110 +100,45 @@ else:
         col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
         if mercado_aberto:
-    if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
-            try:
-                valor_jogador = jogador["valor"]
-                valor_venda = round(valor_jogador * 0.7)  # 30% de perda
-                novo_saldo = saldo + valor_venda
+            if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+                try:
+                    valor_jogador = jogador["valor"]
+                    valor_venda = round(valor_jogador * 0.7)
+                    novo_saldo = saldo + valor_venda
+                    limite_saldo = 5_000_000_000
 
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+                    if novo_saldo > limite_saldo:
+                        st.error(f"O saldo máximo permitido é R$ {limite_saldo:,.0f}".replace(",", "."))
+                        st.stop()
 
-                supabase.table("mercado_transferencias").insert({
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": valor_jogador,
-                    "id_time": id_time,
-                    "time_origem": nome_time
-                }).execute()
+                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                    supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                registrar_movimentacao(
-                    id_time=id_time,
-                    jogador=jogador["nome"],
-                    valor=valor_venda,
-                    tipo="Mercado",
-                    categoria="Venda",
-                    destino="Mercado"
-                )
+                    supabase.table("mercado_transferencias").insert({
+                        "nome": jogador["nome"],
+                        "posicao": jogador["posicao"],
+                        "overall": jogador["overall"],
+                        "valor": valor_jogador,
+                        "id_time": id_time,
+                        "time_origem": nome_time
+                    }).execute()
 
-                st.success(f"{jogador['nome']} foi vendido por R$ {valor_venda:,.0f}".replace(",", "."))
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
-            try:
-                valor_total = jogador["valor"]
-                valor_recebido = round(valor_total * 0.7)
-                novo_saldo = saldo + valor_recebido
+                    registrar_movimentacao(
+                        id_time=id_time,
+                        jogador=jogador["nome"],
+                        valor=valor_venda,
+                        tipo="Mercado",
+                        categoria="Venda",
+                        destino="Mercado"
+                    )
 
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+                    st.success(f"{jogador['nome']} foi vendido por R$ {valor_venda:,.0f}".replace(",", "."))
+                    st.experimental_rerun()
 
-                supabase.table("mercado_transferencias").insert({
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": jogador["valor"],
-                    "id_time": id_time,
-                    "time_origem": nome_time
-                }).execute()
-
-                registrar_movimentacao(
-                    id_time=id_time,
-                    jogador=jogador["nome"],
-                    valor=valor_recebido,
-                    tipo="Mercado",
-                    categoria="Venda",
-                    destino="Mercado"
-                )
-
-                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
-else:
-        col5.button(f"Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
-            valor_total = jogador["valor"]
-            valor_recebido = round(valor_total * 0.7)
-            novo_saldo = saldo + valor_recebido
-            limite_saldo = 5_000_000_000
-
-            if novo_saldo > limite_saldo:
-                st.error(f"O saldo máximo permitido é R$ {limite_saldo:,.0f}".replace(",", "."))
-                st.stop()
-
-            try:
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-
-                supabase.table("mercado_transferencias").insert({
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": jogador["valor"],
-                    "id_time": id_time,
-                    "time_origem": nome_time
-                }).execute()
-
-                registrar_movimentacao(
-                    id_time=id_time,
-                    jogador=jogador["nome"],
-                    valor=valor_recebido,
-                    tipo="Mercado",
-                    categoria="Venda",
-                    destino="Mercado"
-                )
-
-                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
+                except Exception as e:
+                    st.error(f"Erro ao vender jogador: {e}")
+        else:
+            col5.button(f"Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
 
 
 
