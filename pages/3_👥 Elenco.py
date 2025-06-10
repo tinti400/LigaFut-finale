@@ -26,6 +26,7 @@ if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
 
 # 📅 Dados do time logado
 id_time = st.session_state["id_time"]
+id_time = str(id_time)  # 🔁 Garante que será string para evitar falha na query
 nome_time = st.session_state["nome_time"]
 
 # 🎯 Cabeçalho
@@ -111,9 +112,13 @@ else:
                         st.error(f"O saldo máximo permitido é R$ {limite_saldo:,.0f}".replace(",", "."))
                         st.stop()
 
+                    # 🔁 Atualiza saldo do time
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                    # ❌ Remove jogador do elenco
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
+                    # 🛒 Insere no mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -123,6 +128,7 @@ else:
                         "time_origem": nome_time
                     }).execute()
 
+                    # 🧾 Registro da movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
