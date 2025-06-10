@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+from datetime import datetime
+import pandas as pd
 from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Elenco - LigaFut", layout="wide")
@@ -29,24 +31,16 @@ nome_time = st.session_state["nome_time"]
 # 🎯 Cabeçalho
 st.markdown("<h1 style='text-align: center;'>👥 Elenco do Técnico</h1><hr>", unsafe_allow_html=True)
 
-# 🔍 Filtros
+# 🧹 Removido o upload via Excel
+
+# 🔍 Filtro de busca
 filtro_posicao = st.selectbox("Filtrar por posição", ["Todos", "GL", "ZAG", "LD", "LE", "VOL", "MC", "MD", "ME", "PD", "PE", "SA", "CA"])
 filtro_nome = st.text_input("Buscar por nome").lower()
+
 if st.button("🔄 Limpar filtros"):
     st.experimental_rerun()
 
-# 🔒 Verifica status do mercado
-try:
-    config = supabase.table("configuracoes").select("aberto").eq("id", "estado_mercado").single().execute()
-    mercado_aberto = config.data.get("aberto", False) if config.data else False
-except Exception as e:
-    st.error(f"Erro ao verificar status do mercado: {e}")
-    mercado_aberto = False
-
-if not mercado_aberto:
-    st.warning("🚫 O mercado está fechado no momento. Você não pode vender jogadores.")
-
-# 📅 Carrega elenco
+# 📝 Carrega elenco do time
 try:
     response = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
     elenco = response.data
@@ -54,7 +48,7 @@ except Exception as e:
     st.error(f"Erro ao carregar elenco: {e}")
     elenco = []
 
-# 🔍 Aplica filtros
+# 🎯 Aplica filtros
 elenco_filtrado = []
 for jogador in elenco:
     if filtro_posicao != "Todos" and jogador.get("posicao") != filtro_posicao:
@@ -67,18 +61,18 @@ for jogador in elenco:
 media_overall = round(sum(j["overall"] for j in elenco_filtrado) / len(elenco_filtrado), 1) if elenco_filtrado else 0
 valor_total = sum(j["valor"] for j in elenco_filtrado)
 
-# 💰 Saldo atual (sem cache)
+# 💰 Verifica saldo
 saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
 saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
 
-# 📈 Exibe dados do time
+# 📈 Exibe stats
 st.markdown("### 💰 Saldo atual: **R$ {:,.0f}**".format(saldo).replace(",", "."))
 st.markdown("### 📅 Jogadores no elenco: {} / {}".format(len(elenco_filtrado), len(elenco)))
 st.markdown("### 📊 Estatísticas:")
 st.markdown("- Média de Overall: **{}**".format(media_overall))
 st.markdown("- Valor total do elenco: **R$ {:,.0f}**".format(valor_total).replace(",", "."))
 
-# 📋 Exibe jogadores
+# 📊 Exibe elenco
 if not elenco_filtrado:
     st.info("Nenhum jogador encontrado com os filtros selecionados.")
 else:
@@ -89,47 +83,36 @@ else:
         col3.markdown(f"**Overall:** {jogador['overall']}")
         col4.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
 
-        if mercado_aberto:
-            if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
-                try:
-                    saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-                    saldo_atual = saldo_res.data[0]["saldo"] if saldo_res.data else 0
+        if col5.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+            try:
+                valor_total = jogador["valor"]
+                valor_recebido = round(valor_total * 0.7)
+                novo_saldo = saldo + valor_recebido
 
-                    valor_venda = round(jogador["valor"] * 0.7)
-                    novo_saldo = saldo_atual + valor_venda
-                    limite = 5_000_000_000
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                    if novo_saldo > limite:
-                        st.error("⚠️ Saldo máximo permitido: R$ 5.000.000.000")
-                        st.stop()
+                supabase.table("mercado_transferencias").insert({
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "overall": jogador["overall"],
+                    "valor": jogador["valor"],
+                    "id_time": id_time,
+                    "time_origem": nome_time
+                }).execute()
 
-                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                    supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-                    supabase.table("mercado_transferencias").insert({
-                        "nome": jogador["nome"],
-                        "posicao": jogador["posicao"],
-                        "overall": jogador["overall"],
-                        "valor": jogador["valor"],
-                        "id_time": id_time,
-                        "time_origem": nome_time
-                    }).execute()
+                registrar_movimentacao(
+                    id_time=id_time,
+                    jogador=jogador["nome"],
+                    valor=valor_recebido,
+                    tipo="Mercado",
+                    categoria="Venda",
+                    destino="Mercado"
+                )
 
-                    registrar_movimentacao(
-                        id_time=id_time,
-                        jogador=jogador["nome"],
-                        valor=valor_venda,
-                        tipo="Mercado",
-                        categoria="Venda",
-                        origem=nome_time,
-                        destino="Mercado"
-                    )
-
-                    st.success(f"{jogador['nome']} foi vendido por R$ {valor_venda:,.0f}".replace(",", "."))
-                    st.experimental_rerun()
-
-                except Exception as e:
-                    st.error(f"Erro ao vender jogador: {e}")
-        else:
-            col5.button("Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
+                st.success("{} foi vendido para o mercado por R$ {:,.0f}".format(jogador["nome"], valor_recebido).replace(",", "."))
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao vender jogador: {e}")
 
 
