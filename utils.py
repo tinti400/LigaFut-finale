@@ -1,56 +1,46 @@
-# utils.py
-
 import streamlit as st
 from datetime import datetime
-import pytz
 from supabase import create_client
+import pytz
 
-# 🔐 Conexão com Supabase
+# Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# Função para registrar movimentações no Firestore (sem atualizar saldo)
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
-    """
-    Registra movimentações financeiras no Supabase.
-    
-    Parâmetros:
-    - id_time: ID do time
-    - jogador: Nome do jogador
-    - tipo: Tipo de movimentação (ex: 'leilao', 'mercado', 'proposta')
-    - categoria: 'compra' ou 'venda'
-    - valor: Valor POSITIVO
-    - origem: time de onde o jogador veio (opcional)
-    - destino: time para onde o jogador foi (opcional)
-    """
     try:
-        # Garantir formato consistente
-        categoria = categoria.lower().strip()
-        tipo = tipo.lower().strip()
+        categoria = categoria.strip().lower()
+        tipo = tipo.strip().lower()
 
-        if not id_time or not jogador or not tipo or not categoria:
-            raise ValueError("Dados obrigatórios ausentes para registrar movimentação.")
+        # Data atual em UTC-3
+        fuso = pytz.timezone('America/Sao_Paulo')
+        agora = datetime.now(fuso).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Data e hora com fuso horário de Brasília
-        fuso_brasilia = pytz.timezone("America/Sao_Paulo")
-        agora = datetime.now(fuso_brasilia)
-
-        # Monta objeto da movimentação
-        movimentacao = {
+        # Inserir no histórico (sem alterar saldo)
+        supabase.table("historico_financeiro").insert({
             "id_time": id_time,
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
             "valor": valor,
+            "data": agora,
             "origem": origem,
-            "destino": destino,
-            "data_hora": agora.isoformat()
-        }
-
-        # Insere no banco
-        supabase.table("movimentacoes").insert(movimentacao).execute()
-
+            "destino": destino
+        }).execute()
     except Exception as e:
         st.error(f"Erro ao registrar movimentação: {e}")
+
+# Função para validar sessão ativa
+def verificar_sessao(usuario_id, session_id):
+    try:
+        res = supabase.table("usuarios").select("session_id").eq("id", usuario_id).execute()
+        if res.data and res.data[0]["session_id"] != session_id:
+            return False
+        return True
+    except:
+        return False
+
 
 
