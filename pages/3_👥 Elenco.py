@@ -25,8 +25,7 @@ if res.data and res.data[0]["session_id"] != st.session_state["session_id"]:
     st.stop()
 
 # 📅 Dados do time logado
-id_time = st.session_state["id_time"]
-id_time = str(id_time)  # 🔁 Garante que será string para evitar falha na query
+id_time = str(st.session_state["id_time"])  # garantir string
 nome_time = st.session_state["nome_time"]
 
 # 🎯 Cabeçalho
@@ -108,17 +107,23 @@ else:
                     novo_saldo = saldo + valor_venda
                     limite_saldo = 5_000_000_000
 
+                    st.write("🆔 id_time:", id_time)
+                    st.write("💰 saldo antes:", saldo)
+                    st.write("💸 valor da venda (70%):", valor_venda)
+                    st.write("💰 novo saldo esperado:", novo_saldo)
+
                     if novo_saldo > limite_saldo:
                         st.error(f"O saldo máximo permitido é R$ {limite_saldo:,.0f}".replace(",", "."))
                         st.stop()
 
-                    # 🔁 Atualiza saldo do time
-                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                    # Atualiza saldo
+                    res = supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                    st.write("📦 Resultado update saldo:", res)
 
-                    # ❌ Remove jogador do elenco
+                    # Remove do elenco
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                    # 🛒 Insere no mercado
+                    # Adiciona no mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -128,7 +133,6 @@ else:
                         "time_origem": nome_time
                     }).execute()
 
-                    # 🧾 Registro da movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
@@ -140,11 +144,11 @@ else:
 
                     st.success(f"{jogador['nome']} foi vendido por R$ {valor_venda:,.0f}".replace(",", "."))
                     st.experimental_rerun()
-
                 except Exception as e:
                     st.error(f"Erro ao vender jogador: {e}")
         else:
             col5.button(f"Venda indisponível", key=f"bloqueado_{jogador['id']}", disabled=True)
+
 
 
 
