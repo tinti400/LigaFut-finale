@@ -24,15 +24,23 @@ if not punicoes:
 # 📊 Formatando os dados
 linhas = []
 for p in punicoes:
+    tipo = str(p.get("tipo", "")).lower()
+    valor_ou_pontos = "-"
+    if tipo == "financeira":
+        valor_ou_pontos = f"-{int(p.get('valor', 0))}"
+    elif tipo == "pontuacao":
+        valor_ou_pontos = f"-{int(p.get('pontos', 0))}"
+
     linhas.append({
-        "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M"),
+        "📅 Data": datetime.fromisoformat(p.get("data", datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M"),
         "🏷️ Time": p.get("nome_time", "Desconhecido"),
-        "🚫 Tipo": str(p.get("tipo", "")).capitalize(),
+        "🚫 Tipo": tipo.capitalize(),
         "💬 Motivo": p.get("motivo", "-"),
-        "🧮 Valor/Pontos": f"-{int(p['valor']) if p['tipo'] == 'financeira' else int(p['pontos'])}"
+        "🧮 Valor/Pontos": valor_ou_pontos
     })
 
 df = pd.DataFrame(linhas)
 
 # 📋 Exibir em tabela
 st.dataframe(df, use_container_width=True)
+
