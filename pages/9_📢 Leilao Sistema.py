@@ -44,14 +44,20 @@ id_time_vencedor = leilao.get("id_time_atual", "")
 nome_jogador = leilao.get("nome_jogador", "Desconhecido")
 posicao_jogador = leilao.get("posicao_jogador", "-")
 overall_jogador = leilao.get("overall_jogador", "N/A")
+imagem_url = leilao.get("imagem_url", "")
 
 # ⏱️ Cronômetro
 fim_dt = datetime.fromisoformat(fim)
 tempo_restante = max(0, int((fim_dt - datetime.utcnow()).total_seconds()))
 minutos, segundos = divmod(tempo_restante, 60)
-st.markdown(f"<h2 style='text-align:center'>⏳ Tempo restante: {minutos:02d}:{segundos:02d}</h2>", unsafe_allow_html=True)
 
+# 📸 Exibir imagem do jogador, se houver
+if imagem_url:
+    st.image(imagem_url, width=200)
+
+st.markdown(f"<h2 style='text-align:center'>⏳ Tempo restante: {minutos:02d}:{segundos:02d}</h2>", unsafe_allow_html=True)
 st.markdown("---")
+
 col1, col2, col3, col4 = st.columns([2, 4, 2, 2])
 with col1: st.subheader(posicao_jogador)
 with col2: st.subheader(nome_jogador)
