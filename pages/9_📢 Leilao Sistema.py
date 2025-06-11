@@ -19,6 +19,17 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 id_time_usuario = st.session_state["id_time"]
 nome_time_usuario = st.session_state.get("nome_time", "")
 
+# 🔒 Verifica restrição de leilão para o time
+try:
+    res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time_usuario).execute()
+    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+
+    if restricoes.get("leilao", False):
+        st.error("🚫 Seu time está proibido de participar de leilões.")
+        st.stop()
+except Exception as e:
+    st.warning(f"⚠️ Erro ao verificar restrições: {e}")
+
 # 🔍 Buscar leilao ativo
 res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).limit(1).execute()
 if not res.data:
