@@ -7,17 +7,17 @@ import pytz
 st.set_page_config(page_title="🔧 Admin Leilão - LigaFut", layout="wide")
 st.title("🔧 Administração de Leilão")
 
-# Conexão com Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# Verifica login do admin
+# ✅ Verifica login e tipo de usuário
 if "usuario_id" not in st.session_state or st.session_state.get("tipo") != "admin":
     st.warning("Acesso restrito ao administrador.")
     st.stop()
 
-# Campos para criar leilão
+# 📦 Campos para criar leilão
 st.subheader("📦 Criar novo leilão")
 nome_jogador = st.text_input("Nome do jogador")
 posicao_jogador = st.selectbox("Posição", [
@@ -63,7 +63,7 @@ if st.button("🚀 Criar Leilão"):
     except Exception as e:
         st.error(f"Erro ao criar leilão: {e}")
 
-# Lista de leilões criados
+# 📋 Lista de leilões criados
 st.subheader("📋 Leilões criados")
 res_leiloes = supabase.table("leiloes").select("*").order("fim", desc=True).execute()
 leiloes = res_leiloes.data if res_leiloes.data else []
