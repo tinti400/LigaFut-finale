@@ -14,11 +14,10 @@ supabase = create_client(url, key)
 st.markdown("<h1 style='text-align:center; color:#C0392B;'>📜 Histórico de Punições</h1>", unsafe_allow_html=True)
 st.markdown("---")
 
-# Carregar punições
+# 📦 Carregar punições
 res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
 punicoes = res.data if res.data else []
 
-# Organizar dados
 dados_formatados = []
 for p in punicoes:
     try:
@@ -42,12 +41,13 @@ for p in punicoes:
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
 
-# Exibir
+# ✅ Exibição
 if dados_formatados:
     df = pd.DataFrame(dados_formatados)
     st.dataframe(df, use_container_width=True)
 else:
     st.info("✅ Nenhuma punição registrada até o momento.")
+
 
 
 
