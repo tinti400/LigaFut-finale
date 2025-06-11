@@ -11,7 +11,8 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.title("📜 Histórico de Punições")
+st.markdown("<h1 style='text-align:center; color:#C0392B;'>📜 Histórico de Punições</h1>", unsafe_allow_html=True)
+st.markdown("---")
 
 # Carregar punições
 res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
@@ -26,26 +27,44 @@ for p in punicoes:
 
         valor = "-"
         if tipo == "financeira":
-            valor = f"R$ {int(p.get('valor', 0)):,}".replace(",", ".")
+            valor = f"<span style='color:#E74C3C;'>- R$ {int(p.get('valor', 0)):,}</span>".replace(",", ".")
         elif tipo == "pontuacao":
-            valor = f"-{int(p.get('pontos', 0))} pts"
+            valor = f"<span style='color:#F39C12;'>- {int(p.get('pontos', 0))} pts</span>"
 
         dados_formatados.append({
             "🏷️ Time": p.get("nome_time", "Desconhecido"),
             "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
             "🚫 Tipo": tipo_formatado,
             "✏️ Motivo": p.get("motivo", "-"),
-            "🧮 Valor/Pontos": valor
+            "💥 Penalidade": valor
         })
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
 
-df = pd.DataFrame(dados_formatados)
+# Exibir
+if dados_formatados:
+    df = pd.DataFrame(dados_formatados)
 
-# 📋 Exibir em tabela
-if not df.empty:
-    st.dataframe(df)
+    # Estilização visual
+    st.markdown("""
+        <style>
+            .stDataFrame tbody td {
+                text-align: center;
+                font-size: 16px;
+            }
+            .stDataFrame thead th {
+                background-color: #F5B7B1;
+                color: black;
+                text-align: center;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.write("🔽 Punições aplicadas recentemente:")
+    st.dataframe(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+
 else:
-    st.warning("Nenhuma punição registrada até o momento.")
+    st.info("✅ Nenhuma punição registrada até o momento.")
+
 
 
