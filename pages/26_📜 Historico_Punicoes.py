@@ -1,50 +1,50 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
-import pandas as pd
 from supabase import create_client
+import pandas as pd
+from datetime import datetime
 
-st.set_page_config(page_title="📜 Histórico de Punições", layout="wide")
-st.title("📜 Histórico de Punições Aplicadas")
+st.set_page_config(page_title="Histórico de Punições - LigaFut", layout="wide")
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🔍 Carregar punições
-res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
-punicoes = res.data or []
+st.title("📜 Histórico de Punições")
 
-# 🔄 Processar dados
-tabela = []
+# Carregar punições
+res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
+punicoes = res.data if res.data else []
+
+# Organizar dados
+dados_formatados = []
 for p in punicoes:
     try:
-        tipo = p.get("tipo", "")
-        motivo = p.get("motivo", "-")
-        data = p.get("data", "")[:10]
-        valor = p.get("valor")
-        pontos = p.get("pontos")
-        time_id = p.get("id_time")
+        tipo = p.get("tipo") or ""
+        tipo_formatado = tipo.capitalize() if isinstance(tipo, str) else "Desconhecido"
 
-        # Buscar nome do time
-        res_time = supabase.table("times").select("nome").eq("id", time_id).limit(1).execute()
-        nome_time = res_time.data[0]["nome"] if res_time.data else "Desconhecido"
+        valor = "-"
+        if tipo == "financeira":
+            valor = f"R$ {int(p.get('valor', 0)):,}".replace(",", ".")
+        elif tipo == "pontuacao":
+            valor = f"-{int(p.get('pontos', 0))} pts"
 
-        penalidade = f"-R$ {int(valor):,}".replace(",", ".") if tipo == "financeira" else f"-{int(pontos)} pts"
-
-        tabela.append({
-            "Time": nome_time,
-            "Data": data,
-            "Motivo": motivo,
-            "Tipo": tipo.capitalize(),
-            "Penalidade": penalidade
+        dados_formatados.append({
+            "🏷️ Time": p.get("nome_time", "Desconhecido"),
+            "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
+            "🚫 Tipo": tipo_formatado,
+            "✏️ Motivo": p.get("motivo", "-"),
+            "🧮 Valor/Pontos": valor
         })
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
 
-# 📊 Mostrar tabela
-if tabela:
-    df = pd.DataFrame(tabela)
+df = pd.DataFrame(dados_formatados)
+
+# 📋 Exibir em tabela
+if not df.empty:
     st.dataframe(df)
 else:
-    st.info("Nenhuma punição registrada até o momento.")
+    st.warning("Nenhuma punição registrada até o momento.")
 
