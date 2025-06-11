@@ -53,22 +53,26 @@ fim_dt = datetime.fromisoformat(fim)
 tempo_restante = max(0, int((fim_dt - datetime.utcnow()).total_seconds()))
 minutos, segundos = divmod(tempo_restante, 60)
 
-# 🖼️ Exibir imagem e info do jogador
+# 🖼️ Exibir imagem e dados organizados
+st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+
 if imagem_url:
-    st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-    st.image(imagem_url, width=220, caption=nome_jogador)
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.image(imagem_url, width=250)
 
+st.markdown(f"""
+<h3>{nome_jogador}</h3>
+<p>
+<b>Posição:</b> {posicao_jogador} &nbsp;&nbsp; 
+<b>Overall:</b> {overall_jogador} &nbsp;&nbsp; 
+<b>Nacionalidade:</b> {nacionalidade}<br><br>
+<b>💰 Preço Atual:</b> R$ {valor_atual:,.0f}
+</p>
+""", unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ⏳ Cronômetro visual
 st.markdown(f"<h2 style='text-align:center'>⏳ Tempo restante: {minutos:02d}:{segundos:02d}</h2>", unsafe_allow_html=True)
-st.markdown("---")
-
-col1, col2, col3, col4 = st.columns([2, 4, 2, 2])
-with col1: st.subheader(posicao_jogador)
-with col2: st.subheader(nome_jogador)
-with col3: st.metric("⭐ Overall", overall_jogador)
-with col4: st.metric("💰 Lance Atual", f"R$ {valor_atual:,.0f}".replace(",", "."))
-
-st.markdown(f"🏳️ **Origem:** {origem} &nbsp;&nbsp;&nbsp;&nbsp; 🌍 **Nacionalidade:** {nacionalidade}")
 st.markdown("---")
 
 # 🏧 Último lance
