@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client, Client
 import uuid
@@ -56,6 +57,7 @@ if "usuario" not in st.session_state and "usuario" in params:
             st.session_state["id_time"] = user["time_id"]
             st.session_state["divisao"] = user.get("divisao", "Divisão 1")
             st.session_state["session_id"] = novo_session_id
+            st.session_state["administrador"] = user.get("administrador", False)
 
             time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
             st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
@@ -66,7 +68,7 @@ if "usuario" not in st.session_state and "usuario" in params:
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
-        for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao", "session_id"]:
+        for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao", "session_id", "administrador"]:
             st.session_state.pop(key, None)
         st.experimental_set_query_params()
         st.success("Sessão encerrada. Recarregue ou faça login.")
@@ -103,6 +105,7 @@ with st.container():
                         st.session_state["id_time"] = user["time_id"]
                         st.session_state["divisao"] = user.get("divisao", "Divisão 1")
                         st.session_state["session_id"] = novo_session_id
+                        st.session_state["administrador"] = user.get("administrador", False)
                         st.experimental_set_query_params(usuario=user["usuario"])
 
                         time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
