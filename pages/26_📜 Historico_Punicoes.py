@@ -25,18 +25,19 @@ for p in punicoes:
         tipo = p.get("tipo") or ""
         tipo_formatado = tipo.capitalize() if isinstance(tipo, str) else "Desconhecido"
 
-        valor = "-"
         if tipo == "financeira":
-            valor = f"<span style='color:#E74C3C;'>- R$ {int(p.get('valor', 0)):,}</span>".replace(",", ".")
+            penalidade = f"- R$ {int(p.get('valor', 0)):,}".replace(",", ".")
         elif tipo == "pontuacao":
-            valor = f"<span style='color:#F39C12;'>- {int(p.get('pontos', 0))} pts</span>"
+            penalidade = f"- {int(p.get('pontos', 0))} pts"
+        else:
+            penalidade = "-"
 
         dados_formatados.append({
             "🏷️ Time": p.get("nome_time", "Desconhecido"),
             "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
             "🚫 Tipo": tipo_formatado,
             "✏️ Motivo": p.get("motivo", "-"),
-            "💥 Penalidade": valor
+            "💥 Penalidade": penalidade
         })
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
@@ -44,27 +45,10 @@ for p in punicoes:
 # Exibir
 if dados_formatados:
     df = pd.DataFrame(dados_formatados)
-
-    # Estilização visual
-    st.markdown("""
-        <style>
-            .stDataFrame tbody td {
-                text-align: center;
-                font-size: 16px;
-            }
-            .stDataFrame thead th {
-                background-color: #F5B7B1;
-                color: black;
-                text-align: center;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.write("🔽 Punições aplicadas recentemente:")
-    st.dataframe(df.to_html(escape=False, index=False), unsafe_allow_html=True)
-
+    st.dataframe(df, use_container_width=True)
 else:
     st.info("✅ Nenhuma punição registrada até o momento.")
+
 
 
 
