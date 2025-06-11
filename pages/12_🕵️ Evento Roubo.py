@@ -19,6 +19,17 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
+# 🔒 Verifica se o time está proibido de participar do evento de roubo
+try:
+    res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
+    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+
+    if restricoes.get("roubo", False):
+        st.error("🚫 Seu time está proibido de participar do Evento de Roubo.")
+        st.stop()
+except Exception as e:
+    st.warning(f"⚠️ Erro ao verificar restrições: {e}")
+
 st.title("🕵️ Evento de Roubo - LigaFut")
 
 ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"
@@ -58,7 +69,7 @@ if eh_admin:
             "vez": "0",
             "roubos": {},
             "bloqueios": {},
-            "ultimos_bloqueios": bloqueios,  # Salva os bloqueios para a próxima edição
+            "ultimos_bloqueios": bloqueios,
             "ja_perderam": {},
             "concluidos": [],
             "inicio": str(datetime.utcnow())
@@ -66,12 +77,6 @@ if eh_admin:
         st.experimental_rerun()
 
 # 🔐 Fase de bloqueio
-if ativo and fase == "sorteio" and eh_admin:
-    st.subheader("🛡️ Iniciar Fase de Bloqueio")
-    if st.button("➡️ Começar Bloqueios"):
-        supabase.table("configuracoes").update({"fase": "bloqueio"}).eq("id", ID_CONFIG).execute()
-        st.experimental_rerun()
-
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
     bloqueios_atual = bloqueios.get(id_time, [])
@@ -218,6 +223,3 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
-
-
-
