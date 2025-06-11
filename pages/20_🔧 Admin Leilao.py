@@ -12,9 +12,17 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login e tipo de usuário
-if "usuario_id" not in st.session_state or st.session_state.get("tipo") != "admin":
-    st.warning("Acesso restrito ao administrador.")
+# ✅ Verifica login e se é admin (por e-mail ou nome de usuário)
+usuario_atual = st.session_state.get("usuario", "").lower()
+try:
+    admin_ref = supabase.table("admins").select("email").execute()
+    emails_admin = [item["email"].lower() for item in admin_ref.data]
+except Exception as e:
+    emails_admin = []
+    st.error("Erro ao verificar permissões de administrador.")
+
+if usuario_atual not in emails_admin:
+    st.warning("🔒 Acesso restrito ao administrador.")
     st.stop()
 
 # 📦 Campos para criar leilão
