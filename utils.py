@@ -65,13 +65,21 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             st.error(f"❌ Time com ID '{id_time}' não encontrado.")
             return
 
-        saldo_atual = res.data[0]["saldo"]
+        saldo_atual = res.data[0].get("saldo")
+        if saldo_atual is None:
+            st.error("❌ Saldo atual não encontrado para este time.")
+            return
+
+        st.write(f"[DEBUG] Saldo antes: {saldo_atual}, valor: {valor}, tipo: {tipo}, categoria: {categoria}")
 
         # Calcula o novo saldo
         novo_saldo = saldo_atual - valor if categoria == "compra" else saldo_atual + valor
 
         # Atualiza o saldo no banco
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+        update = supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+        if not update.data:
+            st.error("❌ Falha ao atualizar o saldo no banco de dados (sem retorno).")
+            return
 
         # Data atual no fuso de Brasília
         agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
@@ -90,10 +98,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
 
         # Salva no Supabase
         supabase.table("movimentacoes").insert(registro).execute()
+        st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação: {e}")
-
-
-
-
