@@ -50,7 +50,7 @@ def obter_nomes_times():
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
-# 🧠 Classificação
+# 🧠 Classificação com punições
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
 
@@ -96,7 +96,6 @@ def calcular_classificacao(rodadas, times_map):
                 tabela[m]["e"] += 1
                 tabela[v]["e"] += 1
 
-    # 🔄 Garante que todos os times da divisão estejam presentes
     for tid in times_map:
         if tid not in tabela:
             tabela[tid] = {
@@ -104,6 +103,20 @@ def calcular_classificacao(rodadas, times_map):
                 "logo": times_map[tid]["logo"],
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
+
+    # ➖ Aplicar punições de pontos
+    try:
+        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
+        puni_map = {}
+        for p in res_punicoes.data:
+            tid = p["id_time"]
+            puni_map[tid] = puni_map.get(tid, 0) + p["pontos_retirados"]
+
+        for tid in tabela:
+            if tid in puni_map:
+                tabela[tid]["pontos"] = max(0, tabela[tid]["pontos"] - puni_map[tid])
+    except Exception as e:
+        st.error(f"Erro ao aplicar punições: {e}")
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
