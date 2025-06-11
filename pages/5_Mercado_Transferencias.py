@@ -14,6 +14,17 @@ supabase = create_client(url, key)
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
+# 🔒 Verifica se o time está bloqueado no mercado
+try:
+    res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
+    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+
+    if restricoes.get("mercado", False):
+        st.error("🚫 Seu time está proibido de acessar o Mercado de Transferências.")
+        st.stop()
+except Exception as e:
+    st.warning(f"⚠️ Erro ao verificar restrições: {e}")
+
 # 🔒 Verifica se o mercado está aberto
 status_res = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
 mercado_aberto = status_res.data[0]["mercado_aberto"] if status_res.data else False
@@ -93,7 +104,7 @@ for jogador in jogadores_pagina:
                     # 2. Remove do mercado
                     supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                    # 3. Registra movimentação (saldo será atualizado internamente)
+                    # 3. Registra movimentação
                     registrar_movimentacao(
                         id_time=id_time,
                         jogador=jogador["nome"],
