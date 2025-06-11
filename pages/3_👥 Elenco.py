@@ -21,6 +21,10 @@ nome_time = st.session_state.get("nome_time", "")
 
 st.title(f"👥 Elenco do {nome_time}")
 
+# 💰 Buscar saldo do time
+res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+
 # 📦 Buscar elenco do time
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
@@ -28,6 +32,23 @@ jogadores = res.data if res.data else []
 if not jogadores:
     st.info("📃 Nenhum jogador encontrado no elenco.")
     st.stop()
+
+# 🧮 Calcular estatísticas do elenco
+quantidade = len(jogadores)
+valor_total = sum(j.get("valor", 0) for j in jogadores)
+
+# 🎯 Exibir informações principais
+st.markdown(
+    f"""
+    <div style='text-align:center;'>
+        <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
+        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total do elenco: <strong>R$ {valor_total:,.0f}</strong></h4>
+    </div>
+    """.replace(",", "."),
+    unsafe_allow_html=True
+)
+
+st.markdown("---")
 
 # 🧑‍💼 Exibir jogadores com imagem redonda + nacionalidade + origem + botão de venda
 for jogador in jogadores:
