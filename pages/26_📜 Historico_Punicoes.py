@@ -21,18 +21,21 @@ punicoes = res.data if res.data else []
 dados_formatados = []
 for p in punicoes:
     try:
-        valor = None
-        if p.get("tipo") == "financeira":
+        tipo = p.get("tipo") or ""
+        tipo_formatado = tipo.capitalize() if isinstance(tipo, str) else "Desconhecido"
+
+        valor = "-"
+        if tipo == "financeira":
             valor = f"R$ {int(p.get('valor', 0)):,}".replace(",", ".")
-        elif p.get("tipo") == "pontuacao":
+        elif tipo == "pontuacao":
             valor = f"-{int(p.get('pontos', 0))} pts"
 
         dados_formatados.append({
             "🏷️ Time": p.get("nome_time", "Desconhecido"),
             "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
-            "🚫 Tipo": p.get("tipo", "").capitalize(),
+            "🚫 Tipo": tipo_formatado,
             "✏️ Motivo": p.get("motivo", "-"),
-            "🧮 Valor/Pontos": valor or "-"
+            "🧮 Valor/Pontos": valor
         })
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
@@ -44,4 +47,5 @@ if not df.empty:
     st.dataframe(df)
 else:
     st.warning("Nenhuma punição registrada até o momento.")
+
 
