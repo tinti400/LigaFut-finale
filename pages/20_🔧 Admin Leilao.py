@@ -1,89 +1,78 @@
-
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime, timedelta
+import pytz
 
-st.set_page_config(page_title="Admin - Leilões em Fila", layout="wide")
+st.set_page_config(page_title="🔧 Admin Leilão - LigaFut", layout="wide")
+st.title("🔧 Administração de Leilão")
 
-# 🔐 Supabase
+# Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado para acessar esta página.")
+# Verifica login do admin
+if "usuario_id" not in st.session_state or st.session_state.get("tipo") != "admin":
+    st.warning("Acesso restrito ao administrador.")
     st.stop()
 
-# 👑 Verifica admin
-email_usuario = st.session_state.get("usuario", "")
-admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-if not admin_ref.data:
-    st.warning("🔒 Acesso restrito a administradores.")
-    st.stop()
+# Campos para criar leilão
+st.subheader("📦 Criar novo leilão")
+nome_jogador = st.text_input("Nome do jogador")
+posicao_jogador = st.selectbox("Posição", [
+    "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
+    "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
+    "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centro Avante (CA)"
+])
+overall_jogador = st.number_input("Overall", min_value=50, max_value=99, value=70)
+valor_inicial = st.number_input("Valor inicial (R$)", min_value=100000, step=50000)
+duracao_minutos = st.number_input("Duração do leilão (em minutos)", min_value=1, value=2)
+id_time = st.text_input("ID do time vendedor")
+nome_time = st.text_input("Nome do time vendedor")
 
-st.title("🧑‍⚖️ Administração de Leilões (Fila)")
+if st.button("🚀 Criar Leilão"):
+    try:
+        agora = datetime.now(pytz.timezone("America/Sao_Paulo"))
+        fim = agora + timedelta(minutes=duracao_minutos)
 
-# 📝 Adicionar novo leilão manualmente
-with st.form("novo_leilao"):
-    nome = st.text_input("Nome do Jogador").strip()
-    posicao = st.selectbox("Posição", [
-        "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
-        "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
-        "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
-    ])
-    overall = st.number_input("Overall", min_value=1, max_value=99)
-    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100_000, step=50_000)
-    incremento = st.number_input("Incremento mínimo (R$)", min_value=100_000, step=50_000, value=3_000_000)
-    duracao = st.slider("Duração (min)", 1, 10, value=2)
-    botao = st.form_submit_button("Adicionar à Fila")
-
-    if botao and nome:
-        novo = {
-            "nome_jogador": nome,
-            "posicao_jogador": posicao,
-            "overall_jogador": overall,
+        res = supabase.table("leiloes").insert({
+            "nome_jogador": nome_jogador,
+            "posicao_jogador": posicao_jogador,
+            "overall_jogador": overall_jogador,
             "valor_inicial": valor_inicial,
-            "valor_atual": valor_inicial,
-            "incremento_minimo": incremento,
-            "inicio": None,
-            "fim": None,
+            "id_time_vendedor": id_time,
+            "nome_time_vendedor": nome_time,
             "ativo": False,
-            "finalizado": False
-        }
-        supabase.table("leiloes").insert(novo).execute()
-        st.success("✅ Jogador adicionado à fila.")
-
-# 🔄 Verificar e ativar leilão
-res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute()
-ativo = res.data[0] if res.data else None
-
-if ativo:
-    st.subheader("🔴 Leilão Ativo")
-    st.markdown(f"**Jogador:** {ativo['nome_jogador']}")
-    st.markdown(f"**Posição:** {ativo['posicao_jogador']}")
-    st.markdown(f"**Valor Atual:** R$ {ativo['valor_atual']:,.0f}".replace(",", "."))
-
-    fim = datetime.fromisoformat(ativo["fim"])
-    restante = fim - datetime.utcnow()
-    if restante.total_seconds() <= 0:
-        supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", ativo["id"]).execute()
-        st.info("⏱️ Leilão finalizado automaticamente.")
-    else:
-        st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
-else:
-    proximo = supabase.table("leiloes").select("*").eq("ativo", False).eq("finalizado", False).order("id").limit(1).execute()
-    if proximo.data:
-        leilao = proximo.data[0]
-        agora = datetime.utcnow()
-        fim = agora + timedelta(minutes=2)
-        supabase.table("leiloes").update({
-            "ativo": True,
-            "inicio": agora.isoformat(),
+            "finalizado": False,
             "fim": fim.isoformat()
-        }).eq("id", leilao["id"]).execute()
-        st.success("✅ Novo leilão iniciado automaticamente.")
+        }).execute()
+
+        st.success("✅ Leilão criado com sucesso!")
         st.experimental_rerun()
-    else:
-        st.info("✅ Nenhum leilão ativo. Fila vazia.")
+    except Exception as e:
+        st.error(f"Erro ao criar leilão: {e}")
+
+# Lista de leilões ativos
+st.subheader("📋 Leilões criados")
+res_leiloes = supabase.table("leiloes").select("*").order("fim", desc=True).execute()
+leiloes = res_leiloes.data if res_leiloes.data else []
+
+for leilao in leiloes:
+    with st.expander(f"{leilao['nome_jogador']} ({leilao['posicao_jogador']}) - R$ {leilao['valor_inicial']:,}".replace(",", ".")):
+        st.write("👤 Time vendedor:", leilao.get("nome_time_vendedor"))
+        st.write("⏰ Termina em:", leilao.get("fim"))
+        st.write("🔁 Status:", "Ativo" if leilao.get("ativo") else "Inativo")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Ativar", key=f"ativar_{leilao['id']}"):
+                supabase.table("leiloes").update({"ativo": True}).eq("id", leilao["id"]).execute()
+                st.success("Leilão ativado!")
+                st.experimental_rerun()
+        with col2:
+            if st.button("🛑 Desativar", key=f"desativar_{leilao['id']}"):
+                supabase.table("leiloes").update({"ativo": False}).eq("id", leilao["id"]).execute()
+                st.warning("Leilão desativado.")
+                st.experimental_rerun()
+
