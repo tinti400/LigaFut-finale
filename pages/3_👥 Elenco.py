@@ -1,4 +1,4 @@
-co# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from utils import registrar_movimentacao
@@ -29,36 +29,44 @@ if not jogadores:
     st.info("📃 Nenhum jogador encontrado no elenco.")
     st.stop()
 
-# 🧑‍💼 Exibir jogadores
+# 🧑‍💼 Exibir jogadores com imagem redonda + nacionalidade + origem + botão de venda
 for jogador in jogadores:
-    col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 2, 2, 2, 2])
+    col1, col2, col3, col4, col5, col6 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2])
 
+    # Imagem do jogador (circular)
     with col1:
-        if jogador.get("imagem_url"):
-            st.image(jogador["imagem_url"], width=60)
+        imagem = jogador.get("imagem_url", "")
+        if imagem:
+            st.markdown(
+                f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown("<div style='width:60px;height:60px;border-radius:50%;border:2px solid #ddd;background:#eee;'></div>", unsafe_allow_html=True)
 
     with col2:
-        st.markdown(f"**{jogador['nome']}**")
-        st.markdown(f"**{jogador.get('nacionalidade', '🇧🇷')}**")
+        st.markdown(f"**{jogador.get('nome', 'Sem nome')}**")
+        st.markdown(f"🌍 {jogador.get('nacionalidade', 'Desconhecida')}")
 
     with col3:
-        st.markdown(f"**Posição:** {jogador['posicao']}")
-
+        st.markdown(f"📌 {jogador.get('posicao', '-')}")
+    
     with col4:
-        st.markdown(f"**Overall:** {jogador['overall']}")
+        st.markdown(f"⭐ {jogador.get('overall', '-')}")
 
     with col5:
-        st.markdown("**Valor:** R$ {:,.0f}".format(jogador["valor"]).replace(",", "."))
+        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
         origem = jogador.get("origem", "Desconhecida")
-        st.markdown(f"**Origem:** {origem}")
+        st.markdown(f"💰 **{valor_formatado}**")
+        st.markdown(f"🏟️ {origem}")
 
     with col6:
-        if st.button(f"Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+        if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # Remove jogador do elenco
+                # 🗑️ Remover jogador do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Insere no mercado com valor cheio
+                # 🛒 Inserir no mercado com valor cheio
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -71,6 +79,7 @@ for jogador in jogadores:
                     "origem": origem
                 }).execute()
 
+                # 💰 Registrar movimentação
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
@@ -81,11 +90,12 @@ for jogador in jogadores:
                 )
 
                 st.success(f"{jogador['nome']} foi vendido para o mercado com sucesso.")
-                st.experimental_rerun()
+                st.rerun()
 
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
 
 st.markdown("---")
-st.button("🔄 Atualizar", on_click=st.experimental_rerun)
+st.button("🔄 Atualizar", on_click=st.rerun)
+
 
