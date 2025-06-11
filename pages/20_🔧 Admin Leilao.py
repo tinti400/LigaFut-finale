@@ -7,17 +7,17 @@ import pytz
 st.set_page_config(page_title="🔧 Admin Leilão - LigaFut", layout="wide")
 st.title("🔧 Administração de Leilão")
 
-# Conexão com Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# Verifica login do admin
-if "usuario_id" not in st.session_state or st.session_state.get("tipo") != "admin":
+# ✅ Verifica login do admin usando o campo booleano "administrador"
+if "usuario_id" not in st.session_state or not st.session_state.get("administrador", False):
     st.warning("Acesso restrito ao administrador.")
     st.stop()
 
-# Campos para criar leilão
+# 📦 Campos para criar novo leilão
 st.subheader("📦 Criar novo leilão")
 nome_jogador = st.text_input("Nome do jogador")
 posicao_jogador = st.selectbox("Posição", [
@@ -31,12 +31,13 @@ duracao_minutos = st.number_input("Duração do leilão (em minutos)", min_value
 id_time = st.text_input("ID do time vendedor")
 nome_time = st.text_input("Nome do time vendedor")
 
+# 🚀 Botão para criar leilão
 if st.button("🚀 Criar Leilão"):
     try:
         agora = datetime.now(pytz.timezone("America/Sao_Paulo"))
         fim = agora + timedelta(minutes=duracao_minutos)
 
-        res = supabase.table("leiloes").insert({
+        supabase.table("leiloes").insert({
             "nome_jogador": nome_jogador,
             "posicao_jogador": posicao_jogador,
             "overall_jogador": overall_jogador,
@@ -53,7 +54,7 @@ if st.button("🚀 Criar Leilão"):
     except Exception as e:
         st.error(f"Erro ao criar leilão: {e}")
 
-# Lista de leilões ativos
+# 📋 Lista de leilões criados
 st.subheader("📋 Leilões criados")
 res_leiloes = supabase.table("leiloes").select("*").order("fim", desc=True).execute()
 leiloes = res_leiloes.data if res_leiloes.data else []
@@ -75,4 +76,5 @@ for leilao in leiloes:
                 supabase.table("leiloes").update({"ativo": False}).eq("id", leilao["id"]).execute()
                 st.warning("Leilão desativado.")
                 st.experimental_rerun()
+
 
