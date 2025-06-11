@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -37,6 +36,9 @@ with st.form("novo_leilao"):
     valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100_000, step=50_000)
     incremento = st.number_input("Incremento mínimo (R$)", min_value=100_000, step=50_000, value=3_000_000)
     duracao = st.slider("Duração (min)", 1, 10, value=2)
+    origem = st.text_input("Origem do Jogador (ex: Real Madrid)")
+    nacionalidade = st.text_input("Nacionalidade (ex: Brasil)")
+    imagem_url = st.text_input("URL da Imagem do Jogador (opcional)")
     botao = st.form_submit_button("Adicionar à Fila")
 
     if botao and nome:
@@ -50,7 +52,10 @@ with st.form("novo_leilao"):
             "inicio": None,
             "fim": None,
             "ativo": False,
-            "finalizado": False
+            "finalizado": False,
+            "origem": origem,
+            "nacionalidade": nacionalidade,
+            "imagem_url": imagem_url
         }
         supabase.table("leiloes").insert(novo).execute()
         st.success("✅ Jogador adicionado à fila.")
@@ -64,6 +69,11 @@ if ativo:
     st.markdown(f"**Jogador:** {ativo['nome_jogador']}")
     st.markdown(f"**Posição:** {ativo['posicao_jogador']}")
     st.markdown(f"**Valor Atual:** R$ {ativo['valor_atual']:,.0f}".replace(",", "."))
+    st.markdown(f"**Origem:** {ativo.get('origem', 'Desconhecida')}")
+    st.markdown(f"**Nacionalidade:** {ativo.get('nacionalidade', 'Desconhecida')}")
+
+    if ativo.get("imagem_url"):
+        st.image(ativo["imagem_url"], width=200)
 
     fim = datetime.fromisoformat(ativo["fim"])
     restante = fim - datetime.utcnow()
@@ -87,6 +97,3 @@ else:
         st.experimental_rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
-
-
-
