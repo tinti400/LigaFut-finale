@@ -11,44 +11,60 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.markdown("<h1 style='text-align:center; color:#C0392B;'>📜 Histórico de Punições</h1>", unsafe_allow_html=True)
-st.markdown("---")
+import streamlit as st
+import pandas as pd
+from supabase import create_client
+from datetime import datetime
 
-# 📦 Carregar punições
+st.set_page_config(page_title="📜 Histórico de Punições", layout="wide")
+st.title("📜 Histórico de Punições Aplicadas")
+
+# 🔐 Supabase
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
+
+# 🔍 Carregar punições
 res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
-punicoes = res.data if res.data else []
+punicoes = res.data or []
 
-dados_formatados = []
+# 🔄 Processar dados
+tabela = []
 for p in punicoes:
     try:
-        tipo = p.get("tipo") or ""
-        tipo_formatado = tipo.capitalize() if isinstance(tipo, str) else "Desconhecido"
+        tipo = p.get("tipo", "").capitalize()
+        motivo = p.get("motivo", "-")
+        data = p.get("data", "")[:10]
+        valor = p.get("valor") or 0
+        pontos = p.get("pontos") or 0
+        time_id = p.get("id_time")
 
-        if tipo == "financeira":
-            penalidade = f"- R$ {int(p.get('valor', 0)):,}".replace(",", ".")
-        elif tipo == "pontuacao":
-            penalidade = f"- {int(p.get('pontos', 0))} pts"
-        else:
-            penalidade = "-"
+        # Buscar nome do time
+        res_time = supabase.table("times").select("nome").eq("id", time_id).limit(1).execute()
+        nome_time = res_time.data[0]["nome"] if res_time.data else "Desconhecido"
 
-        dados_formatados.append({
-            "🏷️ Time": p.get("nome_time", "Desconhecido"),
-            "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
-            "🚫 Tipo": tipo_formatado,
-            "✏️ Motivo": p.get("motivo", "-"),
-            "💥 Penalidade": penalidade
+        penalidade = f"R$ -{int(valor):,}".replace(",", ".") if tipo.lower() == "financeira" else f"-{pontos} pts"
+
+        tabela.append({
+            "🛡️ Time": nome_time,
+            "📅 Data": data,
+            "📌 Motivo": motivo,
+            "🚫 Tipo": tipo,
+            "💸 Penalidade": penalidade
         })
     except Exception as e:
         st.error(f"Erro ao processar punição: {e}")
 
-# ✅ Exibição
-if dados_formatados:
-    df = pd.DataFrame(dados_formatados)
-    st.dataframe(df, use_container_width=True)
+# 💡 Mostrar tabela estilizada
+if tabela:
+    df = pd.DataFrame(tabela)
+    st.markdown(
+        f"""
+        <div style='overflow-x: auto; border-radius: 10px; border: 1px solid #CCC; padding: 10px; background-color: #f9f9f9'>
+            {df.to_html(index=False, escape=False)}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 else:
-    st.info("✅ Nenhuma punição registrada até o momento.")
-
-
-
-
-
+    st.info("Nenhuma punição registrada até o momento.")
