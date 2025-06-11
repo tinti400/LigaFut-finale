@@ -45,15 +45,19 @@ nome_jogador = leilao.get("nome_jogador", "Desconhecido")
 posicao_jogador = leilao.get("posicao_jogador", "-")
 overall_jogador = leilao.get("overall_jogador", "N/A")
 imagem_url = leilao.get("imagem_url", "")
+origem = leilao.get("origem", "Desconhecida")
+nacionalidade = leilao.get("nacionalidade", "Desconhecida")
 
 # ⏱️ Cronômetro
 fim_dt = datetime.fromisoformat(fim)
 tempo_restante = max(0, int((fim_dt - datetime.utcnow()).total_seconds()))
 minutos, segundos = divmod(tempo_restante, 60)
 
-# 📸 Exibir imagem do jogador, se houver
+# 🖼️ Exibir imagem e info do jogador
 if imagem_url:
-    st.image(imagem_url, width=200)
+    st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+    st.image(imagem_url, width=220, caption=nome_jogador)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown(f"<h2 style='text-align:center'>⏳ Tempo restante: {minutos:02d}:{segundos:02d}</h2>", unsafe_allow_html=True)
 st.markdown("---")
@@ -64,12 +68,13 @@ with col2: st.subheader(nome_jogador)
 with col3: st.metric("⭐ Overall", overall_jogador)
 with col4: st.metric("💰 Lance Atual", f"R$ {valor_atual:,.0f}".replace(",", "."))
 
+st.markdown(f"🏳️ **Origem:** {origem} &nbsp;&nbsp;&nbsp;&nbsp; 🌍 **Nacionalidade:** {nacionalidade}")
+st.markdown("---")
+
 # 🏧 Último lance
 if id_time_vencedor:
     nome_time = supabase.table("times").select("nome").eq("id", id_time_vencedor).execute().data[0]["nome"]
     st.info(f"🏷️ Último Lance: {nome_time}")
-
-st.markdown("---")
 
 # ⏹️ Finalização automática
 if tempo_restante == 0:
