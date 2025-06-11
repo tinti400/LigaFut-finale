@@ -86,6 +86,9 @@ if st.button("✅ Aplicar Punição"):
 
             st.success(f"💰 Multa de R$ {valor:,.0f} aplicada ao time {nome_escolhido}.".replace(",", "."))
 
+    except Exception as e:
+        st.error(f"Erro ao aplicar punição: {e}")
+
 # 🧱 Seção de restrições
 st.markdown("---")
 st.subheader("🚫 Restrições de Acesso do Time")
