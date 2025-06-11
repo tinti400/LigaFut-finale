@@ -96,11 +96,6 @@ if tempo_restante == 0:
 
         supabase.table("elenco").insert(jogador).execute()
 
-        saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
-        saldo = saldo_ref.data[0]["saldo"]
-        novo_saldo = saldo - valor_atual
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
-
         registrar_movimentacao(
             id_time=id_time_vencedor,
             jogador=nome_jogador,
@@ -149,4 +144,3 @@ if tempo_restante > 0:
 st.markdown("---")
 if st.button("🔄 Atualizar"):
     st.experimental_rerun()
-
