@@ -4,7 +4,7 @@ from supabase import create_client
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="📜 Histórico de Punições", layout="wide")
+st.set_page_config(page_title="Histórico de Punições - LigaFut", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -13,34 +13,35 @@ supabase = create_client(url, key)
 
 st.title("📜 Histórico de Punições")
 
-# 🚨 Carregar punições
+# Carregar punições
 res = supabase.table("punicoes").select("*").order("data", desc=True).execute()
-punicoes = res.data
+punicoes = res.data if res.data else []
 
-if not punicoes:
-    st.warning("Nenhuma punição registrada.")
-    st.stop()
-
-# 📊 Formatando os dados
-linhas = []
+# Organizar dados
+dados_formatados = []
 for p in punicoes:
-    tipo = str(p.get("tipo", "")).lower()
-    valor_ou_pontos = "-"
-    if tipo == "financeira":
-        valor_ou_pontos = f"-{int(p.get('valor', 0))}"
-    elif tipo == "pontuacao":
-        valor_ou_pontos = f"-{int(p.get('pontos', 0))}"
+    try:
+        valor = None
+        if p.get("tipo") == "financeira":
+            valor = f"R$ {int(p.get('valor', 0)):,}".replace(",", ".")
+        elif p.get("tipo") == "pontuacao":
+            valor = f"-{int(p.get('pontos', 0))} pts"
 
-    linhas.append({
-        "📅 Data": datetime.fromisoformat(p.get("data", datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M"),
-        "🏷️ Time": p.get("nome_time", "Desconhecido"),
-        "🚫 Tipo": tipo.capitalize(),
-        "💬 Motivo": p.get("motivo", "-"),
-        "🧮 Valor/Pontos": valor_ou_pontos
-    })
+        dados_formatados.append({
+            "🏷️ Time": p.get("nome_time", "Desconhecido"),
+            "📅 Data": datetime.fromisoformat(p["data"]).strftime("%d/%m/%Y %H:%M") if p.get("data") else "",
+            "🚫 Tipo": p.get("tipo", "").capitalize(),
+            "✏️ Motivo": p.get("motivo", "-"),
+            "🧮 Valor/Pontos": valor or "-"
+        })
+    except Exception as e:
+        st.error(f"Erro ao processar punição: {e}")
 
-df = pd.DataFrame(linhas)
+df = pd.DataFrame(dados_formatados)
 
 # 📋 Exibir em tabela
-st.dataframe(df, use_container_width=True)
+if not df.empty:
+    st.dataframe(df)
+else:
+    st.warning("Nenhuma punição registrada até o momento.")
 
