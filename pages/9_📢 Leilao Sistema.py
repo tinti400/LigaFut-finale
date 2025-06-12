@@ -82,17 +82,27 @@ if id_time_vencedor:
 
 # ⏹️ Marcar leilão como aguardando validação
 if tempo_restante == 0:
-    leilao_atualizado = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
-    if leilao_atualizado.data and not leilao_atualizado.data[0]["finalizado"] and not leilao_atualizado.data[0].get("validado", False):
+    try:
+        leilao_atualizado = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
+        
+        if leilao_atualizado.data:
+            finalizado = leilao_atualizado.data[0].get("finalizado", False)
+            validado = leilao_atualizado.data[0].get("validado", False)
 
-        supabase.table("leiloes").update({
-            "ativo": False,
-            "aguardando_validacao": True
-        }).eq("id", leilao["id"]).execute()
+            if not finalizado and not validado:
+                supabase.table("leiloes").update({
+                    "ativo": False,
+                    "aguardando_validacao": True
+                }).eq("id", leilao["id"]).execute()
 
-        st.success("✅ Leilão finalizado! Aguardando validação do administrador.")
-    else:
-        st.info("⏳ Leilão já finalizado ou validado.")
+                st.success("✅ Leilão finalizado! Aguardando validação do administrador.")
+            else:
+                st.info("⏳ Leilão já finalizado ou validado.")
+        else:
+            st.warning("❌ Não foi possível encontrar dados do leilão.")
+
+    except Exception as e:
+        st.error(f"Erro ao verificar status do leilão: {e}")
 
     st.stop()
 
@@ -124,8 +134,8 @@ if tempo_restante > 0:
                     }).eq("id", leilao["id"]).execute()
 
                     st.success("✅ Lance enviado com sucesso!")
-                    st.rerun()
+                    st.experimental_rerun()
 
 st.markdown("---")
 if st.button("🔄 Atualizar"):
-    st.rerun()
+    st.experimental_rerun()
