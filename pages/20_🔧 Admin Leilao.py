@@ -107,22 +107,30 @@ else:
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
-# 📅 Aprovação manual pós-finalização
-finalizados = supabase.table("leiloes").select("*") \
-    .eq("finalizado", True).eq("enviado_bid", False) \
+# 📄 Leilões Finalizados Pendentes de Aprovação (somente os 2 últimos)
+finalizados = supabase.table("leiloes") \
+    .select("*") \
+    .eq("finalizado", True) \
+    .eq("enviado_bid", False) \
+    .order("fim", desc=True) \
+    .limit(2) \
     .execute()
 
 if finalizados.data:
     st.subheader("📄 Leilões Finalizados Pendentes de Aprovação")
     for item in finalizados.data:
-        st.markdown(f"**{item['nome_jogador']}** ({item['posicao_jogador']}) - R$ {item['valor_atual']:,.0f}".replace(",", "."))
-        if st.button(f"✅ Enviar {item['nome_jogador']} ao BID", key=f"enviar_{item['id']}"):
+        nome = item.get("nome_jogador") or "Jogador sem nome"
+        posicao = item.get("posicao_jogador") or "Posição indefinida"
+        valor = item.get("valor_atual", 0)
+
+        st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
+        if st.button(f"✅ Enviar {nome} ao BID", key=f"enviar_{item['id']}"):
             try:
                 jogador = {
-                    "nome": item["nome_jogador"],
-                    "posicao": item["posicao_jogador"],
+                    "nome": nome,
+                    "posicao": posicao,
                     "overall": item["overall_jogador"],
-                    "valor": item["valor_atual"],
+                    "valor": valor,
                     "id_time": item["id_time_atual"],
                     "origem": item.get("origem", ""),
                     "nacionalidade": item.get("nacionalidade", ""),
@@ -132,16 +140,32 @@ if finalizados.data:
 
                 registrar_movimentacao(
                     id_time=item["id_time_atual"],
-                    jogador=item["nome_jogador"],
+                    jogador=nome,
                     tipo="leilao",
                     categoria="compra",
-                    valor=item["valor_atual"],
+                    valor=valor,
                     origem=item.get("origem", ""),
                     destino=None
                 )
 
                 supabase.table("leiloes").update({"enviado_bid": True}).eq("id", item["id"]).execute()
-                st.success(f"✅ {item['nome_jogador']} foi adicionado ao elenco com sucesso!")
+                st.success(f"✅ {nome} foi adicionado ao elenco com sucesso!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao enviar ao BID: {e}")
+
+# 🗑️ Botão para limpar histórico de leilões já enviados ao BID
+st.markdown("---")
+st.subheader("🧨 Limpar Histórico de Leilões Enviados ao BID")
+
+if st.button("🧹 Apagar Histórico de Leilões Enviados"):
+    try:
+        supabase.table("leiloes") \
+            .delete() \
+            .eq("finalizado", True) \
+            .eq("enviado_bid", True) \
+            .execute()
+        st.success("🧹 Histórico apagado com sucesso!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro ao apagar histórico: {e}")
