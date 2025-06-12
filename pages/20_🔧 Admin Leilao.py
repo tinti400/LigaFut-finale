@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime, timedelta
+from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Admin - Leilões em Fila", layout="wide")
 
@@ -61,7 +62,8 @@ with st.form("novo_leilao"):
             "finalizado": False,
             "origem": origem,
             "nacionalidade": nacionalidade,
-            "imagem_url": imagem_url
+            "imagem_url": imagem_url,
+            "enviado_bID": False
         }
         supabase.table("leiloes").insert(novo).execute()
         st.success("✅ Jogador adicionado à fila.")
@@ -83,9 +85,11 @@ if ativo:
 
     fim = datetime.fromisoformat(ativo["fim"])
     restante = fim - datetime.utcnow()
+
     if restante.total_seconds() <= 0:
         supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", ativo["id"]).execute()
         st.info("⏱️ Leilão finalizado automaticamente.")
+        st.experimental_rerun()
     else:
         st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
 else:
@@ -97,13 +101,50 @@ else:
         supabase.table("leiloes").update({
             "ativo": True,
             "inicio": agora.isoformat(),
-            "fim": fim.isoformat(),
-            "imagem_url": leilao.get("imagem_url"),
-            "origem": leilao.get("origem"),
-            "nacionalidade": leilao.get("nacionalidade")
+            "fim": fim.isoformat()
         }).eq("id", leilao["id"]).execute()
         st.success("✅ Novo leilão iniciado automaticamente.")
         st.experimental_rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
+# ✅ Validação manual após finalização
+finalizados = supabase.table("leiloes").select("*").eq("finalizado", True).eq("enviado_bID", False).order("id").execute()
+if finalizados.data:
+    st.subheader("📤 Leilões Finalizados Pendentes de Aprovação")
+    for item in finalizados.data:
+        st.markdown(f"**{item['nome_jogador']}** ({item['posicao_jogador']}) - R$ {item['valor_atual']:,.0f}".replace(",", "."))
+        if st.button(f"✅ Enviar {item['nome_jogador']} ao BID", key=f"enviar_{item['id']}"):
+            try:
+                jogador = {
+                    "nome": item["nome_jogador"],
+                    "posicao": item["posicao_jogador"],
+                    "overall": item["overall_jogador"],
+                    "valor": item["valor_atual"],
+                    "id_time": item["id_time_atual"],
+                    "origem": item.get("origem", ""),
+                    "nacionalidade": item.get("nacionalidade", ""),
+                    "imagem_url": item.get("imagem_url", "")
+                }
+                supabase.table("elenco").insert(jogador).execute()
+
+                saldo_ref = supabase.table("times").select("saldo").eq("id", item["id_time_atual"]).execute()
+                saldo = saldo_ref.data[0]["saldo"]
+                novo_saldo = saldo - item["valor_atual"]
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", item["id_time_atual"]).execute()
+
+                registrar_movimentacao(
+                    id_time=item["id_time_atual"],
+                    jogador=item["nome_jogador"],
+                    tipo="leilao",
+                    categoria="compra",
+                    valor=item["valor_atual"],
+                    origem=item.get("origem", ""),
+                    destino=None
+                )
+
+                supabase.table("leiloes").update({"enviado_bID": True}).eq("id", item["id"]).execute()
+                st.success(f"✅ {item['nome_jogador']} foi adicionado ao elenco com sucesso!")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao enviar ao BID: {e}")

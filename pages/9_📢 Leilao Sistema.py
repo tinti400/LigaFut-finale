@@ -80,35 +80,20 @@ if id_time_vencedor:
     nome_time = supabase.table("times").select("nome").eq("id", id_time_vencedor).execute().data[0]["nome"]
     st.info(f"🏷️ Último Lance: {nome_time}")
 
-# ⏹️ Finalização automática
+# ⏹️ Marcar leilão como aguardando validação
 if tempo_restante == 0:
-    if id_time_vencedor:
-        jogador = {
-            "nome": nome_jogador,
-            "posicao": posicao_jogador,
-            "overall": overall_jogador,
-            "valor": valor_atual,
-            "id_time": id_time_vencedor,
-            "origem": origem,
-            "nacionalidade": nacionalidade,
-            "imagem_url": imagem_url
-        }
+    leilao_atualizado = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
+    if leilao_atualizado.data and not leilao_atualizado.data[0]["finalizado"] and not leilao_atualizado.data[0].get("validado", False):
 
-        supabase.table("elenco").insert(jogador).execute()
+        supabase.table("leiloes").update({
+            "ativo": False,
+            "aguardando_validacao": True
+        }).eq("id", leilao["id"]).execute()
 
-        registrar_movimentacao(
-            id_time=id_time_vencedor,
-            jogador=nome_jogador,
-            tipo="leilao",
-            categoria="compra",
-            valor=valor_atual,
-            origem=origem,
-            destino=None
-        )
+        st.success("✅ Leilão finalizado! Aguardando validação do administrador.")
+    else:
+        st.info("⏳ Leilão já finalizado ou validado.")
 
-        st.success(f"✅ {nome_jogador} foi arrematado por {nome_time} por R$ {valor_atual:,.0f}!".replace(",", "."))
-
-    supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", leilao["id"]).execute()
     st.stop()
 
 # 📢 Dar lances
@@ -139,8 +124,8 @@ if tempo_restante > 0:
                     }).eq("id", leilao["id"]).execute()
 
                     st.success("✅ Lance enviado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
 
 st.markdown("---")
 if st.button("🔄 Atualizar"):
-    st.experimental_rerun()
+    st.rerun()
