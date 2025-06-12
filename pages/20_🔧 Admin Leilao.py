@@ -10,6 +10,16 @@ st.set_page_config(page_title="Admin - Leilões em Fila", layout="wide")
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
+# -*- coding: utf-8 -*-
+import streamlit as st
+from supabase import create_client
+from datetime import datetime, timedelta
+from utils import registrar_movimentacao
+
+# 🔐 Conexão com Supabase
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -89,7 +99,7 @@ if ativo:
     if restante.total_seconds() <= 0:
         supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", ativo["id"]).execute()
         st.info("⏱️ Leilão finalizado automaticamente.")
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
 else:
@@ -104,7 +114,7 @@ else:
             "fim": fim.isoformat()
         }).eq("id", leilao["id"]).execute()
         st.success("✅ Novo leilão iniciado automaticamente.")
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
@@ -145,6 +155,7 @@ if finalizados.data:
 
                 supabase.table("leiloes").update({"enviado_bID": True}).eq("id", item["id"]).execute()
                 st.success(f"✅ {item['nome_jogador']} foi adicionado ao elenco com sucesso!")
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao enviar ao BID: {e}")
+
