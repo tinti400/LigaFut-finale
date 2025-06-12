@@ -62,7 +62,9 @@ with st.form("novo_leilao"):
             "origem": origem,
             "nacionalidade": nacionalidade,
             "imagem_url": imagem_url,
-            "enviado_bid": False
+            "enviado_bid": False,
+            "validado": False,
+            "aguardando_validacao": False
         }
         supabase.table("leiloes").insert(novo).execute()
         st.success("✅ Jogador adicionado à fila.")
@@ -86,9 +88,9 @@ if ativo:
     restante = fim - datetime.utcnow()
 
     if restante.total_seconds() <= 0:
-        supabase.table("leiloes").update({"ativo": False, "finalizado": True}).eq("id", ativo["id"]).execute()
-        st.info("⏱️ Leilão finalizado automaticamente.")
-        st.rerun()
+        supabase.table("leiloes").update({"ativo": False, "aguardando_validacao": True}).eq("id", ativo["id"]).execute()
+        st.info("⏱️ Leilão marcado como aguardando validação.")
+        st.experimental_rerun()
     else:
         st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
 else:
@@ -103,28 +105,28 @@ else:
             "fim": fim.isoformat()
         }).eq("id", leilao["id"]).execute()
         st.success("✅ Novo leilão iniciado automaticamente.")
-        st.rerun()
+        st.experimental_rerun()
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
-# 📄 Leilões Finalizados Pendentes de Aprovação (somente os 2 últimos)
-finalizados = supabase.table("leiloes") \
+# 📄 Leilões aguardando validação do administrador
+pendentes = supabase.table("leiloes") \
     .select("*") \
-    .eq("finalizado", True) \
-    .eq("enviado_bid", False) \
+    .eq("aguardando_validacao", True) \
+    .eq("validado", False) \
     .order("fim", desc=True) \
-    .limit(2) \
+    .limit(5) \
     .execute()
 
-if finalizados.data:
-    st.subheader("📄 Leilões Finalizados Pendentes de Aprovação")
-    for item in finalizados.data:
+if pendentes.data:
+    st.subheader("📄 Leilões Aguardando Validação do Administrador")
+    for item in pendentes.data:
         nome = item.get("nome_jogador") or "Jogador sem nome"
         posicao = item.get("posicao_jogador") or "Posição indefinida"
         valor = item.get("valor_atual", 0)
 
         st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
-        if st.button(f"✅ Enviar {nome} ao BID", key=f"enviar_{item['id']}"):
+        if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
             try:
                 jogador = {
                     "nome": nome,
@@ -148,11 +150,17 @@ if finalizados.data:
                     destino=None
                 )
 
-                supabase.table("leiloes").update({"enviado_bid": True}).eq("id", item["id"]).execute()
-                st.success(f"✅ {nome} foi adicionado ao elenco com sucesso!")
-                st.rerun()
+                supabase.table("leiloes").update({
+                    "validado": True,
+                    "finalizado": True,
+                    "enviado_bid": True,
+                    "aguardando_validacao": False
+                }).eq("id", item["id"]).execute()
+
+                st.success(f"✅ {nome} foi validado e adicionado ao elenco com sucesso!")
+                st.experimental_rerun()
             except Exception as e:
-                st.error(f"Erro ao enviar ao BID: {e}")
+                st.error(f"Erro ao validar o leilão: {e}")
 
 # 🗑️ Botão para limpar histórico de leilões já enviados ao BID
 st.markdown("---")
@@ -166,6 +174,7 @@ if st.button("🧹 Apagar Histórico de Leilões Enviados"):
             .eq("enviado_bid", True) \
             .execute()
         st.success("🧹 Histórico apagado com sucesso!")
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.error(f"Erro ao apagar histórico: {e}")
+
