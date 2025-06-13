@@ -42,7 +42,7 @@ with st.expander("📥 Importar jogadores via planilha (.xlsx)"):
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
             st.success("✅ Jogadores importados com sucesso!")
-            st.rerun()
+            st.experimental_rerun()
         except Exception as e:
             st.error(f"Erro ao importar: {e}")
 
@@ -104,11 +104,11 @@ if elenco:
                     )
 
                     st.success(f"{jogador['nome']} foi vendido por R$ {valor_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                    st.rerun()
+                    st.experimental_rerun()
         with col6:
             if eh_admin and st.button("🗑️", key=f"del_{jogador['id']}"):
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
                 st.success(f"Jogador {jogador['nome']} excluído do elenco.")
-                st.rerun()
+                st.experimental_rerun()
 else:
     st.info("Nenhum jogador no elenco ainda.")
