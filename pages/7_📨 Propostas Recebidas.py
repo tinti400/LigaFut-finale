@@ -17,6 +17,15 @@ nome_time = st.session_state["nome_time"]
 count_recebidas = supabase.table("propostas").select("*").eq("destino_id", id_time).eq("status", "pendente").execute()
 notificacoes_recebidas = len(count_recebidas.data) if count_recebidas.data else 0
 
+# 🔔 Sidebar com contador
+with st.sidebar:
+    if notificacoes_recebidas > 0:
+        st.markdown(f"""
+        <span style='color:white;background:red;padding:4px 10px;border-radius:50%;font-size:14px'>
+        {notificacoes_recebidas}</span> 🔔 Propostas Recebidas
+        """, unsafe_allow_html=True)
+
+# 🔰 Título principal com badge
 st.markdown(f"""
 <h3>📨 Propostas Recebidas - {nome_time}
 <span style='color:white;background:red;padding:2px 8px;border-radius:50%;margin-left:10px;'>{notificacoes_recebidas}</span>
@@ -78,7 +87,11 @@ else:
                         registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
 
                     supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
-                    supabase.table("propostas").update({"status": "cancelada"})                         .eq("jogador_nome", jogador_nome)                         .eq("destino_id", id_time)                         .eq("status", "pendente")                         .neq("id", proposta["id"]).execute()
+                    supabase.table("propostas").update({"status": "cancelada"}) \
+                        .eq("jogador_nome", jogador_nome) \
+                        .eq("destino_id", id_time) \
+                        .eq("status", "pendente") \
+                        .neq("id", proposta["id"]).execute()
 
                     st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
                     st.experimental_rerun()
