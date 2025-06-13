@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 from datetime import datetime
+import random
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -15,17 +16,12 @@ st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut</h1><hr>", unsa
 # 🔄 Buscar times
 def buscar_times():
     res = supabase.table("times").select("id, nome, logo").execute()
-    return {
-        item["id"]: {"nome": item["nome"], "escudo_url": item.get("logo", "")}
-        for item in res.data
-    }
+    return {item["id"]: {"nome": item["nome"], "escudo_url": item.get("logo", "")} for item in res.data}
 
 # 🔄 Buscar data mais recente
 def buscar_data_mais_recente():
     res = supabase.table("copa_ligafut").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
-    if res.data:
-        return res.data[0]["data_criacao"]
-    return None
+    return res.data[0]["data_criacao"] if res.data else None
 
 # 🔄 Buscar fase
 def buscar_fase(fase, data):
@@ -63,7 +59,7 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 📊 Classificação
+# 📊 Classificação dos grupos
 def calcular_classificacao(jogos):
     tabela = {}
     for jogo in jogos:
@@ -86,12 +82,11 @@ def calcular_classificacao(jogos):
         tabela[t]["SG"] = tabela[t]["GP"] - tabela[t]["GC"]
     df = pd.DataFrame.from_dict(tabela, orient="index")
     df["Time"] = df.index.map(lambda x: times[x]["nome"] if x in times else x)
-    df["Logo"] = df.index.map(lambda x: f"<img src='{times[x]['escudo_url']}' width='20'>" if x in times else "")
-    df = df[["Time", "Logo", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
+    df = df[["Time", "P", "J", "V", "E", "D", "GP", "GC", "SG"]]
     df = df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
     return df
 
-# 📋 Exibição por fase
+# 📋 Mostrar jogos por fase
 def exibir_fase_mata(nome, dados, col):
     with col:
         st.markdown(f"### {nome}")
@@ -99,61 +94,36 @@ def exibir_fase_mata(nome, dados, col):
             for jogo in rodada.get("jogos", []):
                 exibir_card(jogo)
 
-# 🔁 Coleta de dados
-times = buscar_times()
-data_atual = buscar_data_mais_recente()
-grupos = buscar_grupos(data_atual)
-oitavas = buscar_fase("oitavas", data_atual)
-quartas = buscar_fase("quartas", data_atual)
-semis = buscar_fase("semifinal", data_atual)
-final = buscar_fase("final", data_atual)
+# ⚙️ Funções auxiliares para mata-mata ida/volta
+def criar_jogos_ida_volta(classificados):
+    random.shuffle(classificados)
+    jogos = []
+    for i in range(0, len(classificados), 2):
+        a, b = classificados[i], classificados[i+1]
+        jogos.append({"mandante": a, "visitante": b, "gols_mandante": None, "gols_visitante": None})
+        jogos.append({"mandante": b, "visitante": a, "gols_mandante": None, "gols_visitante": None})
+    return jogos
 
-# ✅ Organização dos grupos
-grupos_por_nome = {}
-for g in grupos:
-    nome = g.get("grupo", "?")
-    if nome not in grupos_por_nome:
-        grupos_por_nome[nome] = []
-    grupos_por_nome[nome].extend(g.get("jogos", []))
+def obter_vencedores_ida_volta(jogos):
+    confrontos = {}
+    for jogo in jogos:
+        chave = frozenset([jogo["mandante"], jogo["visitante"]])
+        confrontos.setdefault(chave, []).append(jogo)
 
-# 📈 Classificação no topo
-st.subheader("📈 Classificação dos Grupos")
-for grupo, jogos in sorted(grupos_por_nome.items()):
-    st.markdown(f"#### {grupo}")
-    df = calcular_classificacao(jogos)
-    def estilo(row): return ['background-color: #d4edda'] * len(row) if row.name < 4 else [''] * len(row)
-    st.markdown(df.style.apply(estilo, axis=1).to_html(escape=False, index=False), unsafe_allow_html=True)
+    vencedores = []
+    for chave, partidas in confrontos.items():
+        if len(partidas) != 2:
+            return None
+        g1 = partidas[0]; g2 = partidas[1]
+        if None in [g1["gols_mandante"], g1["gols_visitante"], g2["gols_mandante"], g2["gols_visitante"]]:
+            return None
+        time1 = g1["mandante"]
+        time2 = g1["visitante"]
+        gols1 = g1["gols_mandante"] + g2["gols_visitante"]
+        gols2 = g1["gols_visitante"] + g2["gols_mandante"]
+        vencedor = time1 if gols1 > gols2 else time2
+        vencedores.append(vencedor)
+    return vencedores
 
-# 🏁 Fase Mata-Mata
-st.markdown("<hr>", unsafe_allow_html=True)
-st.subheader("🏁 Fase Mata-Mata")
-col1, col2, col3, col4 = st.columns(4)
-exibir_fase_mata("Oitavas", oitavas, col1)
-exibir_fase_mata("Quartas", quartas, col2)
-exibir_fase_mata("Semifinal", semis, col3)
-exibir_fase_mata("Final", final, col4)
-
-# 📅 Jogos e placares
-st.markdown("<hr>", unsafe_allow_html=True)
-st.subheader("📅 Jogos por Grupo")
-cols = st.columns(4)
-for idx, (grupo, jogos) in enumerate(sorted(grupos_por_nome.items())):
-    with cols[idx % 4]:
-        st.markdown(f"### {grupo}")
-        for jogo in jogos:
-            exibir_card(jogo)
-
-# 🏆 Campeão
-st.markdown("### 🏆 Campeão")
-if final and final[0].get("jogos"):
-    jogo_final = final[0]["jogos"][0]
-    gm = jogo_final.get("gols_mandante")
-    gv = jogo_final.get("gols_visitante")
-    if gm is not None and gv is not None:
-        vencedor_id = jogo_final["mandante"] if gm > gv else jogo_final["visitante"]
-        vencedor = times.get(vencedor_id, {"nome": "?"})
-        st.success(f"🏆 Campeão: **{vencedor['nome']}**")
-    else:
-        st.info("Final ainda sem placar.")
-else:
-    st.info("Final ainda não cadastrada.")
+# ✅ Continuação do app: carregamento de dados, exibição dos grupos, botões para avançar fases e definição do campeão...
+# (continue daqui no seu projeto com os blocos que já usava para mostrar classificação e usar essas funções novas nas fases do mata-mata)
