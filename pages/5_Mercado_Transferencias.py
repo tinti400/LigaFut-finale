@@ -79,13 +79,13 @@ inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
 jogadores_pagina = jogadores_filtrados[inicio:fim]
 
-# 🛒 Exibição
-st.title("📈 Mercado de Transferências")
-st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
-
 # 🔍 Verifica quantidade atual do elenco
 res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
 qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
+
+# 🛒 Exibição
+st.title("📈 Mercado de Transferências")
+st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
 for jogador in jogadores_pagina:
     col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
@@ -107,7 +107,6 @@ for jogador in jogadores_pagina:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
-                        # 1. Adiciona ao elenco
                         supabase.table("elenco").insert({
                             "nome": jogador["nome"],
                             "posicao": jogador["posicao"],
@@ -116,10 +115,8 @@ for jogador in jogadores_pagina:
                             "id_time": id_time
                         }).execute()
 
-                        # 2. Remove do mercado
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                        # 3. Registra movimentação
                         registrar_movimentacao(
                             id_time=id_time,
                             jogador=jogador["nome"],
@@ -132,24 +129,37 @@ for jogador in jogadores_pagina:
 
                         st.success(f"{jogador['nome']} comprado com sucesso!")
                         st.experimental_rerun()
-
                     except Exception as e:
                         st.error(f"Erro ao comprar jogador: {e}")
 
-    # ✏️ Botão de edição (somente admin)
+    # ✏️ Edição e exclusão apenas para admins
     if is_admin:
-        with st.expander(f"✏️ Editar valor de {jogador['nome']}"):
+        with st.expander(f"⚙️ Opções administrativas - {jogador['nome']}"):
             novo_valor = st.number_input(
-                "Novo valor (R$)", min_value=0, value=jogador["valor"],
-                step=100000, format="%d", key=f"valor_{jogador['id']}"
+                "✏️ Novo valor (R$)",
+                min_value=0,
+                value=jogador["valor"],
+                step=100000,
+                format="%d",
+                key=f"novo_valor_{jogador['id']}"
             )
-            if st.button("💾 Salvar novo valor", key=f"salvar_valor_{jogador['id']}"):
-                try:
-                    supabase.table("mercado_transferencias").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
-                    st.success("✅ Valor atualizado com sucesso!")
-                    st.experimental_rerun()
-                except Exception as e:
-                    st.error(f"Erro ao atualizar valor: {e}")
+            col_valor, col_excluir = st.columns(2)
+            with col_valor:
+                if st.button("💾 Salvar novo valor", key=f"salvar_valor_{jogador['id']}"):
+                    try:
+                        supabase.table("mercado_transferencias").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
+                        st.success("✅ Valor atualizado com sucesso!")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao atualizar valor: {e}")
+            with col_excluir:
+                if st.button("🗑️ Excluir do mercado", key=f"excluir_{jogador['id']}"):
+                    try:
+                        supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+                        st.success(f"Jogador {jogador['nome']} removido do mercado.")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir jogador: {e}")
 
 # 🔁 Navegação entre páginas
 col_nav1, col_nav2, col_nav3 = st.columns(3)
@@ -157,7 +167,6 @@ with col_nav1:
     if st.button("⬅ Página anterior") and pagina_atual > 1:
         st.session_state["pagina_mercado"] -= 1
         st.experimental_rerun()
-
 with col_nav3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
