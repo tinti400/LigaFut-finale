@@ -37,11 +37,12 @@ with st.expander("📥 Importar jogadores via planilha (.xlsx)"):
                     "nome": row["nome"],
                     "posicao": row["posição"],
                     "overall": int(row["overall"]),
-                    "valor": float(row["valor"]),
+                    "valor": int(float(row["valor"])),
                     "id_time": id_time
                 }
                 supabase.table("elenco").insert(jogador_data).execute()
             st.success("✅ Jogadores importados com sucesso!")
+            st.rerun()
         except Exception as e:
             st.error(f"Erro ao importar: {e}")
 
