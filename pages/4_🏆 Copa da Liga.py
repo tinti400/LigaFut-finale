@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 from datetime import datetime
+import random
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -168,3 +169,55 @@ if final and final[0].get("jogos"):
         st.info("Final ainda sem placar.")
 else:
     st.info("Final ainda não cadastrada.")
+
+# ⚔️ Avançar para o Mata-Mata (Sorteio)
+st.markdown("---")
+st.subheader("⚔️ Sorteio das Oitavas")
+
+if st.button("🔄 Avançar para o Mata-Mata (Sorteio)"):
+    classificados = []
+    for jogos in grupos_por_nome.values():
+        df = calcular_classificacao(jogos)
+        top4_ids = [idx for idx in df.index[:4]]
+        for i in top4_ids:
+            nome = df.loc[i, "Time"]
+            id_time = next((k for k, v in times.items() if v["nome"] == nome), None)
+            if id_time:
+                classificados.append(id_time)
+
+    if len(classificados) != 16:
+        st.error("Número de classificados diferente de 16. Verifique a fase de grupos.")
+        st.stop()
+
+    random.shuffle(classificados)
+    confrontos = []
+
+    for i in range(0, 16, 2):
+        time_a = classificados[i]
+        time_b = classificados[i + 1]
+
+        jogo_ida = {
+            "mandante": time_a,
+            "visitante": time_b,
+            "gols_mandante": None,
+            "gols_visitante": None
+        }
+        jogo_volta = {
+            "mandante": time_b,
+            "visitante": time_a,
+            "gols_mandante": None,
+            "gols_visitante": None
+        }
+
+        confrontos.extend([jogo_ida, jogo_volta])
+
+    data_hoje = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    supabase.table("copa_ligafut").insert({
+        "fase": "oitavas",
+        "data_criacao": data_hoje,
+        "jogos": confrontos
+    }).execute()
+
+    st.success("✅ Confrontos das oitavas sorteados e salvos com sucesso!")
+    st.experimental_rerun()
+
