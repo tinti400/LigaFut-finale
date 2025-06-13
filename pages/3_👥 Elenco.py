@@ -19,6 +19,11 @@ if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
 usuario_id = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state.get("nome_time", "")
+email_usuario = st.session_state.get("usuario", "")
+
+# ⚙️ Verifica se é admin
+res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+is_admin = len(res_admin.data) > 0
 
 st.title(f"👥 Elenco do {nome_time}")
 
@@ -30,11 +35,10 @@ saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
 
-# 🧮 Calcular estatísticas do elenco
+# Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 
-# 🎯 Exibir informações principais
 st.markdown(
     f"""
     <div style='text-align:center;'>
@@ -47,16 +51,33 @@ st.markdown(
 
 st.markdown("---")
 
-# 📤 Upload de planilha
-st.subheader("📥 Importar jogadores via planilha Excel")
+# 🔁 Atualizar botão
+st.button("🔄 Atualizar", on_click=st.experimental_rerun)
+
+# 🗑️ Botão para limpar elenco (ADM)
+if is_admin:
+    if st.button("🧹 Limpar elenco deste time"):
+        try:
+            supabase.table("elenco").delete().eq("id_time", id_time).execute()
+            st.success("Elenco limpo com sucesso!")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao limpar elenco: {e}")
+
+# 📥 Upload de planilha
+st.subheader("📤 Importar jogadores via planilha Excel")
 arquivo = st.file_uploader("Selecione um arquivo .xlsx com os jogadores", type=["xlsx"])
 
-if arquivo:
+if "planilha_importada" not in st.session_state:
+    st.session_state["planilha_importada"] = False
+
+if arquivo and not st.session_state["planilha_importada"]:
     try:
         df = pd.read_excel(arquivo)
         obrigatorios = {"nome", "posição", "overall", "valor"}
 
-        if not obrigatorios.issubset(set(df.columns.str.lower())):
+        colunas_arquivo = set(map(str.lower, df.columns))
+        if not obrigatorios.issubset(colunas_arquivo):
             st.error("A planilha deve conter as colunas: nome, posição, overall, valor.")
         else:
             for _, row in df.iterrows():
@@ -69,26 +90,19 @@ if arquivo:
                     "nacionalidade": row.get("nacionalidade", "Desconhecida"),
                     "origem": "Importado"
                 }).execute()
+
             st.success("✅ Jogadores importados com sucesso!")
+            st.session_state["planilha_importada"] = True
             st.experimental_rerun()
+
     except Exception as e:
         st.error(f"Erro ao importar: {e}")
-
-# 🧹 Limpar elenco (disponível para todos)
-if jogadores:
-    if st.button("🧹 Limpar elenco COMPLETO"):
-        try:
-            supabase.table("elenco").delete().eq("id_time", id_time).execute()
-            st.success("✅ Elenco limpo com sucesso!")
-            st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Erro ao limpar elenco: {e}")
 
 # 🧑‍💼 Exibir jogadores
 for jogador in jogadores:
     col1, col2, col3, col4, col5, col6 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2])
 
-    # Imagem do jogador (circular)
+    # Imagem
     with col1:
         imagem = jogador.get("imagem_url", "")
         if imagem:
@@ -118,10 +132,9 @@ for jogador in jogadores:
     with col6:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # Remover do elenco
+                # Remover
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-
-                # Adicionar no mercado
+                # Inserir no mercado
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -133,8 +146,7 @@ for jogador in jogadores:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": origem
                 }).execute()
-
-                # Registrar movimentação
+                # Movimentação
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
@@ -143,18 +155,7 @@ for jogador in jogadores:
                     categoria="venda",
                     destino="Mercado"
                 )
-
-                st.success(f"{jogador['nome']} foi vendido para o mercado com sucesso.")
+                st.success(f"{jogador['nome']} foi vendido com sucesso!")
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
-
-st.markdown("---")
-st.button("🔄 Atualizar", on_click=st.experimental_rerun)
-
-
-
-
-
-
-
