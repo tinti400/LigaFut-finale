@@ -14,6 +14,13 @@ supabase = create_client(url, key)
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
+# ✅ Verifica se o usuário é admin
+is_admin = False
+if "usuario" in st.session_state:
+    email_usuario = st.session_state["usuario"]
+    admin_check = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    is_admin = bool(admin_check.data)
+
 # 🔒 Verifica se o time está bloqueado no mercado
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
@@ -120,6 +127,21 @@ for jogador in jogadores_pagina:
 
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
+
+    # ✏️ Botão de edição (somente admin)
+    if is_admin:
+        with st.expander(f"✏️ Editar valor de {jogador['nome']}"):
+            novo_valor = st.number_input(
+                "Novo valor (R$)", min_value=0, value=jogador["valor"],
+                step=100000, format="%d", key=f"valor_{jogador['id']}"
+            )
+            if st.button("💾 Salvar novo valor", key=f"salvar_valor_{jogador['id']}"):
+                try:
+                    supabase.table("mercado_transferencias").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
+                    st.success("✅ Valor atualizado com sucesso!")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"Erro ao atualizar valor: {e}")
 
 # 🔁 Navegação entre páginas
 col_nav1, col_nav2, col_nav3 = st.columns(3)
