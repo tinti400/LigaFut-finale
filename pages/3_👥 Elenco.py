@@ -27,11 +27,11 @@ is_admin = len(res_admin.data) > 0
 
 st.title(f"👥 Elenco do {nome_time}")
 
-# 💰 Buscar saldo do time
+# 💰 Buscar saldo
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
 saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 
-# 📦 Buscar elenco do time
+# 📦 Buscar elenco
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
 
@@ -51,58 +51,52 @@ st.markdown(
 
 st.markdown("---")
 
-# 🔁 Atualizar botão
-st.button("🔄 Atualizar", on_click=st.experimental_rerun)
-
-# 🗑️ Botão para limpar elenco (ADM)
-if is_admin:
-    if st.button("🧹 Limpar elenco deste time"):
+# 🧹 Limpar elenco (ADM)
+if is_admin and jogadores:
+    if st.button("🧹 Limpar elenco COMPLETO"):
         try:
             supabase.table("elenco").delete().eq("id_time", id_time).execute()
-            st.success("Elenco limpo com sucesso!")
+            st.success("✅ Elenco limpo com sucesso!")
             st.experimental_rerun()
         except Exception as e:
             st.error(f"Erro ao limpar elenco: {e}")
 
-# 📥 Upload de planilha
-st.subheader("📤 Importar jogadores via planilha Excel")
-arquivo = st.file_uploader("Selecione um arquivo .xlsx com os jogadores", type=["xlsx"])
+# 📥 Importação com botão
+st.subheader("📤 Importar jogadores via planilha Excel (.xlsx)")
+arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
 
-if "planilha_importada" not in st.session_state:
-    st.session_state["planilha_importada"] = False
+if arquivo:
+    st.success("✅ Arquivo carregado. Agora clique no botão abaixo para importar.")
+    if st.button("📤 Processar Planilha"):
+        try:
+            df = pd.read_excel(arquivo)
+            obrigatorios = {"nome", "posição", "overall", "valor"}
+            colunas_arquivo = set(map(str.lower, df.columns))
 
-if arquivo and not st.session_state["planilha_importada"]:
-    try:
-        df = pd.read_excel(arquivo)
-        obrigatorios = {"nome", "posição", "overall", "valor"}
+            if not obrigatorios.issubset(colunas_arquivo):
+                st.error("A planilha deve conter as colunas: nome, posição, overall, valor.")
+            else:
+                for _, row in df.iterrows():
+                    supabase.table("elenco").insert({
+                        "id_time": id_time,
+                        "nome": row["nome"],
+                        "posicao": row["posição"],
+                        "overall": int(row["overall"]),
+                        "valor": int(float(row["valor"])),
+                        "nacionalidade": row.get("nacionalidade", "Desconhecida"),
+                        "origem": "Importado"
+                    }).execute()
+                st.success("✅ Jogadores importados com sucesso!")
+                st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao importar: {e}")
 
-        colunas_arquivo = set(map(str.lower, df.columns))
-        if not obrigatorios.issubset(colunas_arquivo):
-            st.error("A planilha deve conter as colunas: nome, posição, overall, valor.")
-        else:
-            for _, row in df.iterrows():
-                supabase.table("elenco").insert({
-                    "id_time": id_time,
-                    "nome": row["nome"],
-                    "posicao": row["posição"],
-                    "overall": int(row["overall"]),
-                    "valor": int(float(row["valor"])),
-                    "nacionalidade": row.get("nacionalidade", "Desconhecida"),
-                    "origem": "Importado"
-                }).execute()
+st.markdown("---")
 
-            st.success("✅ Jogadores importados com sucesso!")
-            st.session_state["planilha_importada"] = True
-            st.experimental_rerun()
-
-    except Exception as e:
-        st.error(f"Erro ao importar: {e}")
-
-# 🧑‍💼 Exibir jogadores
+# 📋 Exibir jogadores
 for jogador in jogadores:
     col1, col2, col3, col4, col5, col6 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2])
 
-    # Imagem
     with col1:
         imagem = jogador.get("imagem_url", "")
         if imagem:
@@ -132,9 +126,7 @@ for jogador in jogadores:
     with col6:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # Remover
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-                # Inserir no mercado
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -146,7 +138,6 @@ for jogador in jogadores:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": origem
                 }).execute()
-                # Movimentação
                 registrar_movimentacao(
                     id_time=id_time,
                     jogador=jogador["nome"],
