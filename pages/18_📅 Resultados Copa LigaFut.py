@@ -119,7 +119,7 @@ st.subheader("⚔️ Resultados do Mata-Mata")
 fases_mata = ["oitavas", "quartas", "semifinal", "final"]
 fase_selecionada = st.selectbox("Escolha a fase para editar os resultados:", fases_mata)
 
-# 🆕 CORRIGIDO: buscar a fase eliminatória mais recente (sem depender da fase de grupos)
+# Buscar a fase eliminatória mais recente
 res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).order("data_criacao", desc=True).limit(1).execute()
 fase_data = res_fase.data[0] if res_fase.data else None
 
@@ -141,7 +141,7 @@ for idx, jogo in enumerate(jogos_mata):
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
-        jogos_mata[idx]["gols_mandante"] = st.number_input(
+        gols_m_edit = st.number_input(
             f"Gols {mandante_nome}", min_value=0,
             value=int(gols_m) if gols_m is not None else 0,
             key=f"mata_gm_{idx}", format="%d"
@@ -149,7 +149,7 @@ for idx, jogo in enumerate(jogos_mata):
     with col3:
         st.markdown("**X**")
     with col4:
-        jogos_mata[idx]["gols_visitante"] = st.number_input(
+        gols_v_edit = st.number_input(
             f"Gols {visitante_nome}", min_value=0,
             value=int(gols_v) if gols_v is not None else 0,
             key=f"mata_gv_{idx}", format="%d"
@@ -159,7 +159,22 @@ for idx, jogo in enumerate(jogos_mata):
 
     st.markdown("")
 
-# 💾 Botão para salvar todos os jogos da fase
+    # Botão de salvar resultado individual
+    if st.button("💾 Salvar Resultado", key=f"salvar_mata_{idx}"):
+        jogos_mata[idx]["gols_mandante"] = gols_m_edit
+        jogos_mata[idx]["gols_visitante"] = gols_v_edit
+
+        try:
+            supabase.table("copa_ligafut").update({
+                "jogos": jogos_mata
+            }).eq("id", fase_data["id"]).execute()
+            st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
+        except Exception as e:
+            st.error(f"Erro ao salvar: {e}")
+
+    st.markdown("---")
+
+# Botão para salvar todos os resultados da fase
 if st.button("💾 Salvar todos os resultados da fase eliminatória"):
     try:
         supabase.table("copa_ligafut").update({
