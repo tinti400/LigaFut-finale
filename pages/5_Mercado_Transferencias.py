@@ -83,6 +83,10 @@ jogadores_pagina = jogadores_filtrados[inicio:fim]
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
+# 🔍 Verifica quantidade atual do elenco
+res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
+
 for jogador in jogadores_pagina:
     col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
     with col1:
@@ -94,39 +98,43 @@ for jogador in jogadores_pagina:
     with col3:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
     with col4:
-        if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
-            if saldo_time < jogador["valor"]:
-                st.error("❌ Saldo insuficiente.")
-            else:
-                try:
-                    # 1. Adiciona ao elenco
-                    supabase.table("elenco").insert({
-                        "nome": jogador["nome"],
-                        "posicao": jogador["posicao"],
-                        "overall": jogador["overall"],
-                        "valor": jogador["valor"],
-                        "id_time": id_time
-                    }).execute()
+        if qtde_elenco >= 35:
+            st.warning("⚠️ Elenco cheio (35 jogadores)")
+            st.button("❌ Comprar (bloqueado)", key=f"bloqueado_{jogador['id']}", disabled=True)
+        else:
+            if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
+                if saldo_time < jogador["valor"]:
+                    st.error("❌ Saldo insuficiente.")
+                else:
+                    try:
+                        # 1. Adiciona ao elenco
+                        supabase.table("elenco").insert({
+                            "nome": jogador["nome"],
+                            "posicao": jogador["posicao"],
+                            "overall": jogador["overall"],
+                            "valor": jogador["valor"],
+                            "id_time": id_time
+                        }).execute()
 
-                    # 2. Remove do mercado
-                    supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+                        # 2. Remove do mercado
+                        supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                    # 3. Registra movimentação
-                    registrar_movimentacao(
-                        id_time=id_time,
-                        jogador=jogador["nome"],
-                        tipo="mercado",
-                        categoria="compra",
-                        valor=jogador["valor"],
-                        origem=jogador.get("time_origem"),
-                        destino=nome_time
-                    )
+                        # 3. Registra movimentação
+                        registrar_movimentacao(
+                            id_time=id_time,
+                            jogador=jogador["nome"],
+                            tipo="mercado",
+                            categoria="compra",
+                            valor=jogador["valor"],
+                            origem=jogador.get("time_origem"),
+                            destino=nome_time
+                        )
 
-                    st.success(f"{jogador['nome']} comprado com sucesso!")
-                    st.experimental_rerun()
+                        st.success(f"{jogador['nome']} comprado com sucesso!")
+                        st.experimental_rerun()
 
-                except Exception as e:
-                    st.error(f"Erro ao comprar jogador: {e}")
+                    except Exception as e:
+                        st.error(f"Erro ao comprar jogador: {e}")
 
     # ✏️ Botão de edição (somente admin)
     if is_admin:
