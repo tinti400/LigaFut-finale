@@ -24,13 +24,13 @@ if len(admin_ref.data) == 0:
     st.warning("⛔️ Acesso restrito aos administradores.")
     st.stop()
 
-# ⏲️ Data da copa mais recente
-def buscar_data_recente():
+# ⏲️ Data da copa mais recente (fase de grupos)
+def buscar_data_recente_grupos():
     res = supabase.table("grupos_copa").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
     return res.data[0]["data_criacao"] if res.data else None
 
-data_atual = buscar_data_recente()
-if not data_atual:
+data_atual_grupos = buscar_data_recente_grupos()
+if not data_atual_grupos:
     st.info("Nenhuma edição da copa encontrada.")
     st.stop()
 
@@ -42,7 +42,7 @@ def buscar_times():
 times = buscar_times()
 
 # 🔢 Buscar jogos da fase de grupos
-res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual).eq("fase", "grupos").execute()
+res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
 grupo_data = res.data if res.data else []
 
 if not grupo_data:
@@ -103,7 +103,7 @@ for idx, jogo in enumerate(jogos):
         try:
             supabase.table("copa_ligafut").update({
                 "jogos": jogos
-            }).eq("grupo", tab).eq("data_criacao", data_atual).eq("fase", "grupos").execute()
+            }).eq("grupo", tab).eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
             st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
@@ -119,7 +119,8 @@ st.subheader("⚔️ Resultados do Mata-Mata")
 fases_mata = ["oitavas", "quartas", "semifinal", "final"]
 fase_selecionada = st.selectbox("Escolha a fase para editar os resultados:", fases_mata)
 
-res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).eq("data_criacao", data_atual).execute()
+# 🆕 CORRIGIDO: buscar a fase eliminatória mais recente (sem depender da fase de grupos)
+res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).order("data_criacao", desc=True).limit(1).execute()
 fase_data = res_fase.data[0] if res_fase.data else None
 
 if not fase_data:
@@ -163,7 +164,7 @@ if st.button("💾 Salvar todos os resultados da fase eliminatória"):
     try:
         supabase.table("copa_ligafut").update({
             "jogos": jogos_mata
-        }).eq("fase", fase_selecionada).eq("data_criacao", data_atual).execute()
+        }).eq("id", fase_data["id"]).execute()
         st.success("✅ Resultados atualizados com sucesso!")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
