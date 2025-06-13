@@ -4,23 +4,26 @@ from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
 
 st.set_page_config(page_title="📨 Propostas Recebidas", layout="wide")
-
-# ✅ Verifica sessão única
 verificar_sessao()
 
-# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 📌 Dados do usuário logado
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-st.title(f"📨 Propostas Recebidas - {nome_time}")
+# 🔴 Contador de propostas pendentes
+count_recebidas = supabase.table("propostas").select("*").eq("destino_id", id_time).eq("status", "pendente").execute()
+notificacoes_recebidas = len(count_recebidas.data) if count_recebidas.data else 0
 
-# 🔍 Carregar apenas propostas pendentes
-res = supabase.table("propostas").select("*").eq("destino_id", id_time).eq("status", "pendente").execute()
+st.markdown(f"""
+<h3>📨 Propostas Recebidas - {nome_time}
+<span style='color:white;background:red;padding:2px 8px;border-radius:50%;margin-left:10px;'>{notificacoes_recebidas}</span>
+</h3>
+""", unsafe_allow_html=True)
+
+res = count_recebidas
 propostas = res.data if res.data else []
 
 if not propostas:
@@ -48,10 +51,8 @@ else:
                     id_time_destino = proposta["id_time_alvo"]
                     jogador_nome = proposta["jogador_nome"]
 
-                    # Remover jogador do time vendedor
                     supabase.table("elenco").delete().eq("id_time", id_time_destino).eq("nome", jogador_nome).execute()
 
-                    # Adicionar ao comprador com novo valor
                     novo_jogador = {
                         "nome": jogador_nome,
                         "posicao": proposta["jogador_posicao"],
@@ -61,7 +62,6 @@ else:
                     }
                     supabase.table("elenco").insert(novo_jogador).execute()
 
-                    # Troca de jogadores (se houver)
                     for jogador in jogadores_oferecidos:
                         supabase.table("elenco").delete().eq("id_time", id_time_origem).eq("nome", jogador["nome"]).execute()
                         jogador_trocado = {
@@ -73,20 +73,12 @@ else:
                         }
                         supabase.table("elenco").insert(jogador_trocado).execute()
 
-                    # Registrar movimentações financeiras
                     if valor > 0:
                         registrar_movimentacao(id_time_origem, jogador_nome, "Transferência", "Compra", valor)
                         registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
 
-                    # Atualizar status da proposta aceita
                     supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
-
-                    # Cancelar outras propostas pelo mesmo jogador
-                    supabase.table("propostas").update({"status": "cancelada"}) \
-                        .eq("jogador_nome", jogador_nome) \
-                        .eq("destino_id", id_time) \
-                        .eq("status", "pendente") \
-                        .neq("id", proposta["id"]).execute()
+                    supabase.table("propostas").update({"status": "cancelada"})                         .eq("jogador_nome", jogador_nome)                         .eq("destino_id", id_time)                         .eq("status", "pendente")                         .neq("id", proposta["id"]).execute()
 
                     st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
                     st.experimental_rerun()

@@ -3,42 +3,40 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import uuid
-from utils import verificar_sessao  # ✅ Sessão única
+from utils import verificar_sessao
 
 st.set_page_config(page_title="📤 Propostas Enviadas - LigaFut", layout="wide")
+verificar_sessao()
 
-verificar_sessao()  # ✅ Aplicação de sessão única
-
-# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# Dados do time logado
 id_time_origem = st.session_state["id_time"]
 nome_time_origem = st.session_state["nome_time"]
 
-st.title("📤 Propostas Enviadas")
+# 🔴 Contador de propostas enviadas pendentes
+count_enviadas = supabase.table("propostas").select("*").eq("id_time_origem", id_time_origem).eq("status", "pendente").execute()
+notificacoes_enviadas = len(count_enviadas.data) if count_enviadas.data else 0
 
-# 🧠 Buscar todos os times (para enviar proposta)
+st.markdown(f"""
+<h3>📤 Propostas Enviadas
+<span style='color:white;background:red;padding:2px 8px;border-radius:50%;margin-left:10px;'>{notificacoes_enviadas}</span>
+</h3>
+""", unsafe_allow_html=True)
+
 times_ref = supabase.table("times").select("id", "nome").neq("id", id_time_origem).execute()
 times_disponiveis = times_ref.data or []
-
 nomes_times = {t["nome"]: t["id"] for t in times_disponiveis}
 nome_time_alvo = st.selectbox("Escolha o time para enviar proposta:", list(nomes_times.keys()))
 
-# Buscar elenco do time escolhido
 id_time_alvo = nomes_times[nome_time_alvo]
 elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time_alvo).execute()
 elenco_disponivel = elenco_ref.data or []
 
 jogadores_alvo = [f'{j["nome"]} ({j["posicao"]})' for j in elenco_disponivel]
 jogador_escolhido = st.selectbox("Escolha o jogador desejado:", jogadores_alvo)
-
-# Dados do jogador alvo
 jogador_data = next((j for j in elenco_disponivel if f'{j["nome"]} ({j["posicao"]})' == jogador_escolhido), None)
-
-# Valor da proposta
 valor_oferecido = st.number_input("Valor oferecido (R$):", min_value=0, step=100000)
 
 if st.button("📩 Enviar proposta"):
@@ -65,14 +63,9 @@ if st.button("📩 Enviar proposta"):
     else:
         st.warning("Jogador não encontrado!")
 
-# 🔎 Ver propostas enviadas
 st.subheader("📜 Suas propostas enviadas")
 try:
-    propostas_ref = supabase.table("propostas") \
-        .select("*") \
-        .eq("id_time_origem", id_time_origem) \
-        .order("created_at", desc=True) \
-        .execute()
+    propostas_ref = supabase.table("propostas")         .select("*")         .eq("id_time_origem", id_time_origem)         .order("created_at", desc=True)         .execute()
 
     propostas = propostas_ref.data or []
     if not propostas:
