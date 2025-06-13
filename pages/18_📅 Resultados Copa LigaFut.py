@@ -110,5 +110,60 @@ for idx, jogo in enumerate(jogos):
 
     st.markdown("---")
 
+# ===============================
+# ⚔️ Edição dos Resultados do Mata-Mata
+# ===============================
+st.markdown("---")
+st.subheader("⚔️ Resultados do Mata-Mata")
 
+fases_mata = ["oitavas", "quartas", "semifinal", "final"]
+fase_selecionada = st.selectbox("Escolha a fase para editar os resultados:", fases_mata)
 
+res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).eq("data_criacao", data_atual).execute()
+fase_data = res_fase.data[0] if res_fase.data else None
+
+if not fase_data:
+    st.info(f"A fase '{fase_selecionada}' ainda não foi gerada.")
+    st.stop()
+
+jogos_mata = fase_data.get("jogos", [])
+
+for idx, jogo in enumerate(jogos_mata):
+    mandante_id = jogo.get("mandante")
+    visitante_id = jogo.get("visitante")
+    mandante_nome = times.get(mandante_id, "Mandante")
+    visitante_nome = times.get(visitante_id, "Visitante")
+    gols_m = jogo.get("gols_mandante")
+    gols_v = jogo.get("gols_visitante")
+
+    col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
+    with col1:
+        st.markdown(f"**{mandante_nome}**")
+    with col2:
+        jogos_mata[idx]["gols_mandante"] = st.number_input(
+            f"Gols {mandante_nome}", min_value=0,
+            value=int(gols_m) if gols_m is not None else 0,
+            key=f"mata_gm_{idx}", format="%d"
+        )
+    with col3:
+        st.markdown("**X**")
+    with col4:
+        jogos_mata[idx]["gols_visitante"] = st.number_input(
+            f"Gols {visitante_nome}", min_value=0,
+            value=int(gols_v) if gols_v is not None else 0,
+            key=f"mata_gv_{idx}", format="%d"
+        )
+    with col5:
+        st.markdown(f"**{visitante_nome}**")
+
+    st.markdown("")
+
+# 💾 Botão para salvar todos os jogos da fase
+if st.button("💾 Salvar todos os resultados da fase eliminatória"):
+    try:
+        supabase.table("copa_ligafut").update({
+            "jogos": jogos_mata
+        }).eq("fase", fase_selecionada).eq("data_criacao", data_atual).execute()
+        st.success("✅ Resultados atualizados com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar: {e}")
