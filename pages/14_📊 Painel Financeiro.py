@@ -12,7 +12,7 @@ st.set_page_config(page_title="📊 Movimentações Simples", layout="wide")
 st.title("📊 Painel Financeiro - Simples")
 
 # 🔎 Buscar movimentações (ordenadas por data)
-res = supabase.table("movimentacoes").select("*").order("data", asc=True).execute()
+res = supabase.table("movimentacoes").select("*").order("data", desc=False).limit(500).execute()
 movs = res.data if res.data else []
 if not movs:
     st.warning("Nenhuma movimentação registrada.")
@@ -38,27 +38,28 @@ for i in reversed(df.index):  # Começa do mais recente pro mais antigo
     destino = row.get("destino", "")
     data = row.get("data", "")
 
-    if tipo.lower() in ["compra", "leilao", "multa", "roubo"]:  # Origem gasta
+    if tipo.lower() in ["compra", "leilao", "multa", "roubo"]:
         if origem in saldos_atuais:
             saldo_novo = saldos_atuais[origem]
             saldo_antigo = saldo_novo + valor
             linhas.append({
                 "Time": origem,
-                "Movimentação": tipo,
+                "Movimentação": tipo.title(),
                 "Valor": f'R${valor:,.0f}'.replace(",", ".").replace(".", ",", 1),
                 "Saldo Antigo": f'R${saldo_antigo:,.0f}'.replace(",", ".").replace(".", ",", 1),
                 "Saldo Novo": f'R${saldo_novo:,.0f}'.replace(",", ".").replace(".", ",", 1)
             })
-            saldos_atuais[origem] = saldo_antigo  # retrocedendo
+            saldos_atuais[origem] = saldo_antigo
 
-    if tipo.lower() in ["venda", "leilao", "multa", "roubo"]:  # Destino recebe
+    if tipo.lower() in ["venda", "leilao", "multa", "roubo"]:
         if destino in saldos_atuais:
             saldo_novo = saldos_atuais[destino]
-            saldo_antigo = saldo_novo - valor if tipo != "roubo" else saldo_novo - (valor / 2)
+            valor_recebido = valor if tipo != "roubo" else valor / 2
+            saldo_antigo = saldo_novo - valor_recebido
             linhas.append({
                 "Time": destino,
-                "Movimentação": tipo,
-                "Valor": f'R${valor:,.0f}'.replace(",", ".").replace(".", ",", 1),
+                "Movimentação": tipo.title(),
+                "Valor": f'R${valor_recebido:,.0f}'.replace(",", ".").replace(".", ",", 1),
                 "Saldo Antigo": f'R${saldo_antigo:,.0f}'.replace(",", ".").replace(".", ",", 1),
                 "Saldo Novo": f'R${saldo_novo:,.0f}'.replace(",", ".").replace(".", ",", 1)
             })
