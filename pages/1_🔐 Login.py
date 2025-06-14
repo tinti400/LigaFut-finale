@@ -2,14 +2,14 @@
 import streamlit as st
 from supabase import create_client, Client
 import uuid
-import bcrypt
+
+# ✅ Configuração da página
+st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
-
-st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
 # 🎨 Estilo com fundo escuro e card centralizado
 st.markdown(f"""
@@ -87,26 +87,22 @@ with st.container():
         if usuario and senha:
             with st.spinner("🔄 Verificando suas credenciais..."):
                 try:
-                    res = supabase.table("usuarios").select("*").ilike("usuario", usuario).execute()
+                    res = supabase.table("usuarios").select("*").ilike("usuario", usuario).ilike("senha", senha).execute()
                     if res.data:
                         user = res.data[0]
-                        senha_valida = bcrypt.checkpw(senha.encode(), user["senha"].encode())
-                        if senha_valida:
-                            novo_session_id = str(uuid.uuid4())
-                            supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
-                            st.session_state["usuario"] = user["usuario"]
-                            st.session_state["usuario_id"] = user["id"]
-                            st.session_state["id_time"] = user["time_id"]
-                            st.session_state["divisao"] = user.get("divisao", "Divisão 1")
-                            st.session_state["session_id"] = novo_session_id
-                            st.session_state["administrador"] = user.get("administrador", False)
-                            st.experimental_set_query_params(usuario=user["usuario"])
-                            time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
-                            st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
-                            st.success("✅ Login realizado com sucesso! Redirecionando...")
-                            st.experimental_rerun()
-                        else:
-                            st.error("❌ Usuário ou senha inválidos.")
+                        novo_session_id = str(uuid.uuid4())
+                        supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
+                        st.session_state["usuario"] = user["usuario"]
+                        st.session_state["usuario_id"] = user["id"]
+                        st.session_state["id_time"] = user["time_id"]
+                        st.session_state["divisao"] = user.get("divisao", "Divisão 1")
+                        st.session_state["session_id"] = novo_session_id
+                        st.session_state["administrador"] = user.get("administrador", False)
+                        st.experimental_set_query_params(usuario=user["usuario"])
+                        time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
+                        st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
+                        st.success("✅ Login realizado com sucesso! Redirecionando...")
+                        st.experimental_rerun()
                     else:
                         st.error("❌ Usuário ou senha inválidos.")
                 except Exception as e:
@@ -130,21 +126,16 @@ with st.expander("🔒 Trocar Senha"):
             st.error("❌ As novas senhas não coincidem.")
         else:
             try:
-                res = supabase.table("usuarios").select("*").ilike("usuario", email_confirm).execute()
+                res = supabase.table("usuarios").select("*").ilike("usuario", email_confirm).ilike("senha", senha_atual).execute()
                 if res.data:
-                    user = res.data[0]
-                    if bcrypt.checkpw(senha_atual.encode(), user["senha"].encode()):
-                        nova_hash = bcrypt.hashpw(nova_senha.encode(), bcrypt.gensalt()).decode()
-                        supabase.table("usuarios").update({"senha": nova_hash}).eq("id", user["id"]).execute()
-                        st.success("🔐 Senha atualizada com sucesso!")
-                    else:
-                        st.error("❌ Senha atual incorreta.")
+                    usuario_id = res.data[0]["id"]
+                    supabase.table("usuarios").update({"senha": nova_senha}).eq("id", usuario_id).execute()
+                    st.success("🔐 Senha atualizada com sucesso!")
                 else:
-                    st.error("❌ Usuário não encontrado.")
+                    st.error("❌ E-mail ou senha atual inválidos.")
             except Exception as e:
                 st.error(f"Erro ao atualizar senha: {e}")
 
 # ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
-
