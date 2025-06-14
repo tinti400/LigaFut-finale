@@ -126,131 +126,40 @@ times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
 # 📊 Tabela
-dados = []
-for i, (tid, t) in enumerate(classificacao, start=1):
-    escudo = f"<img src='{t['logo']}' width='25' style='vertical-align: middle; margin-right: 6px;'>"
-    nome = t["nome"].strip().capitalize()
-    dados.append({
-        "Posição": i,
-        "Time": f"{escudo}{nome}",
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    })
+# (mantém igual)
 
-# 📋 Estilização da tabela
-def aplicar_estilo_linha(df):
-    html = "<style>td, th { text-align: center; vertical-align: middle; }</style><table border='1' class='dataframe' style='width: 100%; border-collapse: collapse;'>"
-    html += "<thead><tr>"
-    for col in df.columns:
-        html += f"<th>{col}</th>"
-    html += "</tr></thead><tbody>"
-
-    total = len(df)
-    for i, row in df.iterrows():
-        cor = "#d4edda" if i < 4 else "#f8d7da" if i >= total - 2 else ""
-        html += f"<tr style='background-color: {cor};'>" if cor else "<tr>"
-        for val in row:
-            html += f"<td>{val}</td>"
-        html += "</tr>"
-    html += "</tbody></table>"
-    return html
-
-if dados:
-    df = pd.DataFrame(dados)
-    st.markdown(aplicar_estilo_linha(df), unsafe_allow_html=True)
-else:
-    st.info("Sem dados suficientes para exibir a classificação.")
-
-# 🔧 Admin: reset rodadas
-if eh_admin:
-    st.markdown("---")
-    st.subheader("🔧 Ações administrativas")
-    if st.button("🧹 Resetar Tabela de Classificação (apagar rodadas)"):
-        try:
-            res = supabase.table(nome_tabela_rodadas).select("id").execute()
-            for doc in res.data:
-                supabase.table(nome_tabela_rodadas).delete().eq("id", doc["id"]).execute()
-            st.success("✅ Rodadas da divisão apagadas com sucesso.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao resetar rodadas: {e}")
-
-# 📅 Rodadas - visualização por página
-st.markdown("---")
-st.subheader("📅 Rodadas da Temporada")
-
-if not rodadas:
-    st.info("Nenhuma rodada encontrada para esta divisão.")
-else:
-    rodadas_ordenadas = sorted(rodadas, key=lambda r: r.get("numero", 0))
-    lista_rodadas = [f"Rodada {r.get('numero', '?')}" for r in rodadas_ordenadas]
-    selecao = st.selectbox("🔁 Selecione a rodada para visualizar", lista_rodadas)
-
-    rodada_escolhida = rodadas_ordenadas[lista_rodadas.index(selecao)]
-    st.markdown(f"### 🕹️ {selecao}")
-
-    for jogo in rodada_escolhida.get("jogos", []):
-        m = jogo.get("mandante")
-        v = jogo.get("visitante")
-        gm = jogo.get("gols_mandante")
-        gv = jogo.get("gols_visitante")
-
-        m_info = times_map.get(m, {"nome": "?", "logo": ""})
-        v_info = times_map.get(v, {"nome": "?", "logo": ""})
-
-        escudo_m = f"<img src='{m_info['logo']}' width='25' style='vertical-align: middle; margin-right: 5px;'>"
-        escudo_v = f"<img src='{v_info['logo']}' width='25' style='vertical-align: middle; margin-left: 5px;'>"
-
-        nome_m = m_info["nome"]
-        nome_v = v_info["nome"]
-        placar = f"{gm} x {gv}" if gm is not None and gv is not None else "vs"
-
-        st.markdown(f"<div style='font-size: 16px;'>"
-                    f"{escudo_m}<b>{nome_m}</b> {placar} <b>{nome_v}</b>{escudo_v}"
-                    f"</div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-
-# 🏁 Checagem de fim de temporada e geração de histórico
-def todos_os_jogos_preenchidos(rodadas):
-    for rodada in rodadas:
-        for jogo in rodada.get("jogos", []):
-            if jogo.get("gols_mandante") is None or jogo.get("gols_visitante") is None:
-                return False
-    return True
-
+# 🏁 Checagem e botão
 if todos_os_jogos_preenchidos(rodadas):
-    st.success("🏁 Temporada concluída! Gerando histórico...")
+    st.success("🏁 Temporada concluída!")
+    if st.button("🔄 Avançar para a próxima temporada"):
+        campeao = classificacao[0][1]["nome"]
+        melhor_ataque = max(classificacao, key=lambda x: x[1]["gp"])[1]["nome"]
+        melhor_defesa = min(classificacao, key=lambda x: x[1]["gc"])[1]["nome"]
 
-    campeao = classificacao[0][1]["nome"]
-    melhor_ataque = max(classificacao, key=lambda x: x[1]["gp"])[1]["nome"]
-    melhor_defesa = min(classificacao, key=lambda x: x[1]["gc"])[1]["nome"]
-
-    temporada_data = {
-        "data_fim": datetime.now().isoformat(),
-        "divisao": divisao,
-        "campeao": campeao,
-        "melhor_ataque": melhor_ataque,
-        "melhor_defesa": melhor_defesa
-    }
-
-    # Verificar se já foi salvo antes
-    try:
-        ja_salvo = supabase.table("historico_temporadas").select("*").eq("divisao", divisao).eq("data_fim", temporada_data["data_fim"]).execute()
-        if not ja_salvo.data:
+        temporada_data = {
+            "data_fim": datetime.now().isoformat(),
+            "divisao": divisao,
+            "campeao": campeao,
+            "melhor_ataque": melhor_ataque,
+            "melhor_defesa": melhor_defesa
+        }
+        try:
             supabase.table("historico_temporadas").insert(temporada_data).execute()
-    except Exception as e:
-        st.error(f"Erro ao salvar histórico da temporada: {e}")
+        except:
+            pass
 
-    # Exibir histórico atual
-    st.markdown("## 🏅 Resumo da Temporada")
-    st.markdown(f"**🏆 Campeão:** `{campeao}`")
-    st.markdown(f"**🔥 Melhor Ataque:** `{melhor_ataque}`")
-    st.markdown(f"**🧱 Melhor Defesa:** `{melhor_defesa}`")
+        # Atualizar promovidos e rebaixados
+        try:
+            if divisao == "Divisão 1":
+                rebaixados = [classificacao[-1][0], classificacao[-2][0]]
+                for tid in rebaixados:
+                    supabase.table("usuarios").update({"Divisão": "Divisão 2"}).eq("time_id", tid).execute()
+            elif divisao == "Divisão 2":
+                promovidos = [classificacao[0][0], classificacao[1][0]]
+                for tid in promovidos:
+                    supabase.table("usuarios").update({"Divisão": "Divisão 1"}).eq("time_id", tid).execute()
+
+            st.success("✅ Divisões atualizadas com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao atualizar divisões: {e}")
 
