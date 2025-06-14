@@ -10,7 +10,7 @@ supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
-# 🎨 Estilo visual moderno com botões destacados
+# 🎨 Estilo visual completo
 st.markdown("""
     <style>
     .stApp {
@@ -32,6 +32,13 @@ st.markdown("""
         background-color: #1f2833 !important;
         color: white !important;
         border-radius: 8px !important;
+        font-size: 1.05rem !important;
+    }
+    .stTextInput>div>div>input {
+        font-size: 1.05rem !important;
+    }
+    .stSelectbox>div>div {
+        font-size: 1.05rem !important;
     }
     .stButton>button {
         background-color: #66fcf1;
@@ -42,32 +49,41 @@ st.markdown("""
         padding: 0.75em;
         margin-top: 1em;
         transition: 0.3s ease;
+        font-size: 1.05rem;
     }
     .stButton>button:hover {
         background-color: #45e0d1;
         transform: scale(1.02);
     }
+
+    /* Botão verde para Atualizar Senha */
+    button[data-baseweb="button"][id="senha"] {
+        background-color: #34c759 !important;
+        color: white !important;
+    }
+
     h2 {
-        font-size: 28px;
+        font-size: 30px;
         text-align: center;
         color: white !important;
     }
     p {
         text-align: center;
-        font-size: 16px;
+        font-size: 18px;
         color: #d1d1d1;
     }
     label {
         color: white !important;
+        font-size: 1.05rem !important;
     }
 
-    /* Destacar os títulos dos expansores */
     [data-testid="stExpander"] > summary {
         background-color: #66fcf1 !important;
         color: black !important;
         font-weight: bold;
         padding: 10px;
         border-radius: 8px;
+        font-size: 1.05rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -146,13 +162,13 @@ with st.container():
             st.warning("⚠️ Preencha todos os campos.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 🔁 Troca de senha (visual destacado)
+# 🔁 Troca de senha
 with st.expander("🔒 Trocar Senha"):
     email_confirm = st.text_input("Confirme seu e-mail")
     senha_atual = st.text_input("Senha atual", type="password")
     nova_senha = st.text_input("Nova senha", type="password")
     confirma_nova_senha = st.text_input("Confirme a nova senha", type="password")
-    botao_trocar = st.button("✅ Atualizar Senha")
+    botao_trocar = st.button("✅ Atualizar Senha", key="senha")
 
     if botao_trocar:
         if not all([email_confirm, senha_atual, nova_senha, confirma_nova_senha]):
@@ -171,7 +187,7 @@ with st.expander("🔒 Trocar Senha"):
             except Exception as e:
                 st.error(f"Erro ao atualizar senha: {e}")
 
-# ❓ Esqueci minha senha (visual destacado)
+# ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
 
