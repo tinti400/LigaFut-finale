@@ -11,7 +11,7 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="📊 Movimentações Simples", layout="wide")
 st.title("📊 Painel Financeiro - Simples")
 
-# 🔎 Buscar movimentações (ordenadas por data)
+# 🔎 Buscar movimentações (ordenadas por data crescente)
 res = supabase.table("movimentacoes").select("*").order("data", desc=False).limit(500).execute()
 movs = res.data if res.data else []
 if not movs:
@@ -24,21 +24,26 @@ df["valor"] = df["valor"].astype(float)
 
 # 💰 Buscar saldos atuais dos times
 res_saldos = supabase.table("times").select("nome, saldo").execute()
-mapa_saldos = {item["nome"]: float(item["saldo"]) for item in res_saldos.data}
+mapa_saldos = {
+    item["nome"].strip().title(): float(item["saldo"])
+    for item in res_saldos.data
+    if item.get("nome") and item.get("saldo") is not None
+}
 
 # 🧾 Montar nova tabela com saldos
 linhas = []
 saldos_atuais = mapa_saldos.copy()
 
-for i in reversed(df.index):  # Começa do mais recente pro mais antigo
+for i in reversed(df.index):  # Do mais recente para o mais antigo
     row = df.loc[i]
-    tipo = row.get("tipo", "")
+    tipo = str(row.get("tipo", "")).strip().lower()
     valor = row["valor"]
-    origem = row.get("origem", "")
-    destino = row.get("destino", "")
+    origem = str(row.get("origem", "")).strip().title()
+    destino = str(row.get("destino", "")).strip().title()
     data = row.get("data", "")
 
-    if tipo.lower() in ["compra", "leilao", "multa", "roubo"]:
+    # 🧾 Quem pagou
+    if tipo in ["compra", "leilao", "multa", "roubo"]:
         if origem in saldos_atuais:
             saldo_novo = saldos_atuais[origem]
             saldo_antigo = saldo_novo + valor
@@ -51,7 +56,8 @@ for i in reversed(df.index):  # Começa do mais recente pro mais antigo
             })
             saldos_atuais[origem] = saldo_antigo
 
-    if tipo.lower() in ["venda", "leilao", "multa", "roubo"]:
+    # 🧾 Quem recebeu
+    if tipo in ["venda", "leilao", "multa", "roubo"]:
         if destino in saldos_atuais:
             saldo_novo = saldos_atuais[destino]
             valor_recebido = valor if tipo != "roubo" else valor / 2
@@ -65,8 +71,11 @@ for i in reversed(df.index):  # Começa do mais recente pro mais antigo
             })
             saldos_atuais[destino] = saldo_antigo
 
-# 📊 Exibir resultado ordenado por data
-tabela_final = pd.DataFrame(linhas[::-1])  # volta pra ordem normal
-st.dataframe(tabela_final, use_container_width=True)
+# 📊 Exibir resultado
+if linhas:
+    tabela_final = pd.DataFrame(linhas[::-1])  # volta pra ordem original
+    st.dataframe(tabela_final, use_container_width=True)
+else:
+    st.error("❌ Nenhuma movimentação válida foi processada. Verifique os nomes dos times e os saldos.")
 
 
