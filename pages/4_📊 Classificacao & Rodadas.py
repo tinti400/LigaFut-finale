@@ -216,3 +216,41 @@ else:
                     f"</div>", unsafe_allow_html=True)
 
     st.markdown("---")
+
+# 🏁 Checagem de fim de temporada e geração de histórico
+def todos_os_jogos_preenchidos(rodadas):
+    for rodada in rodadas:
+        for jogo in rodada.get("jogos", []):
+            if jogo.get("gols_mandante") is None or jogo.get("gols_visitante") is None:
+                return False
+    return True
+
+if todos_os_jogos_preenchidos(rodadas):
+    st.success("🏁 Temporada concluída! Gerando histórico...")
+
+    campeao = classificacao[0][1]["nome"]
+    melhor_ataque = max(classificacao, key=lambda x: x[1]["gp"])[1]["nome"]
+    melhor_defesa = min(classificacao, key=lambda x: x[1]["gc"])[1]["nome"]
+
+    temporada_data = {
+        "data_fim": datetime.now().isoformat(),
+        "divisao": divisao,
+        "campeao": campeao,
+        "melhor_ataque": melhor_ataque,
+        "melhor_defesa": melhor_defesa
+    }
+
+    # Verificar se já foi salvo antes
+    try:
+        ja_salvo = supabase.table("historico_temporadas").select("*").eq("divisao", divisao).eq("data_fim", temporada_data["data_fim"]).execute()
+        if not ja_salvo.data:
+            supabase.table("historico_temporadas").insert(temporada_data).execute()
+    except Exception as e:
+        st.error(f"Erro ao salvar histórico da temporada: {e}")
+
+    # Exibir histórico atual
+    st.markdown("## 🏅 Resumo da Temporada")
+    st.markdown(f"**🏆 Campeão:** `{campeao}`")
+    st.markdown(f"**🔥 Melhor Ataque:** `{melhor_ataque}`")
+    st.markdown(f"**🧱 Melhor Defesa:** `{melhor_defesa}`")
+
