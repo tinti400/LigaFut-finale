@@ -3,39 +3,63 @@ import streamlit as st
 from supabase import create_client, Client
 import uuid
 
-# ✅ Configuração da página
-st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
-
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(url, key)
 
-# 🎨 Estilo com fundo escuro e card centralizado
-st.markdown(f"""
+st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
+
+# 🎨 Estilo visual moderno
+st.markdown("""
     <style>
-    .stApp {{
-        background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)),
-                          url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo//Ronaldinhobarca.png");
+    .stApp {
+        background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+                          url("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/Ronaldinhobarca.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-    }}
-    .login-card {{
+    }
+    .login-card {
         background-color: rgba(0, 0, 0, 0.85);
         padding: 2rem;
         border-radius: 16px;
         max-width: 420px;
         margin: auto;
         color: white;
-    }}
-    .login-card input {{
-        color: black !important;
-    }}
-    h2, p, label {{
+    }
+    .login-card input {
+        background-color: #1f2833 !important;
         color: white !important;
+        border-radius: 8px !important;
+    }
+    .stButton>button {
+        background-color: #66fcf1;
+        color: black;
+        font-weight: bold;
+        border-radius: 10px;
+        width: 100%;
+        padding: 0.75em;
+        margin-top: 1em;
+        transition: 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #45e0d1;
+        transform: scale(1.02);
+    }
+    h2 {
+        font-size: 28px;
         text-align: center;
-    }}
+        color: white !important;
+    }
+    p {
+        text-align: center;
+        font-size: 16px;
+        color: #d1d1d1;
+    }
+    label {
+        color: white !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,7 +84,7 @@ if "usuario" not in st.session_state and "usuario" in params:
     except:
         pass
 
-# 🔓 Já está logado?
+# 🔓 Se já estiver logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔓 Sair"):
@@ -72,15 +96,17 @@ if "usuario" in st.session_state:
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🧾 Formulário de login
+# 🧾 Formulário
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+    st.image("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/logo-ligafut.png", width=100)
     st.markdown("<h2>🏟️ LigaFut</h2>", unsafe_allow_html=True)
-    st.markdown("<p>Simule qualquer campeonato com seus amigos</p>", unsafe_allow_html=True)
+    st.markdown("<p>Gerencie seu clube. Simule torneios. Comande como um verdadeiro técnico!</p>", unsafe_allow_html=True)
 
     with st.form("login_form"):
         usuario = st.text_input("Usuário (e-mail)")
-        senha = st.text_input("Senha", type="password")
+        mostrar_senha = st.checkbox("👁 Mostrar senha")
+        senha = st.text_input("Senha", type="default" if mostrar_senha else "password")
         botao_login = st.form_submit_button("Entrar")
 
     if botao_login:
@@ -111,7 +137,7 @@ with st.container():
             st.warning("⚠️ Preencha todos os campos.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 🔁 Trocar senha
+# 🔁 Troca de senha
 with st.expander("🔒 Trocar Senha"):
     email_confirm = st.text_input("Confirme seu e-mail")
     senha_atual = st.text_input("Senha atual", type="password")
@@ -139,3 +165,4 @@ with st.expander("🔒 Trocar Senha"):
 # ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
+
