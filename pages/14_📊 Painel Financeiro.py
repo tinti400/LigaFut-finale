@@ -22,19 +22,19 @@ if not movs:
 # 🔁 Converter para DataFrame
 df = pd.DataFrame(movs)
 
-# 🛠️ Depuração: mostrar colunas reais da base
+# 🛠️ Debug: exibir colunas reais
 st.subheader("🧪 Colunas encontradas na base de dados:")
 st.write(df.columns.tolist())
 
-# ⏱️ Ajustar data e valor
+# ⏱️ Formatar data e valor
 if "data" in df.columns:
     df["data"] = pd.to_datetime(df["data"]).dt.strftime("%d/%m/%Y %H:%M")
 
 if "valor" in df.columns:
     df["valor"] = df["valor"].astype(float).apply(lambda x: f'R${x:,.0f}'.replace(",", ".").replace(".", ",", 1))
 
-# 🏷️ Renomear colunas com ícones, se existirem
-colunas_renomear = {
+# 🏷️ Renomear colunas com ícones
+renomear = {
     "data": "📅 Data",
     "tipo": "📁 Tipo",
     "valor": "💰 Valor",
@@ -42,9 +42,7 @@ colunas_renomear = {
     "origem": "🏳️ Origem",
     "destino": "🏁 Destino"
 }
-
-colunas_existentes_renomear = {k: v for k, v in colunas_renomear.items() if k in df.columns}
-df = df.rename(columns=colunas_existentes_renomear)
+df.rename(columns=renomear, inplace=True)
 
 # 🔍 Filtros
 col1, col2 = st.columns(2)
@@ -58,7 +56,7 @@ with col1:
 with col2:
     filtro_tipo = st.selectbox("📂 Filtrar por Tipo de Movimento", ["Todos"] + tipos)
 
-# 🎯 Aplicar filtros
+# 🎯 Aplicar filtros após renomear
 df_filtrado = df.copy()
 
 if filtro_time != "Todos":
@@ -67,7 +65,7 @@ if filtro_time != "Todos":
 if filtro_tipo != "Todos":
     df_filtrado = df_filtrado[df_filtrado["📁 Tipo"] == filtro_tipo]
 
-# 📋 Exibir resultado final com segurança
+# 📋 Exibir resultado
 st.markdown(f"<h4 style='margin-top:30px;'>🔽 Total de {len(df_filtrado)} movimentações encontradas</h4>", unsafe_allow_html=True)
 
 colunas_exibicao = ["📅 Data", "📁 Tipo", "💰 Valor", "👤 Jogador", "🏳️ Origem", "🏁 Destino"]
