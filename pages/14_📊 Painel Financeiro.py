@@ -8,7 +8,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="📊 Movimentações Simples", layout="wide")
+st.set_page_config(page_title="📊 Painel Financeiro Simples", layout="wide")
 st.title("📊 Painel Financeiro - Simples")
 
 # 🔎 Buscar movimentações (ordenadas por data crescente)
@@ -22,6 +22,10 @@ df = pd.DataFrame(movs)
 df["data"] = pd.to_datetime(df["data"]).dt.strftime("%d/%m/%Y %H:%M")
 df["valor"] = df["valor"].astype(float)
 
+# ✅ Padronizar nomes dos times nas movimentações
+df["origem"] = df["origem"].astype(str).str.strip().str.title()
+df["destino"] = df["destino"].astype(str).str.strip().str.title()
+
 # 💰 Buscar saldos atuais dos times
 res_saldos = supabase.table("times").select("nome, saldo").execute()
 mapa_saldos = {
@@ -30,16 +34,24 @@ mapa_saldos = {
     if item.get("nome") and item.get("saldo") is not None
 }
 
+# 👁️ Debug: visualizar times cadastrados vs movimentações
+st.subheader("👁️ Times da tabela de saldos (times):")
+st.write(sorted(mapa_saldos.keys()))
+
+st.subheader("🔎 Nomes encontrados nas movimentações:")
+st.write("Origem:", sorted(df["origem"].dropna().unique().tolist()))
+st.write("Destino:", sorted(df["destino"].dropna().unique().tolist()))
+
 # 🧾 Montar nova tabela com saldos
 linhas = []
 saldos_atuais = mapa_saldos.copy()
 
-for i in reversed(df.index):  # Do mais recente para o mais antigo
+for i in reversed(df.index):  # do mais recente para o mais antigo
     row = df.loc[i]
     tipo = str(row.get("tipo", "")).strip().lower()
     valor = row["valor"]
-    origem = str(row.get("origem", "")).strip().title()
-    destino = str(row.get("destino", "")).strip().title()
+    origem = row.get("origem", "")
+    destino = row.get("destino", "")
     data = row.get("data", "")
 
     # 🧾 Quem pagou
@@ -73,9 +85,10 @@ for i in reversed(df.index):  # Do mais recente para o mais antigo
 
 # 📊 Exibir resultado
 if linhas:
-    tabela_final = pd.DataFrame(linhas[::-1])  # volta pra ordem original
+    tabela_final = pd.DataFrame(linhas[::-1])  # volta pra ordem cronológica
     st.dataframe(tabela_final, use_container_width=True)
 else:
-    st.error("❌ Nenhuma movimentação válida foi processada. Verifique os nomes dos times e os saldos.")
+    st.error("❌ Nenhuma movimentação válida foi processada. Verifique os nomes dos times e saldos.")
+
 
 
