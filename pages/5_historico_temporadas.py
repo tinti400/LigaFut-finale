@@ -11,15 +11,15 @@ supabase = create_client(url, key)
 st.set_page_config(page_title="🏅 Histórico de Temporadas", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏅 Histórico de Temporadas LigaFut</h1><hr>", unsafe_allow_html=True)
 
-# 🔄 Função para buscar dados do histórico
+# 🔄 Buscar dados do histórico
 def buscar_historico():
-    res = supabase.table("historico_temporadas").select("*").order("data", desc=True).execute()
+    res = supabase.table("historico_temporadas").select("*").order("data_finalizacao", desc=True).execute()
     return res.data if res.data else []
 
 # 📥 Carrega dados
 dados = buscar_historico()
 
-# 🚫 Caso não haja registros
+# 🚫 Nenhum registro
 if not dados:
     st.info("Nenhuma temporada registrada ainda.")
     st.stop()
@@ -28,21 +28,24 @@ if not dados:
 ligas = [item for item in dados if item.get("tipo") == "liga"]
 copas = [item for item in dados if item.get("tipo") == "copa"]
 
-# 🎨 Função para exibir cards
+# 🎨 Card
 def exibir_card_temporada(item):
-    tipo = "🏆 Liga" if item["tipo"] == "liga" else "🥇 Copa"
-    nome = item.get("campeao", "Desconhecido")
-    melhor_ataque = item.get("melhor_ataque", "N/A")
-    melhor_defesa = item.get("melhor_defesa", "N/A")
-    data = pd.to_datetime(item["data"]).strftime("%d/%m/%Y")
+    tipo = "🏆 Liga" if item.get("tipo") == "liga" else "🥇 Copa"
+    campeao = item.get("campeao", "Desconhecido")
+    ataque = item.get("melhor_ataque", "N/A")
+    defesa = item.get("melhor_defesa", "N/A")
+    divisao = item.get("divisao", "")
+    temporada = item.get("temporada", "?")
+    data = pd.to_datetime(item.get("data_finalizacao")).strftime("%d/%m/%Y")
 
     st.markdown(f"""
-        <div style='background:#f0f0f0;padding:15px;border-radius:10px;margin-bottom:15px;
+        <div style='background:#f8f9fa;padding:15px;border-radius:10px;margin-bottom:15px;
                     box-shadow:0 0 6px rgba(0,0,0,0.1); color:#000'>
-            <h4>{tipo} - {data}</h4>
-            <p><strong>🏅 Campeão:</strong> {nome}</p>
-            <p><strong>🔥 Melhor Ataque:</strong> {melhor_ataque}</p>
-            <p><strong>🧱 Melhor Defesa:</strong> {melhor_defesa}</p>
+            <h4>{tipo} | Temporada {temporada} - {divisao}</h4>
+            <p><strong>📅 Data:</strong> {data}</p>
+            <p><strong>🏅 Campeão:</strong> {campeao}</p>
+            <p><strong>🔥 Melhor Ataque:</strong> {ataque}</p>
+            <p><strong>🧱 Melhor Defesa:</strong> {defesa}</p>
         </div>
     """, unsafe_allow_html=True)
 
