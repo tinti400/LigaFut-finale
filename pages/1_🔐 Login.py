@@ -39,7 +39,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# 🌐 Login via URL (?usuario=adm)
+# 🌐 Login via URL (?usuario=...)
 params = st.experimental_get_query_params()
 if "usuario" not in st.session_state and "usuario" in params:
     try:
@@ -47,18 +47,14 @@ if "usuario" not in st.session_state and "usuario" in params:
         res = supabase.table("usuarios").select("*").ilike("usuario", usuario_param).execute()
         if res.data:
             user = res.data[0]
-
-            # ✅ Atualiza session_id mesmo no login via URL
             novo_session_id = str(uuid.uuid4())
             supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
-
             st.session_state["usuario"] = user["usuario"]
             st.session_state["usuario_id"] = user["id"]
             st.session_state["id_time"] = user["time_id"]
             st.session_state["divisao"] = user.get("divisao", "Divisão 1")
             st.session_state["session_id"] = novo_session_id
             st.session_state["administrador"] = user.get("administrador", False)
-
             time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
             st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
     except:
@@ -94,12 +90,8 @@ with st.container():
                     res = supabase.table("usuarios").select("*").ilike("usuario", usuario).ilike("senha", senha).execute()
                     if res.data:
                         user = res.data[0]
-                        novo_session_id = str(uuid.uuid4())  # 🆕 Identificador único da sessão
-
-                        # Atualiza o session_id no banco
+                        novo_session_id = str(uuid.uuid4())
                         supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
-
-                        # Armazena localmente
                         st.session_state["usuario"] = user["usuario"]
                         st.session_state["usuario_id"] = user["id"]
                         st.session_state["id_time"] = user["time_id"]
@@ -107,12 +99,10 @@ with st.container():
                         st.session_state["session_id"] = novo_session_id
                         st.session_state["administrador"] = user.get("administrador", False)
                         st.experimental_set_query_params(usuario=user["usuario"])
-
                         time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
                         st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
-
-                        st.success("✅ Login realizado com sucesso!")
-                        st.rerun()
+                        st.success("✅ Login realizado com sucesso! Redirecionando...")
+                        st.experimental_rerun()
                     else:
                         st.error("❌ Usuário ou senha inválidos.")
                 except Exception as e:
