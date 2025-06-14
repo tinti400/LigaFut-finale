@@ -12,7 +12,7 @@ st.set_page_config(page_title="📊 Painel Financeiro", layout="wide")
 st.markdown("<h1 style='text-align:center;'>📊 Painel Financeiro da LigaFut</h1><hr>", unsafe_allow_html=True)
 
 # ✅ Buscar movimentações
-res = supabase.table("movimentacoes").select("*").order("created_at", desc=True).limit(500).execute()
+res = supabase.table("movimentacoes").select("*").order("data", desc=True).limit(500).execute()
 movs = res.data if res.data else []
 
 if not movs:
@@ -21,12 +21,12 @@ if not movs:
 
 # 🔁 Converter para DataFrame
 df = pd.DataFrame(movs)
-df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%d/%m/%Y %H:%M")
+df["data"] = pd.to_datetime(df["data"]).dt.strftime("%d/%m/%Y %H:%M")
 df["valor"] = df["valor"].astype(float).apply(lambda x: f'R${x:,.0f}'.replace(",", ".").replace(".", ",", 1))
 
 # ✅ Renomear colunas para exibição
 df = df.rename(columns={
-    "created_at": "📅 Data",
+    "data": "📅 Data",
     "tipo": "📁 Tipo",
     "valor": "💰 Valor",
     "jogador": "👤 Jogador",
@@ -58,3 +58,4 @@ if filtro_tipo != "Todos":
 # 📋 Exibir tabela final
 st.markdown(f"<h4 style='margin-top:30px;'>🔽 Total de {len(df_filtrado)} movimentações encontradas</h4>", unsafe_allow_html=True)
 st.dataframe(df_filtrado[["📅 Data", "📁 Tipo", "💰 Valor", "👤 Jogador", "🏳️ Origem", "🏁 Destino"]], use_container_width=True)
+
