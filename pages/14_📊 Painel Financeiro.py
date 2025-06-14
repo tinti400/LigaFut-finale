@@ -22,9 +22,52 @@ df = pd.DataFrame(movs)
 df["data"] = pd.to_datetime(df["data"]).dt.strftime("%d/%m/%Y %H:%M")
 df["valor"] = df["valor"].astype(float)
 
-# ✅ Padronizar nomes dos times nas movimentações
-df["origem"] = df["origem"].astype(str).str.strip().str.title()
-df["destino"] = df["destino"].astype(str).str.strip().str.title()
+# 🔁 Mapeamento de apelidos → nomes oficiais
+apelidos_para_oficial = {
+    "Ajax Amsterdam": "Ajax",
+    "Atlético De Madrid": "Atletico De Madrid",
+    "Atletico Madrid": "Atletico De Madrid",
+    "Fc Barcelona": "Barcelona",
+    "Barcelona Fc": "Barcelona",
+    "Fc Bayern": "Bayern",
+    "Bayern Munique": "Bayern",
+    "Belgrano Fc": "Belgrano",
+    "Boca Juniors": "Boca Jrs",
+    "Boca": "Boca Jrs",
+    "Borussia Dortmund": "Borussia",
+    "Casa Pia Ac": "Casa Pia",
+    "Charleroi Sc": "Charleroi",
+    "Chelsea Fc": "Chelsea",
+    "Estudiantes De La Plata": "Estudiantes",
+    "Intermiami": "Inter Miami",
+    "Inter Miami Cf": "Inter Miami",
+    "Leicester City": "Leicester",
+    "Manchester Utd": "Manchester United",
+    "Man Utd": "Manchester United",
+    "Ac Milan": "Milan",
+    "SSC Napoli": "Napoli",
+    "Napoli Fc": "Napoli",
+    "Newell's": "Newells",
+    "Olympique Marseille": "Olympique Marselhe",
+    "O. Marseille": "Olympique Marselhe",
+    "Palmeiras Fc": "Palmeiras",
+    "Palmeiras Futebol Clube": "Palmeiras",
+    "Paris Saint-Germain": "Psg",
+    "PSG FC": "Psg",
+    "Real Betis Balompié": "Real Betis",
+    "Real Madrid Cf": "Real Madrid",
+    "Rio Ave Fc": "Rio Ave",
+    "River Plate": "River",
+    "As Roma": "Roma",
+    "Tottenham Hotspur": "Tottenham",
+    "Venezia Fc": "Venezia",
+    "Wolverhampton Wanderers": "Wolverhampton",
+    "Wrexham Afc": "Wrexham"
+}
+
+# ✅ Padronizar nomes com título e aplicar mapeamento
+df["origem"] = df["origem"].astype(str).str.strip().str.title().replace(apelidos_para_oficial)
+df["destino"] = df["destino"].astype(str).str.strip().str.title().replace(apelidos_para_oficial)
 
 # 💰 Buscar saldos atuais dos times
 res_saldos = supabase.table("times").select("nome, saldo").execute()
@@ -34,7 +77,7 @@ mapa_saldos = {
     if item.get("nome") and item.get("saldo") is not None
 }
 
-# 👁️ Debug: visualizar times cadastrados vs movimentações
+# 👁️ Visualização para debug
 st.subheader("👁️ Times da tabela de saldos (times):")
 st.write(sorted(mapa_saldos.keys()))
 
@@ -85,10 +128,11 @@ for i in reversed(df.index):  # do mais recente para o mais antigo
 
 # 📊 Exibir resultado
 if linhas:
-    tabela_final = pd.DataFrame(linhas[::-1])  # volta pra ordem cronológica
+    tabela_final = pd.DataFrame(linhas[::-1])  # ordem cronológica
     st.dataframe(tabela_final, use_container_width=True)
 else:
     st.error("❌ Nenhuma movimentação válida foi processada. Verifique os nomes dos times e saldos.")
+
 
 
 
