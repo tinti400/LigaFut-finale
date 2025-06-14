@@ -10,7 +10,7 @@ supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="Login - LigaFut", page_icon="⚽", layout="centered")
 
-# 🎨 Estilo visual moderno
+# 🎨 Estilo visual moderno com botões destacados
 st.markdown("""
     <style>
     .stApp {
@@ -59,6 +59,15 @@ st.markdown("""
     }
     label {
         color: white !important;
+    }
+
+    /* Destacar os títulos dos expansores */
+    [data-testid="stExpander"] > summary {
+        background-color: #66fcf1 !important;
+        color: black !important;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 8px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -137,7 +146,7 @@ with st.container():
             st.warning("⚠️ Preencha todos os campos.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 🔁 Troca de senha
+# 🔁 Troca de senha (visual destacado)
 with st.expander("🔒 Trocar Senha"):
     email_confirm = st.text_input("Confirme seu e-mail")
     senha_atual = st.text_input("Senha atual", type="password")
@@ -162,7 +171,7 @@ with st.expander("🔒 Trocar Senha"):
             except Exception as e:
                 st.error(f"Erro ao atualizar senha: {e}")
 
-# ❓ Esqueci minha senha
+# ❓ Esqueci minha senha (visual destacado)
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
 
