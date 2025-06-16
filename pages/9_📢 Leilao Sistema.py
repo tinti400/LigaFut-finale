@@ -4,6 +4,7 @@ from supabase import create_client
 from datetime import datetime, timedelta
 from utils import registrar_movimentacao
 
+# ✅ Configuração de página (sempre antes de qualquer comando Streamlit)
 st.set_page_config(page_title="Leilões Ativos - LigaFut", layout="wide")
 
 # 🔐 Conexão Supabase
@@ -27,40 +28,7 @@ if restricoes.get("leilao", False):
     st.error("🚫 Seu time está proibido de participar de leilões.")
     st.stop()
 
-# 🔄 Buscar todos os leilões ativos
-res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).order("fim").execute()
-leiloes_ativos = res.data
-
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-from datetime import datetime, timedelta
-from utils import registrar_movimentacao
-
-st.set_page_config(page_title="Leilões Ativos - LigaFut", layout="wide")
-
-# 🔐 Conexão Supabase
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
-
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado para acessar esta página.")
-    st.stop()
-
-usuario_id = st.session_state["usuario_id"]
-id_time_usuario = st.session_state["id_time"]
-nome_time_usuario = st.session_state.get("nome_time", "")
-
-# 🔒 Verifica restrição de leilão
-res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time_usuario).execute()
-restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
-if restricoes.get("leilao", False):
-    st.error("🚫 Seu time está proibido de participar de leilões.")
-    st.stop()
-
-# 🔄 Buscar todos os leilões ativos
+# 🔄 Buscar leilões ativos
 res = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).order("fim").execute()
 leiloes_ativos = res.data
 
@@ -76,8 +44,11 @@ for leilao in leiloes_ativos:
 
     with col1:
         imagem_url = leilao.get("imagem_url", "")
-        if imagem_url and imagem_url.startswith("http"):
-            st.image(imagem_url, width=150)
+        if imagem_url:
+            try:
+                st.image(imagem_url, width=150)
+            except:
+                st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
         else:
             st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
 
@@ -93,8 +64,9 @@ for leilao in leiloes_ativos:
         st.markdown(f"**💰 Preço atual:** R$ {leilao['valor_atual']:,}".replace(",", "."))
 
         if leilao.get("id_time_atual"):
-            nome_time = supabase.table("times").select("nome").eq("id", leilao["id_time_atual"]).execute().data[0]["nome"]
-            st.markdown(f"**🏷️ Último Lance:** {nome_time}")
+            res_nome_time = supabase.table("times").select("nome").eq("id", leilao["id_time_atual"]).execute()
+            if res_nome_time.data:
+                st.markdown(f"**🏷️ Último Lance:** {res_nome_time.data[0]['nome']}")
 
         if tempo_restante == 0:
             if not leilao.get("finalizado") and not leilao.get("validado"):
@@ -110,12 +82,11 @@ for leilao in leiloes_ativos:
         st.markdown("#### 💥 Enviar Lance")
         incremento = leilao["incremento_minimo"]
         botoes = [(leilao["valor_atual"] + incremento * i) for i in range(1, 11)]
+        colunas = st.columns(len(botoes))
 
-        colunas = st.columns(5)
         for i, valor_lance in enumerate(botoes):
-            coluna = colunas[i % 5]
-            with coluna:
-                if st.button(f"➕ R$ {valor_lance:,.0f}".replace(",", "."), key=f"lance_{leilao['id']}_{i}"):
+            with colunas[i]:
+                if st.button(f"➕ R$ {valor_lance:,.0f}".replace(",", "."), key=f"{leilao['id']}_lance_{i}"):
                     saldo_ref = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
                     saldo = saldo_ref.data[0]["saldo"]
 
@@ -123,18 +94,20 @@ for leilao in leiloes_ativos:
                         st.error("❌ Saldo insuficiente.")
                     else:
                         agora = datetime.utcnow()
-                        novo_fim = fim_dt
-                        if (fim_dt - agora).total_seconds() <= 15:
-                            novo_fim = agora + timedelta(seconds=15)
+                        fim_atual = datetime.fromisoformat(leilao["fim"])
+                        if (fim_atual - agora).total_seconds() <= 15:
+                            fim_novo = agora + timedelta(seconds=15)
+                        else:
+                            fim_novo = fim_atual
 
                         supabase.table("leiloes").update({
                             "valor_atual": valor_lance,
                             "id_time_atual": id_time_usuario,
                             "time_vencedor": nome_time_usuario,
-                            "fim": novo_fim.isoformat()
+                            "fim": fim_novo.isoformat()
                         }).eq("id", leilao["id"]).execute()
 
-                        st.success("✅ Lance enviado!")
+                        st.success("✅ Lance enviado com sucesso!")
                         st.experimental_rerun()
 
 st.markdown("---")
