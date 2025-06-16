@@ -36,12 +36,17 @@ if not leiloes:
 
 # 🔁 Loop nos leilões
 for leilao in leiloes:
-    st.markdown("---")
-    st.subheader(f"🧤 {leilao['nome_jogador']} ({leilao['posicao_jogador']})")
-
     fim = leilao.get("fim")
     fim_dt = datetime.fromisoformat(fim)
     tempo_restante = max(0, int((fim_dt - datetime.utcnow()).total_seconds()))
+
+    # ⛔ Garante que leilões finalizados aguardando validação não sejam exibidos
+    if datetime.utcnow() >= fim_dt and not leilao.get("aguardando_validacao", False):
+        continue
+
+    st.markdown("---")
+    st.subheader(f"🧤 {leilao['nome_jogador']} ({leilao['posicao_jogador']})")
+
     minutos, segundos = divmod(tempo_restante, 60)
 
     valor_atual = leilao["valor_atual"]
@@ -94,10 +99,12 @@ for leilao in leiloes:
                 if novo_lance > saldo:
                     st.error("❌ Saldo insuficiente.")
                 else:
+                    # ⏳ Estender tempo se necessário
                     agora = datetime.utcnow()
                     if (fim_dt - agora).total_seconds() <= 15:
                         fim_dt = agora + timedelta(seconds=15)
 
+                    # Atualizar leilão
                     supabase.table("leiloes").update({
                         "valor_atual": novo_lance,
                         "id_time_atual": id_time_usuario,
