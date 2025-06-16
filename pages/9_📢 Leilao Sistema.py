@@ -42,9 +42,10 @@ for leilao in leiloes_ativos:
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        try:
-            st.image(leilao.get("imagem_url") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
-        except:
+        imagem_url = leilao.get("imagem_url", "")
+        if imagem_url and imagem_url.startswith("http"):
+            st.image(imagem_url, width=150)
+        else:
             st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
 
     with col2:
@@ -62,7 +63,6 @@ for leilao in leiloes_ativos:
             nome_time = supabase.table("times").select("nome").eq("id", leilao["id_time_atual"]).execute().data[0]["nome"]
             st.markdown(f"**🏷️ Último Lance:** {nome_time}")
 
-        # 🔚 Se acabou o tempo
         if tempo_restante == 0:
             if not leilao.get("finalizado") and not leilao.get("validado"):
                 supabase.table("leiloes").update({
@@ -74,12 +74,11 @@ for leilao in leiloes_ativos:
                 st.info("⏳ Leilão já finalizado.")
             continue
 
-        # ✅ Só mostra botão se leilão ainda estiver aberto
-        if tempo_restante > 0:
-            st.markdown("#### 💥 Enviar Lance")
-            colunas = st.columns(5)
-            botoes = [(leilao["valor_atual"] + leilao["incremento_minimo"] * i) for i in range(1, 6)]
+        st.markdown("#### 💥 Enviar Lance")
+        botoes = [(leilao["valor_atual"] + leilao["incremento_minimo"] * i) for i in range(1, 6)]
 
+        if len(botoes) >= 1:
+            colunas = st.columns(len(botoes))
             for i, valor_lance in enumerate(botoes):
                 with colunas[i]:
                     if st.button(f"➕ R$ {valor_lance:,.0f}".replace(",", "."), key=f"lance_{leilao['id']}_{i}"):
@@ -90,14 +89,15 @@ for leilao in leiloes_ativos:
                             st.error("❌ Saldo insuficiente.")
                         else:
                             agora = datetime.utcnow()
+                            novo_fim = fim_dt
                             if (fim_dt - agora).total_seconds() <= 15:
-                                fim_dt = agora + timedelta(seconds=15)
+                                novo_fim = agora + timedelta(seconds=15)
 
                             supabase.table("leiloes").update({
                                 "valor_atual": valor_lance,
                                 "id_time_atual": id_time_usuario,
                                 "time_vencedor": nome_time_usuario,
-                                "fim": fim_dt.isoformat()
+                                "fim": novo_fim.isoformat()
                             }).eq("id", leilao["id"]).execute()
 
                             st.success("✅ Lance enviado!")
