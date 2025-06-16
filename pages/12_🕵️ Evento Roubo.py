@@ -59,7 +59,7 @@ if st.button("🔄 Atualizar Página"):
 # ADMIN - Reiniciar evento
 if eh_admin:
     st.subheader("🔁 Reiniciar Evento com Nova Ordem")
-    if st.button("🔀 Embaralhar e Iniciar Evento"):
+    if st.button("🌀 Embaralhar e Iniciar Evento"):
         res_times = supabase.table("times").select("id", "nome").execute()
         if not res_times.data:
             st.error("❌ Nenhum time encontrado.")
@@ -98,12 +98,11 @@ if ativo and fase == "bloqueio":
     if len(nomes_bloqueados) < limite_bloqueios:
         max_selecao = limite_bloqueios - len(nomes_bloqueados)
         selecionados = st.multiselect(f"Selecione até {max_selecao} jogador(es) para proteger:", nomes_livres)
-        if selecionados and st.button("🔒 Confirmar proteção"):
-            for nome in selecionados[:max_selecao]:
-                jogador = next(j for j in jogadores_livres if j["nome"] == nome)
-                bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
-            bloqueios[id_time] = bloqueios_atual
+        if selecionados and st.button("🔐 Confirmar proteção"):
+            novos_bloqueios = [{"nome": j["nome"], "posicao": j["posicao"]} for j in jogadores_livres if j["nome"] in selecionados[:max_selecao]]
+            bloqueios[id_time] = bloqueios_atual + novos_bloqueios
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
+            st.success(f"✅ {len(novos_bloqueios)} jogador(es) protegidos com sucesso.")
             st.experimental_rerun()
 
     if bloqueios_atual:
@@ -212,9 +211,9 @@ if evento.get("finalizado"):
         for jogador in lista:
             nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
             resumo.append({
-                "🏆 Time que Roubou": nome_destino,
+                "🌟 Time que Roubou": nome_destino,
                 "👤 Jogador": jogador["nome"],
-                "🎯 Posição": jogador["posicao"],
+                "🌟 Posição": jogador["posicao"],
                 "💰 Valor Pago (50%)": f"R$ {int(jogador['valor'])//2:,.0f}",
                 "❌ Time Roubado": nome_origem
             })
@@ -223,5 +222,3 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
-
-
