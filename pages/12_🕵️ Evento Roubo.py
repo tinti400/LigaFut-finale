@@ -22,7 +22,7 @@ nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
 # Verifica se o time está proibido de participar
-try:
+tente:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
     restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
     if restricoes.get("roubo", False):
@@ -56,10 +56,12 @@ limite_bloqueios = evento.get("limite_bloqueios", 3)
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
-# ADMIN - Reiniciar evento
+# ADMIN - Definir limite de bloqueios e iniciar evento
 if eh_admin:
-    st.subheader("🔁 Reiniciar Evento com Nova Ordem")
-    if st.button("🌀 Embaralhar e Iniciar Evento"):
+    st.subheader("🔐 Configurar Limite de Bloqueio")
+    novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=3, step=1)
+
+    if st.button("✅ Salvar limite e iniciar evento"):
         res_times = supabase.table("times").select("id", "nome").execute()
         if not res_times.data:
             st.error("❌ Nenhum time encontrado.")
@@ -78,10 +80,11 @@ if eh_admin:
                 "ultimos_bloqueios": bloqueios,
                 "ja_perderam": {},
                 "concluidos": [],
-                "inicio": str(datetime.utcnow())
+                "inicio": str(datetime.utcnow()),
+                "limite_bloqueios": novo_limite
             }).eq("id", ID_CONFIG).execute()
-            st.success("✅ Evento reiniciado.")
-            st.rerun()
+            st.success("✅ Evento iniciado com novo limite de bloqueio.")
+            st.experimental_rerun()
 
 # Fase de Bloqueio
 if ativo and fase == "bloqueio":
