@@ -94,12 +94,10 @@ for leilao in leiloes:
                 if novo_lance > saldo:
                     st.error("❌ Saldo insuficiente.")
                 else:
-                    # ⏳ Estender tempo se necessário
                     agora = datetime.utcnow()
                     if (fim_dt - agora).total_seconds() <= 15:
                         fim_dt = agora + timedelta(seconds=15)
 
-                    # Atualizar leilão
                     supabase.table("leiloes").update({
                         "valor_atual": novo_lance,
                         "id_time_atual": id_time_usuario,
@@ -114,3 +112,4 @@ for leilao in leiloes:
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
+
