@@ -8,10 +8,12 @@ from utils import verificar_login, registrar_movimentacao
 
 st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
 
+# 🔗 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🔐 Verifica login
 verificar_login()
 
 id_usuario = st.session_state["usuario_id"]
@@ -19,8 +21,8 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
-# Verifica se o time está proibido de participar
-tente:
+# 🔒 Verifica se o time está proibido de participar
+try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
     restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
     if restricoes.get("roubo", False):
@@ -33,6 +35,7 @@ st.title("🕵️ Evento de Roubo - LigaFut")
 
 ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"
 
+# ⚙️ Configurações do evento
 admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = admin_ref.data and admin_ref.data[0]["administrador"]
 
@@ -51,11 +54,12 @@ roubos = evento.get("roubos", {})
 limite_bloqueios = evento.get("limite_bloqueios", 4)
 
 if st.button("🔄 Atualizar Página"):
-    st.experimental_rerun()
+    st.rerun()
 
+# 🔁 ADMIN - Reiniciar evento
 if eh_admin:
-    st.subheader("🔁 Reiniciar Evento com Nova Ordem (Admin)")
-    if st.button("🔀 Embaralhar e Reiniciar Evento"):
+    st.subheader("🔁 Reiniciar Evento com Nova Ordem")
+    if st.button("🔀 Embaralhar e Iniciar Evento"):
         res_times = supabase.table("times").select("id", "nome").execute()
         if not res_times.data:
             st.error("❌ Nenhum time encontrado.")
@@ -77,15 +81,16 @@ if eh_admin:
                 "inicio": str(datetime.utcnow())
             }).eq("id", ID_CONFIG).execute()
             st.success("✅ Evento reiniciado.")
-            st.experimental_rerun()
+            st.rerun()
 
-# 🔒 Proteção dos jogadores
+# 🔐 Fase de Bloqueio
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
     bloqueios_atual = bloqueios.get(id_time, [])
     bloqueios_anteriores = ultimos_bloqueios.get(id_time, [])
     nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
     nomes_anteriores = [j["nome"] for j in bloqueios_anteriores]
+
     elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
     jogadores_livres = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados + nomes_anteriores]
 
@@ -96,17 +101,17 @@ if ativo and fase == "bloqueio":
             bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
             bloqueios[id_time] = bloqueios_atual
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
-            st.experimental_rerun()
+            st.rerun()
     else:
         for j in bloqueios_atual:
             st.markdown(f"- 🔐 {j['nome']} ({j['posicao']})")
 
-    if eh_admin:
-        if st.button("👉 Iniciar Fase de Ação"):
-            supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
-            st.experimental_rerun()
+    if eh_admin and st.button("👉 Iniciar Fase de Ação"):
+        supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
+        st.success("🚀 Fase de ação iniciada.")
+        st.rerun()
 
-# 🛠️ Fase de Ação
+# ⚔️ Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
     id_atual = ordem[vez]
     if id_time == id_atual:
@@ -150,22 +155,24 @@ if ativo and fase == "acao" and vez < len(ordem):
                     ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
                     supabase.table("configuracoes").update({"roubos": roubos, "ja_perderam": ja_perderam}).eq("id", ID_CONFIG).execute()
                     st.success("✅ Jogador roubado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.success("🔄 Sua vez foi encerrada.")
-                st.experimental_rerun()
+                st.rerun()
     else:
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.warning(f"⏳ Aguarde, é a vez de **{nome_proximo}**")
 
+# ✅ Finalizar evento
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado. Veja o resumo.")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
-    st.experimental_rerun()
+    st.rerun()
 
+# 📊 Resumo
 if evento.get("finalizado"):
     st.success("✅ Evento encerrado. Veja as transferências:")
     resumo = []
@@ -184,4 +191,5 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
 
