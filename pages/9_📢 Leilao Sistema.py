@@ -42,7 +42,11 @@ for leilao in leiloes_ativos:
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.image(leilao.get("imagem_url", ""), width=150)
+        imagem = leilao.get("imagem_url", "")
+        if imagem and (imagem.startswith("http://") or imagem.startswith("https://")):
+            st.image(imagem, width=150)
+        else:
+            st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
 
     with col2:
         fim_dt = datetime.fromisoformat(leilao["fim"])
