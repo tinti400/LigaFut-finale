@@ -22,7 +22,7 @@ nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
 # Verifica se o time está proibido de participar
-tente:
+try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
     restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
     if restricoes.get("roubo", False):
@@ -56,7 +56,7 @@ limite_bloqueios = evento.get("limite_bloqueios", 3)
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
-# ADMIN - Definir limite de bloqueios e iniciar evento
+# ADMIN - Definir limite de bloqueios
 if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
     novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=3, step=1)
