@@ -81,7 +81,7 @@ if eh_admin:
                 "inicio": str(datetime.utcnow())
             }).eq("id", ID_CONFIG).execute()
             st.success("✅ Evento reiniciado.")
-            st.experimental_rerun()
+            st.rerun()
 
 # Fase de Bloqueio
 if ativo and fase == "bloqueio":
