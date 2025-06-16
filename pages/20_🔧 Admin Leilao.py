@@ -94,7 +94,15 @@ if ativos:
         else:
             st.info(f"⏳ Tempo restante: {int(restante.total_seconds())} segundos")
 else:
-    inativos = supabase.table("leiloes").select("*").eq("ativo", False).eq("finalizado", False).order("valor_atual").limit(3).execute().data
+    inativos = supabase.table("leiloes") \
+        .select("*") \
+        .eq("ativo", False) \
+        .eq("finalizado", False) \
+        .eq("aguardando_validacao", False) \
+        .order("valor_atual") \
+        .limit(3) \
+        .execute().data
+
     if inativos:
         for leilao in inativos:
             agora = datetime.utcnow()
@@ -162,11 +170,11 @@ if pendentes.data:
             except Exception as e:
                 st.error(f"Erro ao validar o leilão: {e}")
 
-# 🗑️ Botão para limpar histórico de leilões já enviados ao BID
+# 🪨 Botão para limpar histórico de leilões já enviados ao BID
 st.markdown("---")
-st.subheader("🧨 Limpar Histórico de Leilões Enviados ao BID")
+st.subheader("🪨 Limpar Histórico de Leilões Enviados ao BID")
 
-if st.button("🧹 Apagar Histórico de Leilões Enviados"):
+if st.button("🪩 Apagar Histórico de Leilões Enviados"):
     try:
         supabase.table("leiloes") \
             .delete() \
