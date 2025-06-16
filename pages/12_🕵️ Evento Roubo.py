@@ -99,7 +99,12 @@ if ativo and fase == "bloqueio":
         max_selecao = limite_bloqueios - len(nomes_bloqueados)
         selecionados = st.multiselect(f"Selecione até {max_selecao} jogador(es) para proteger:", nomes_livres)
         if selecionados and st.button("🔐 Confirmar proteção"):
-            novos_bloqueios = [{"nome": j["nome"], "posicao": j["posicao"]} for j in jogadores_livres if j["nome"] in selecionados[:max_selecao]]
+            novos_nomes = list(set(selecionados[:max_selecao]) - set(nomes_bloqueados))
+            novos_bloqueios = []
+            for nome in novos_nomes:
+                jogador = next((j for j in jogadores_livres if j["nome"] == nome), None)
+                if jogador:
+                    novos_bloqueios.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
             bloqueios[id_time] = bloqueios_atual + novos_bloqueios
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
             st.success(f"✅ {len(novos_bloqueios)} jogador(es) protegidos com sucesso.")
