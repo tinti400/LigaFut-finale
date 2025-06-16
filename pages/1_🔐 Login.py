@@ -28,16 +28,7 @@ st.markdown("""
         margin: auto;
         color: white;
     }
-    .login-card input {
-        background-color: #1f2833 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        font-size: 1.05rem !important;
-    }
     .stTextInput>div>div>input {
-        font-size: 1.05rem !important;
-    }
-    .stSelectbox>div>div {
         font-size: 1.05rem !important;
     }
     .stButton>button {
@@ -55,13 +46,10 @@ st.markdown("""
         background-color: #45e0d1;
         transform: scale(1.02);
     }
-
-    /* Botão verde para Atualizar Senha */
     button[data-baseweb="button"][id="senha"] {
         background-color: #34c759 !important;
         color: white !important;
     }
-
     h2 {
         font-size: 30px;
         text-align: center;
@@ -76,7 +64,6 @@ st.markdown("""
         color: white !important;
         font-size: 1.05rem !important;
     }
-
     [data-testid="stExpander"] > summary {
         background-color: #66fcf1 !important;
         color: black !important;
@@ -96,14 +83,12 @@ if "usuario" not in st.session_state and "usuario" in params:
         res = supabase.table("usuarios").select("*").ilike("usuario", usuario_param).execute()
         if res.data:
             user = res.data[0]
-            novo_session_id = str(uuid.uuid4())
-            supabase.table("usuarios").update({"session_id": novo_session_id}).eq("id", user["id"]).execute()
             st.session_state["usuario"] = user["usuario"]
             st.session_state["usuario_id"] = user["id"]
             st.session_state["id_time"] = user["time_id"]
             st.session_state["divisao"] = user.get("divisao", "Divisão 1")
-            st.session_state["session_id"] = novo_session_id
             st.session_state["administrador"] = user.get("administrador", False)
+            st.session_state["session_id"] = user.get("session_id", "")
             time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
             st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
     except:
@@ -112,7 +97,7 @@ if "usuario" not in st.session_state and "usuario" in params:
 # 🔓 Se já estiver logado
 if "usuario" in st.session_state:
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
-    if st.button("🔓 Sair"):
+    if st.button("🔒 Sair"):
         for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao", "session_id", "administrador"]:
             st.session_state.pop(key, None)
         st.experimental_set_query_params()
@@ -121,7 +106,7 @@ if "usuario" in st.session_state:
     st.sidebar.success("Acesse seu painel ao lado.")
     st.stop()
 
-# 🧾 Formulário
+# 🧾 Formulário de login
 with st.container():
     st.markdown("<div class='login-card'>", unsafe_allow_html=True)
     st.image("https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/fundo/logo-ligafut.png", width=100)
@@ -147,8 +132,8 @@ with st.container():
                         st.session_state["usuario_id"] = user["id"]
                         st.session_state["id_time"] = user["time_id"]
                         st.session_state["divisao"] = user.get("divisao", "Divisão 1")
-                        st.session_state["session_id"] = novo_session_id
                         st.session_state["administrador"] = user.get("administrador", False)
+                        st.session_state["session_id"] = novo_session_id
                         st.experimental_set_query_params(usuario=user["usuario"])
                         time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
                         st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
@@ -190,4 +175,3 @@ with st.expander("🔒 Trocar Senha"):
 # ❓ Esqueci minha senha
 with st.expander("❓ Esqueci minha senha"):
     st.info("Entre em contato com o administrador da LigaFut para redefinir sua senha.")
-
