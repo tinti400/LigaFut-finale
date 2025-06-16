@@ -51,7 +51,7 @@ bloqueios = evento.get("bloqueios", {})
 ultimos_bloqueios = evento.get("ultimos_bloqueios", {})
 ja_perderam = evento.get("ja_perderam", {})
 roubos = evento.get("roubos", {})
-limite_bloqueios = evento.get("limite_bloqueios", 4)
+limite_bloqueios = evento.get("limite_bloqueios", 3)
 
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
@@ -92,17 +92,22 @@ if ativo and fase == "bloqueio":
     nomes_anteriores = [j["nome"] for j in bloqueios_anteriores]
 
     elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
-    jogadores_livres = [j["nome"] for j in elenco if j["nome"] not in nomes_bloqueados + nomes_anteriores]
+    jogadores_livres = [j for j in elenco if j["nome"] not in nomes_bloqueados + nomes_anteriores]
+    nomes_livres = [j["nome"] for j in jogadores_livres]
 
     if len(nomes_bloqueados) < limite_bloqueios:
-        selecionado = st.selectbox("Selecione um jogador para proteger:", [""] + jogadores_livres)
-        if selecionado and st.button("🔒 Proteger jogador"):
-            jogador = next(j for j in elenco if j["nome"] == selecionado)
-            bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
+        max_selecao = limite_bloqueios - len(nomes_bloqueados)
+        selecionados = st.multiselect(f"Selecione até {max_selecao} jogador(es) para proteger:", nomes_livres)
+        if selecionados and st.button("🔒 Confirmar proteção"):
+            for nome in selecionados[:max_selecao]:
+                jogador = next(j for j in jogadores_livres if j["nome"] == nome)
+                bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
             bloqueios[id_time] = bloqueios_atual
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
             st.experimental_rerun()
-    else:
+
+    if bloqueios_atual:
+        st.markdown("👥 Jogadores protegidos:")
         for j in bloqueios_atual:
             st.markdown(f"- 🔐 {j['nome']} ({j['posicao']})")
 
@@ -166,6 +171,14 @@ if ativo and fase == "acao" and vez < len(ordem):
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.warning(f"⏳ Aguarde, é a vez de **{nome_proximo}**")
 
+        if eh_admin and st.button("⏭️ Pular vez deste time"):
+            supabase.table("configuracoes").update({
+                "vez": str(vez + 1),
+                "concluidos": concluidos + [id_atual]
+            }).eq("id", ID_CONFIG).execute()
+            st.success(f"⏭️ Vez de {nome_proximo} pulada com sucesso.")
+            st.experimental_rerun()
+
 # ✅ Finalizar evento
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado. Veja o resumo.")
@@ -191,5 +204,3 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
-
-
