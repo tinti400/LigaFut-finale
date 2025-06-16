@@ -25,7 +25,6 @@ if "usuario" in st.session_state:
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
     restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
-
     if restricoes.get("mercado", False):
         st.error("🚫 Seu time está proibido de acessar o Mercado de Transferências.")
         st.stop()
@@ -103,7 +102,12 @@ for jogador in jogadores_pagina:
             st.button("❌ Comprar (bloqueado)", key=f"bloqueado_{jogador['id']}", disabled=True)
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
-                if saldo_time < jogador["valor"]:
+                # Verificação extra para evitar duplicação
+                check = supabase.table("mercado_transferencias").select("id").eq("id", jogador["id"]).execute()
+                if not check.data:
+                    st.error("❌ Este jogador já foi comprado por outro time.")
+                    st.experimental_rerun()
+                elif saldo_time < jogador["valor"]:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
@@ -132,7 +136,7 @@ for jogador in jogadores_pagina:
                     except Exception as e:
                         st.error(f"Erro ao comprar jogador: {e}")
 
-    # ✏️ Edição e exclusão apenas para admins
+    # ⚙️ Admin: editar valor ou excluir
     if is_admin:
         with st.expander(f"⚙️ Opções administrativas - {jogador['nome']}"):
             novo_valor = st.number_input(
@@ -161,7 +165,7 @@ for jogador in jogadores_pagina:
                     except Exception as e:
                         st.error(f"Erro ao excluir jogador: {e}")
 
-# 🔁 Navegação entre páginas
+# 🔁 Paginação
 col_nav1, col_nav2, col_nav3 = st.columns(3)
 with col_nav1:
     if st.button("⬅ Página anterior") and pagina_atual > 1:
