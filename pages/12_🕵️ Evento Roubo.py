@@ -154,31 +154,42 @@ if ativo and fase == "acao" and vez < len(ordem):
                 nomes_disponiveis = [j["nome"] for j in disponiveis]
 
                 jogador_nome = st.selectbox("Escolha um jogador:", [""] + nomes_disponiveis)
-                if jogador_nome and st.button("💰 Roubar jogador"):
+                if jogador_nome:
                     jogador = next(j for j in disponiveis if j["nome"] == jogador_nome)
                     valor = jogador["valor"]
                     valor_pago = valor // 2
+                    st.info(f"💰 Valor do jogador: R$ {valor:,.0f} | Valor a ser pago: R$ {valor_pago:,.0f}")
 
-                    supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador_nome).execute()
-                    supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
-                    registrar_movimentacao(id_time, jogador_nome, "roubo", "entrada", valor_pago)
-                    registrar_movimentacao(id_alvo, jogador_nome, "roubo", "saida", valor_pago)
+                    if st.button("💰 Roubar jogador"):
+                        supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador_nome).execute()
+                        supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
+                        registrar_movimentacao(id_time, jogador_nome, "roubo", "entrada", valor_pago)
+                        registrar_movimentacao(id_alvo, jogador_nome, "roubo", "saida", valor_pago)
 
-                    roubos.setdefault(id_time, []).append({
-                        "nome": jogador_nome,
-                        "posicao": jogador["posicao"],
-                        "valor": valor,
-                        "de": id_alvo
-                    })
-                    ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
+                        # Atualiza saldo dos times
+                        res_saldos = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute()
+                        saldos = {item["id"]: item["saldo"] for item in res_saldos.data}
+                        novo_saldo_comprador = saldos.get(id_time, 0) - valor_pago
+                        novo_saldo_vendedor = saldos.get(id_alvo, 0) + valor_pago
 
-                    supabase.table("configuracoes").update({
-                        "roubos": roubos,
-                        "ja_perderam": ja_perderam
-                    }).eq("id", ID_CONFIG).execute()
+                        supabase.table("times").update({"saldo": novo_saldo_comprador}).eq("id", id_time).execute()
+                        supabase.table("times").update({"saldo": novo_saldo_vendedor}).eq("id", id_alvo).execute()
 
-                    st.success("✅ Jogador roubado com sucesso!")
-                    st.experimental_rerun()
+                        roubos.setdefault(id_time, []).append({
+                            "nome": jogador_nome,
+                            "posicao": jogador["posicao"],
+                            "valor": valor,
+                            "de": id_alvo
+                        })
+                        ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
+
+                        supabase.table("configuracoes").update({
+                            "roubos": roubos,
+                            "ja_perderam": ja_perderam
+                        }).eq("id", ID_CONFIG).execute()
+
+                        st.success("✅ Jogador roubado com sucesso!")
+                        st.experimental_rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
@@ -225,4 +236,5 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
 
