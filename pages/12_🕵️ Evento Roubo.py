@@ -54,7 +54,7 @@ roubos = evento.get("roubos", {})
 limite_bloqueios = evento.get("limite_bloqueios", 3)
 
 if st.button("🔄 Atualizar Página"):
-    st.rerun()
+    st.experimental_rerun()
 
 # ADMIN - Reiniciar evento
 if eh_admin:
@@ -81,7 +81,7 @@ if eh_admin:
                 "inicio": str(datetime.utcnow())
             }).eq("id", ID_CONFIG).execute()
             st.success("✅ Evento reiniciado.")
-            st.rerun()
+            st.experimental_rerun()
 
 # Fase de Bloqueio
 if ativo and fase == "bloqueio":
@@ -104,7 +104,7 @@ if ativo and fase == "bloqueio":
                 bloqueios_atual.append({"nome": jogador["nome"], "posicao": jogador["posicao"]})
             bloqueios[id_time] = bloqueios_atual
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
-            st.rerun()
+            st.experimental_rerun()
 
     if bloqueios_atual:
         st.markdown("👥 Jogadores protegidos:")
@@ -114,7 +114,7 @@ if ativo and fase == "bloqueio":
     if eh_admin and st.button("👉 Iniciar Fase de Ação"):
         supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
         st.success("🚀 Fase de ação iniciada.")
-        st.rerun()
+        st.experimental_rerun()
 
 # Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
@@ -181,13 +181,13 @@ if ativo and fase == "acao" and vez < len(ordem):
                         }).eq("id", ID_CONFIG).execute()
 
                         st.success("✅ Jogador roubado com sucesso!")
-                        st.rerun()
+                        st.experimental_rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.success("🔄 Sua vez foi encerrada.")
-                st.rerun()
+                st.experimental_rerun()
     else:
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.warning(f"⏳ Aguarde, é a vez de **{nome_proximo}**")
@@ -195,13 +195,13 @@ if ativo and fase == "acao" and vez < len(ordem):
         if eh_admin and st.button("⏭️ Pular vez deste time"):
             supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success(f"⏭️ Vez de {nome_proximo} pulada com sucesso.")
-            st.rerun()
+            st.experimental_rerun()
 
 # Finalizar evento
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado. Veja o resumo.")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
-    st.rerun()
+    st.experimental_rerun()
 
 # Resumo
 if evento.get("finalizado"):
