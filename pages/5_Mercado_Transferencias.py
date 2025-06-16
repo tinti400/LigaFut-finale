@@ -48,7 +48,7 @@ st.markdown("### 🔍 Filtros de Pesquisa")
 filtro_nome = st.text_input("Nome do jogador").strip().lower()
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
 
-# 📅 Carrega jogadores do mercado
+# 🗕️ Carrega jogadores do mercado
 res = supabase.table("mercado_transferencias").select("*").execute()
 mercado = res.data if res.data else []
 
@@ -82,9 +82,11 @@ jogadores_pagina = jogadores_filtrados[inicio:fim]
 res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
 qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
 
-# 🛒 Exibição
+# 📒 Exibição
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
+
+selecionados = set()
 
 for jogador in jogadores_pagina:
     col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
@@ -102,7 +104,6 @@ for jogador in jogadores_pagina:
             st.button("❌ Comprar (bloqueado)", key=f"bloqueado_{jogador['id']}", disabled=True)
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
-                # Verificação extra para evitar duplicação
                 check = supabase.table("mercado_transferencias").select("id").eq("id", jogador["id"]).execute()
                 if not check.data:
                     st.error("❌ Este jogador já foi comprado por outro time.")
@@ -136,34 +137,26 @@ for jogador in jogadores_pagina:
                     except Exception as e:
                         st.error(f"Erro ao comprar jogador: {e}")
 
-    # ⚙️ Admin: editar valor ou excluir
     if is_admin:
-        with st.expander(f"⚙️ Opções administrativas - {jogador['nome']}"):
-            novo_valor = st.number_input(
-                "✏️ Novo valor (R$)",
-                min_value=0,
-                value=jogador["valor"],
-                step=100000,
-                format="%d",
-                key=f"novo_valor_{jogador['id']}"
-            )
-            col_valor, col_excluir = st.columns(2)
-            with col_valor:
-                if st.button("💾 Salvar novo valor", key=f"salvar_valor_{jogador['id']}"):
-                    try:
-                        supabase.table("mercado_transferencias").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
-                        st.success("✅ Valor atualizado com sucesso!")
-                        st.experimental_rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao atualizar valor: {e}")
-            with col_excluir:
-                if st.button("🗑️ Excluir do mercado", key=f"excluir_{jogador['id']}"):
-                    try:
-                        supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                        st.success(f"Jogador {jogador['nome']} removido do mercado.")
-                        st.experimental_rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao excluir jogador: {e}")
+        if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
+            selecionados.add(jogador["id"])
+
+# 🩵 Ações em massa para admin
+if is_admin:
+    st.markdown("---")
+    st.markdown("### 🩵 Ações em massa (admin)")
+    if selecionados:
+        st.warning(f"{len(selecionados)} jogadores selecionados.")
+        if st.button("🗑️ Excluir selecionados do mercado"):
+            try:
+                for id_jogador in selecionados:
+                    supabase.table("mercado_transferencias").delete().eq("id", id_jogador).execute()
+                st.success("✅ Jogadores excluídos com sucesso!")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir múltiplos jogadores: {e}")
+    else:
+        st.info("Selecione jogadores acima para habilitar a exclusão.")
 
 # 🔁 Paginação
 col_nav1, col_nav2, col_nav3 = st.columns(3)
