@@ -142,7 +142,15 @@ if ativo and fase == "acao" and vez < len(ordem):
 
                 elenco_alvo = supabase.table("elenco").select("*").eq("id_time", id_alvo).execute().data or []
                 bloqueados = [j["nome"] for j in bloqueios.get(id_alvo, [])]
-                disponiveis = [j for j in elenco_alvo if j["nome"] not in bloqueados]
+
+                jogadores_ja_roubados = []
+                for lista in roubos.values():
+                    jogadores_ja_roubados.extend([r["nome"] for r in lista])
+
+                disponiveis = [
+                    j for j in elenco_alvo
+                    if j["nome"] not in bloqueados and j["nome"] not in jogadores_ja_roubados
+                ]
                 nomes_disponiveis = [j["nome"] for j in disponiveis]
 
                 jogador_nome = st.selectbox("Escolha um jogador:", [""] + nomes_disponiveis)
@@ -156,15 +164,28 @@ if ativo and fase == "acao" and vez < len(ordem):
                     registrar_movimentacao(id_time, jogador_nome, "roubo", "entrada", valor_pago)
                     registrar_movimentacao(id_alvo, jogador_nome, "roubo", "saida", valor_pago)
 
-                    roubos.setdefault(id_time, []).append({"nome": jogador_nome, "posicao": jogador["posicao"], "valor": valor, "de": id_alvo})
+                    roubos.setdefault(id_time, []).append({
+                        "nome": jogador_nome,
+                        "posicao": jogador["posicao"],
+                        "valor": valor,
+                        "de": id_alvo
+                    })
                     ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
-                    supabase.table("configuracoes").update({"roubos": roubos, "ja_perderam": ja_perderam}).eq("id", ID_CONFIG).execute()
+
+                    supabase.table("configuracoes").update({
+                        "roubos": roubos,
+                        "ja_perderam": ja_perderam
+                    }).eq("id", ID_CONFIG).execute()
+
                     st.success("✅ Jogador roubado com sucesso!")
                     st.experimental_rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
-                supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
+                supabase.table("configuracoes").update({
+                    "concluidos": concluidos,
+                    "vez": str(vez + 1)
+                }).eq("id", ID_CONFIG).execute()
                 st.success("🔄 Sua vez foi encerrada.")
                 st.experimental_rerun()
     else:
@@ -204,3 +225,4 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
+
