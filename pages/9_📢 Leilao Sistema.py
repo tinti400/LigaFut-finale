@@ -60,8 +60,9 @@ for leilao in leiloes_ativos:
         st.markdown(f"**💰 Preço atual:** R$ {leilao['valor_atual']:,}".replace(",", "."))
 
         if leilao.get("id_time_atual"):
-            nome_time = supabase.table("times").select("nome").eq("id", leilao["id_time_atual"]).execute().data[0]["nome"]
-            st.markdown(f"**🏷️ Último Lance:** {nome_time}")
+            time_nome = supabase.table("times").select("nome").eq("id", leilao["id_time_atual"]).execute().data
+            if time_nome:
+                st.markdown(f"**🏷️ Último Lance:** {time_nome[0]['nome']}")
 
         if tempo_restante == 0:
             if not leilao.get("finalizado") and not leilao.get("validado"):
@@ -74,11 +75,14 @@ for leilao in leiloes_ativos:
                 st.info("⏳ Leilão já finalizado.")
             continue
 
+        # Lance manual
         st.markdown("#### 💥 Enviar Lance")
-        botoes = [(leilao["valor_atual"] + leilao["incremento_minimo"] * i) for i in range(1, 6)]
+        incremento = leilao.get("incremento_minimo", 100000)
+        valor_atual = leilao["valor_atual"]
+        botoes = [valor_atual + incremento * i for i in range(1, 6)]
 
-        if len(botoes) >= 1:
-            colunas = st.columns(len(botoes))
+        if botoes:
+            colunas = st.columns(max(1, len(botoes)))
             for i, valor_lance in enumerate(botoes):
                 with colunas[i]:
                     if st.button(f"➕ R$ {valor_lance:,.0f}".replace(",", "."), key=f"lance_{leilao['id']}_{i}"):
@@ -89,15 +93,14 @@ for leilao in leiloes_ativos:
                             st.error("❌ Saldo insuficiente.")
                         else:
                             agora = datetime.utcnow()
-                            novo_fim = fim_dt
                             if (fim_dt - agora).total_seconds() <= 15:
-                                novo_fim = agora + timedelta(seconds=15)
+                                fim_dt = agora + timedelta(seconds=15)
 
                             supabase.table("leiloes").update({
                                 "valor_atual": valor_lance,
                                 "id_time_atual": id_time_usuario,
                                 "time_vencedor": nome_time_usuario,
-                                "fim": novo_fim.isoformat()
+                                "fim": fim_dt.isoformat()
                             }).eq("id", leilao["id"]).execute()
 
                             st.success("✅ Lance enviado!")
