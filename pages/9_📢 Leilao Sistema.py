@@ -42,8 +42,8 @@ for leilao in leiloes_ativos:
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        imagem = leilao.get("imagem_url", "")
-        if imagem and (imagem.startswith("http://") or imagem.startswith("https://")):
+        imagem = leilao.get("imagem_url")
+        if imagem and imagem.startswith("http"):
             st.image(imagem, width=150)
         else:
             st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=150)
