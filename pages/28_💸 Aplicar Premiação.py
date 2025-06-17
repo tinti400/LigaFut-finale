@@ -27,7 +27,7 @@ bonus_desempenho = {
     "gol_sofrido": -20_000
 }
 
-# 🥇 Premiação por colocação
+# 🥇 Premiação por posição final
 premiacao_div1 = {
     1: 150_000_000,
     2: 130_000_000,
@@ -74,7 +74,7 @@ for time in times:
     else:
         bonus_total = 0
 
-    # 🏅 Classificação
+    # 🥇 Classificação por divisão
     if divisao == "1":
         classif = supabase.table("classificacao_1_divisao").select("posicao_final").eq("id_time", id_time).execute().data
         posicao = classif[0]["posicao_final"] if classif else None
@@ -103,16 +103,19 @@ st.dataframe(df_preview, use_container_width=True)
 if st.button("💸 Aplicar Premiações Agora"):
     for i, linha in enumerate(tabela_preview):
         id_time = times[i]["id"]
-        total = int(linha["Total a Receber"].replace("R$", "").replace(".", "").replace(",", ""))  # limpa para inteiro
-        saldo_novo = times[i]["saldo"] + total
+        valor_total = linha["Total a Receber"].replace("R$", "").replace(".", "").replace(",", "")
+        total = int(valor_total)
 
-        supabase.table("times").update({"saldo": saldo_novo}).eq("id", id_time).execute()
+        novo_saldo = times[i]["saldo"] + total
+        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
         supabase.table("movimentacoes").insert({
             "id_time": id_time,
             "categoria": "Premiação Final",
             "tipo": "entrada",
             "valor": total,
-            "descricao": f"Premiação final da temporada (Copa + Desempenho + Divisão)"
+            "descricao": "Premiação final da temporada (Copa + Desempenho + Divisão)"
         }).execute()
 
     st.success("✅ Premiação aplicada com sucesso!")
+
