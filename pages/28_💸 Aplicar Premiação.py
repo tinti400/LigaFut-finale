@@ -47,23 +47,21 @@ premiacao_div = {
 st.set_page_config(page_title="💸 Aplicar Premiação", layout="wide")
 st.title("💰 Prévia da Premiação Final da LigaFut")
 
-tabela_preview = []
+# 🔍 Buscar classificações
+class1 = supabase.table("classificacao_1_divisao").select("*").execute().data
+class2 = supabase.table("classificacao_2_divisao").select("*").execute().data
+mapa_class1 = {c["id_time"]: c["posicao_final"] for c in class1 if c.get("id_time") and c.get("posicao_final")}
+mapa_class2 = {c["id_time"]: c["posicao_final"] for c in class2 if c.get("id_time") and c.get("posicao_final")}
 
-# 🔍 Buscar classificações com "id_tempo"
-class1 = supabase.table("classificacao_divisao_1").select("*").execute().data
-class2 = supabase.table("classificacao_divisao_2").select("*").execute().data
-mapa_class1 = {c["id_tempo"]: c["posicao_final"] for c in class1}
-mapa_class2 = {c["id_tempo"]: c["posicao_final"] for c in class2}
-
-# 🔄 Buscar todos os times
 times = supabase.table("times").select("id", "nome", "saldo").execute().data
+
+tabela_preview = []
 
 for time in times:
     id_time = time["id"]
     nome = time["nome"]
     saldo_atual = time.get("saldo", 0)
 
-    # 📌 Detecta a divisão com base nas classificações
     if id_time in mapa_class1:
         divisao = "1"
         posicao = mapa_class1[id_time]
@@ -71,7 +69,7 @@ for time in times:
         divisao = "2"
         posicao = mapa_class2[id_time]
     else:
-        continue  # Time não está classificado
+        continue  # Time não classificado
 
     premio_divisao = premiacao_div.get(posicao, 0)
 
@@ -107,22 +105,24 @@ for time in times:
         "total_valor": total
     })
 
-# Exibe a prévia visual
+# 🔍 Exibir prévia visual
 df_preview = pd.DataFrame(tabela_preview).drop(columns=["id_time", "total_valor"])
 st.dataframe(df_preview, use_container_width=True)
 
-# 🔘 Aplicar premiações
+# 🔘 Aplicar premiação
 if st.button("💸 Aplicar Premiações Agora"):
     for item in tabela_preview:
-        supabase.table("times").update({
-            "saldo": supabase.table("times").select("saldo").eq("id", item["id_time"]).execute().data[0]["saldo"] + item["total_valor"]
-        }).eq("id", item["id_time"]).execute()
+        id_time = item["id_time"]
+        valor_total = item["total_valor"]
+        saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
+        novo_saldo = saldo_atual + valor_total
 
+        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
         supabase.table("movimentacoes").insert({
-            "id_time": item["id_time"],
+            "id_time": id_time,
             "categoria": "Premiação Final",
             "tipo": "entrada",
-            "valor": item["total_valor"],
+            "valor": valor_total,
             "descricao": "Premiação final da temporada (Copa + Desempenho + Divisão)"
         }).execute()
 
