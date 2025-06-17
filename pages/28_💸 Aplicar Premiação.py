@@ -27,7 +27,7 @@ bonus_desempenho = {
     "gol_sofrido": -20_000
 }
 
-# 🥇 Premiação por colocação final
+# 🥇 Premiação por colocação
 premiacao_div = {
     1: 150_000_000,
     2: 130_000_000,
@@ -49,12 +49,13 @@ st.title("💰 Prévia da Premiação Final da LigaFut")
 
 tabela_preview = []
 
-# 🔍 Buscar classificações
+# 🔍 Buscar classificações com "id_tempo"
 class1 = supabase.table("classificacao_divisao_1").select("*").execute().data
 class2 = supabase.table("classificacao_divisao_2").select("*").execute().data
-mapa_class1 = {c["id_time"]: c["posicao_final"] for c in class1}
-mapa_class2 = {c["id_time"]: c["posicao_final"] for c in class2}
+mapa_class1 = {c["id_tempo"]: c["posicao_final"] for c in class1}
+mapa_class2 = {c["id_tempo"]: c["posicao_final"] for c in class2}
 
+# 🔄 Buscar todos os times
 times = supabase.table("times").select("id", "nome", "saldo").execute().data
 
 for time in times:
@@ -62,6 +63,7 @@ for time in times:
     nome = time["nome"]
     saldo_atual = time.get("saldo", 0)
 
+    # 📌 Detecta a divisão com base nas classificações
     if id_time in mapa_class1:
         divisao = "1"
         posicao = mapa_class1[id_time]
@@ -69,7 +71,7 @@ for time in times:
         divisao = "2"
         posicao = mapa_class2[id_time]
     else:
-        continue  # time não classificado, pula
+        continue  # Time não está classificado
 
     premio_divisao = premiacao_div.get(posicao, 0)
 
@@ -92,7 +94,6 @@ for time in times:
         bonus_total = 0
 
     total = premio_copa + bonus_total + premio_divisao
-    novo_saldo = saldo_atual + total
 
     tabela_preview.append({
         "Time": nome,
@@ -102,28 +103,26 @@ for time in times:
         "Desempenho": f"R$ {bonus_total:,.0f}",
         "Classificação": f"R$ {premio_divisao:,.0f}",
         "Total a Receber": f"R$ {total:,.0f}",
+        "id_time": id_time,
+        "total_valor": total
     })
 
-df_preview = pd.DataFrame(tabela_preview)
+# Exibe a prévia visual
+df_preview = pd.DataFrame(tabela_preview).drop(columns=["id_time", "total_valor"])
 st.dataframe(df_preview, use_container_width=True)
 
-# ✅ Botão de confirmação
+# 🔘 Aplicar premiações
 if st.button("💸 Aplicar Premiações Agora"):
-    for i, linha in enumerate(tabela_preview):
-        id_time = list(mapa_class1.keys()) + list(mapa_class2.keys())
-        id_time = id_time[i]
-        valor_total = linha["Total a Receber"].replace("R$", "").replace(".", "").replace(",", "")
-        total = int(valor_total)
+    for item in tabela_preview:
+        supabase.table("times").update({
+            "saldo": supabase.table("times").select("saldo").eq("id", item["id_time"]).execute().data[0]["saldo"] + item["total_valor"]
+        }).eq("id", item["id_time"]).execute()
 
-        saldo_atual = times[i].get("saldo", 0)
-        novo_saldo = saldo_atual + total
-
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
         supabase.table("movimentacoes").insert({
-            "id_time": id_time,
+            "id_time": item["id_time"],
             "categoria": "Premiação Final",
             "tipo": "entrada",
-            "valor": total,
+            "valor": item["total_valor"],
             "descricao": "Premiação final da temporada (Copa + Desempenho + Divisão)"
         }).execute()
 
