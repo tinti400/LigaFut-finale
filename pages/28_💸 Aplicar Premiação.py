@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from supabase import create_client
 import streamlit as st
+import pandas as pd
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -26,7 +27,7 @@ bonus_desempenho = {
     "gol_sofrido": -20_000
 }
 
-# 🥇 Premiação final por posição (Divisão 1 e 2)
+# 🥇 Premiação por colocação
 premiacao_div1 = {
     1: 150_000_000,
     2: 130_000_000,
@@ -42,45 +43,70 @@ premiacao_div1 = {
 }
 premiacao_div2 = premiacao_div1.copy()
 
-# ▶️ Aplicar premiação
-def aplicar_premiacao_final():
-    times = supabase.table("times").select("id", "nome", "saldo", "divisao").execute().data
+st.set_page_config(page_title="💸 Aplicar Premiação", layout="wide")
+st.title("💰 Prévia da Premiação Final da LigaFut")
 
-    for time in times:
-        id_time = time["id"]
-        saldo_atual = time.get("saldo", 0)
-        divisao = time.get("divisao", "2")
+tabela_preview = []
 
-        copa = supabase.table("copa").select("fase_alcancada").eq("id_time", id_time).execute().data
-        fase = copa[0]["fase_alcancancada"] if copa else None
-        premio_copa = premiacao_copa.get(fase, 0)
+times = supabase.table("times").select("id", "nome", "saldo", "divisao").execute().data
 
-        est = supabase.table("estatisticas").select("*").eq("id_time", id_time).execute().data
-        if est:
-            est = est[0]
-            bonus_total = (
-                est.get("vitorias", 0) * bonus_desempenho["vitoria"] +
-                est.get("empates", 0) * bonus_desempenho["empate"] +
-                est.get("gols_pro", 0) * bonus_desempenho["gol_feito"] +
-                est.get("gols_contra", 0) * bonus_desempenho["gol_sofrido"]
-            )
-        else:
-            bonus_total = 0
+for time in times:
+    id_time = time["id"]
+    nome = time["nome"]
+    divisao = time.get("divisao", "2")
+    saldo_atual = time.get("saldo", 0)
 
-        if divisao == "1":
-            classif = supabase.table("classificacao_1_divisao").select("posicao_final").eq("id_time", id_time).execute().data
-            posicao = classif[0]["posicao_final"] if classif else None
-            premio_divisao = premiacao_div1.get(posicao, 0)
-        else:
-            classif = supabase.table("classificacao_2_divisao").select("posicao_final").eq("id_time", id_time).execute().data
-            posicao = classif[0]["posicao_final"] if classif else None
-            premio_divisao = premiacao_div2.get(posicao, 0)
+    # 🏆 Fase da Copa
+    copa = supabase.table("copa").select("fase_alcancada").eq("id_time", id_time).execute().data
+    fase = copa[0]["fase_alcancada"] if copa else None
+    premio_copa = premiacao_copa.get(fase, 0)
 
-        total = premio_copa + bonus_total + premio_divisao
-        novo_saldo = saldo_atual + total
+    # 📊 Desempenho
+    est = supabase.table("estatisticas").select("*").eq("id_time", id_time).execute().data
+    if est:
+        est = est[0]
+        bonus_total = (
+            est.get("vitorias", 0) * bonus_desempenho["vitoria"] +
+            est.get("empates", 0) * bonus_desempenho["empate"] +
+            est.get("gols_pro", 0) * bonus_desempenho["gol_feito"] +
+            est.get("gols_contra", 0) * bonus_desempenho["gol_sofrido"]
+        )
+    else:
+        bonus_total = 0
 
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+    # 🏅 Classificação
+    if divisao == "1":
+        classif = supabase.table("classificacao_1_divisao").select("posicao_final").eq("id_time", id_time).execute().data
+        posicao = classif[0]["posicao_final"] if classif else None
+        premio_divisao = premiacao_div1.get(posicao, 0)
+    else:
+        classif = supabase.table("classificacao_2_divisao").select("posicao_final").eq("id_time", id_time).execute().data
+        posicao = classif[0]["posicao_final"] if classif else None
+        premio_divisao = premiacao_div2.get(posicao, 0)
 
+    total = premio_copa + bonus_total + premio_divisao
+    novo_saldo = saldo_atual + total
+
+    tabela_preview.append({
+        "Time": nome,
+        "Divisão": divisao,
+        "Copa": f"R$ {premio_copa:,.0f}",
+        "Desempenho": f"R$ {bonus_total:,.0f}",
+        "Classificação": f"R$ {premio_divisao:,.0f}",
+        "Total a Receber": f"R$ {total:,.0f}",
+    })
+
+df_preview = pd.DataFrame(tabela_preview)
+st.dataframe(df_preview, use_container_width=True)
+
+# ✅ Botão para aplicar a premiação
+if st.button("💸 Aplicar Premiações Agora"):
+    for i, linha in enumerate(tabela_preview):
+        id_time = times[i]["id"]
+        total = int(linha["Total a Receber"].replace("R$", "").replace(".", "").replace(",", ""))  # limpa para inteiro
+        saldo_novo = times[i]["saldo"] + total
+
+        supabase.table("times").update({"saldo": saldo_novo}).eq("id", id_time).execute()
         supabase.table("movimentacoes").insert({
             "id_time": id_time,
             "categoria": "Premiação Final",
@@ -89,11 +115,4 @@ def aplicar_premiacao_final():
             "descricao": f"Premiação final da temporada (Copa + Desempenho + Divisão)"
         }).execute()
 
-    st.success("✅ Premiação final aplicada com sucesso!")
-
-# 🔘 Botão
-st.set_page_config(page_title="Premiação Final", layout="centered")
-st.title("💸 Aplicar Premiação Final da LigaFut")
-
-if st.button("Aplicar Premiações Agora"):
-    aplicar_premiacao_final()
+    st.success("✅ Premiação aplicada com sucesso!")
