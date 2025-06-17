@@ -104,7 +104,7 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
 
-    # ➖ Aplicar punições de pontos
+    # ➖ Aplicar punições de pontos (permitindo pontos negativos)
     try:
         res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
         puni_map = {}
@@ -114,7 +114,7 @@ def calcular_classificacao(rodadas, times_map):
 
         for tid in tabela:
             if tid in puni_map:
-                tabela[tid]["pontos"] = max(0, tabela[tid]["pontos"] - puni_map[tid])
+                tabela[tid]["pontos"] -= puni_map[tid]
     except Exception as e:
         st.error(f"Erro ao aplicar punições: {e}")
 
@@ -240,7 +240,6 @@ if todos_os_jogos_preenchidos(rodadas):
         "melhor_defesa": melhor_defesa
     }
 
-    # Verificar se já foi salvo antes
     try:
         ja_salvo = supabase.table("historico_temporadas").select("*").eq("divisao", divisao).eq("data_fim", temporada_data["data_fim"]).execute()
         if not ja_salvo.data:
@@ -248,9 +247,7 @@ if todos_os_jogos_preenchidos(rodadas):
     except Exception as e:
         st.error(f"Erro ao salvar histórico da temporada: {e}")
 
-    # Exibir histórico atual
     st.markdown("## 🏅 Resumo da Temporada")
     st.markdown(f"**🏆 Campeão:** `{campeao}`")
     st.markdown(f"**🔥 Melhor Ataque:** `{melhor_ataque}`")
     st.markdown(f"**🧱 Melhor Defesa:** `{melhor_defesa}`")
-
