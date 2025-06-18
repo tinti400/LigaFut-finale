@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from collections import defaultdict
@@ -81,6 +80,9 @@ if mostrar:
             "Fase Alcançada": fase.capitalize()
         })
 
-    df = pd.DataFrame(dados_visual).sort_values("Fase Alcançada", ascending=False)
-    st.dataframe(df, use_container_width=True)
+    if dados_visual:
+        df = pd.DataFrame(dados_visual).sort_values("Fase Alcançada", ascending=False)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("ℹ️ Nenhum dado encontrado para exibição.")
 
