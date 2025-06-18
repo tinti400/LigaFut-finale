@@ -9,65 +9,51 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="📥 Salvar Fase da Copa", layout="wide")
-st.title("📥 Registrar Fase Alcançada na Copa - LigaFut")
+st.title("📥 Atualizar Fase Alcançada na Copa")
 
-# ✅ Verifica login
-if "usuario" not in st.session_state:
-    st.warning("Você precisa estar logado para acessar esta página.")
+# 🔍 Buscar times que participaram da copa
+res_copa = supabase.table("copa").select("id, id_time, fase_alcancada").execute()
+dados_copa = res_copa.data
+
+if not dados_copa:
+    st.warning("Nenhum time participante encontrado na tabela 'copa'.")
     st.stop()
 
-# 🏆 Fases possíveis
-fases = [
-    "grupo", "classificado", "oitavas",
-    "quartas", "semi", "vice", "campeao"
+# Buscar todos os nomes dos times
+ids_times = [item["id_time"] for item in dados_copa]
+res_times = supabase.table("times").select("id", "nome").in_("id", ids_times).execute()
+nomes = {item["id"]: item["nome"] for item in res_times.data}
+
+# Construir DataFrame para exibição e edição
+dados_organizados = []
+for registro in dados_copa:
+    id_time = registro["id_time"]
+    nome_time = nomes.get(id_time, "Desconhecido")
+    fase = registro.get("fase_alcancada", "")
+    dados_organizados.append({"id": registro["id"], "id_time": id_time, "nome": nome_time, "fase": fase})
+
+df = pd.DataFrame(dados_organizados)
+
+# Interface de edição
+st.dataframe(df[["nome", "fase"]], use_container_width=True)
+
+# Fases possíveis para seleção
+fases_possiveis = [
+    "grupos", "classificado", "oitavas", "quartas", "semi", "vice", "campeao"
 ]
 
-# 🔍 Buscar dados dos participantes da copa
-res_copa = supabase.table("copa").select("id", "id_time", "fase_alcancada").execute()
-copa_data = res_copa.data
+st.markdown("### ✏️ Atualizar fases manualmente")
 
-if not copa_data:
-    st.warning("⚠️ Nenhum time participante da Copa foi encontrado.")
-    st.stop()
+for i, row in df.iterrows():
+    nova_fase = st.selectbox(f"🔄 {row['nome']}", fases_possiveis, index=fases_possiveis.index(row["fase"]) if row["fase"] in fases_possiveis else 0, key=f"fase_{i}")
+    df.at[i, "fase"] = nova_fase
 
-# 🔍 Buscar nomes dos times
-ids_times = [item["id_time"] for item in copa_data]
-res_times = supabase.table("times").select("id", "nome").in_("id", ids_times).execute()
-times_map = {t["id"]: t["nome"] for t in res_times.data}
-
-# 📋 Interface para selecionar fase para cada time
-st.markdown("### 🏆 Selecione a fase alcançada por cada time da Copa:")
-
-fase_dict = {}
-for item in copa_data:
-    id_time = item["id_time"]
-    nome = times_map.get(id_time, "Nome Desconhecido")
-    fase_atual = item.get("fase_alcancada", "grupo")
-    fase = st.selectbox(f"Time: {nome}", fases, index=fases.index(fase_atual), key=f"fase_{id_time}")
-    fase_dict[id_time] = {"nome": nome, "fase": fase}
-
-# 🔎 Prévia das seleções
-df_preview = pd.DataFrame([
-    {"Time": dados["nome"], "Fase Selecionada": dados["fase"]}
-    for dados in fase_dict.values()
-])
-
-st.markdown("### 🔎 Prévia das Fases Selecionadas")
-st.dataframe(df_preview, use_container_width=True)
-
-# 💾 Botão para salvar no banco
 if st.button("💾 Salvar Fases da Copa"):
-    try:
-        for item in copa_data:
-            id_time = item["id_time"]
-            id_registro = item["id"]
-            nova_fase = fase_dict[id_time]["fase"]
-
-            supabase.table("copa").update({"fase_alcancada": nova_fase}).eq("id", id_registro).execute()
-
-        st.success("✅ Fases atualizadas com sucesso!")
-    except Exception as e:
-        st.error(f"❌ Erro ao salvar: {e}")
+    for i, row in df.iterrows():
+        supabase.table("copa").update({
+            "fase_alcancada": row["fase"]
+        }).eq("id", row["id"]).execute()
+    st.success("✅ Fases atualizadas com sucesso!")
 
 
 
