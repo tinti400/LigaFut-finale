@@ -105,26 +105,33 @@ for time in times:
         "total_valor": total
     })
 
-# 🔍 Exibir prévia visual
-df_preview = pd.DataFrame(tabela_preview).drop(columns=["id_time", "total_valor"])
-st.dataframe(df_preview, use_container_width=True)
+# ✅ Exibe prévia se houver dados
+if tabela_preview:
+    df_preview = pd.DataFrame(tabela_preview).drop(columns=["id_time", "total_valor"])
+    st.dataframe(df_preview, use_container_width=True)
 
-# 🔘 Aplicar premiação
-if st.button("💸 Aplicar Premiações Agora"):
-    for item in tabela_preview:
-        id_time = item["id_time"]
-        valor_total = item["total_valor"]
-        saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
-        novo_saldo = saldo_atual + valor_total
+    st.markdown("⚠️ **Confirme que deseja aplicar os valores abaixo:**")
+    confirmar = st.checkbox("✅ Confirmo a aplicação das premiações finais")
 
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-        supabase.table("movimentacoes").insert({
-            "id_time": id_time,
-            "categoria": "Premiação Final",
-            "tipo": "entrada",
-            "valor": valor_total,
-            "descricao": "Premiação final da temporada (Copa + Desempenho + Divisão)"
-        }).execute()
+    if st.button("💸 Aplicar Premiações Agora") and confirmar:
+        for item in tabela_preview:
+            id_time = item["id_time"]
+            valor_total = item["total_valor"]
+            saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
+            novo_saldo = saldo_atual + valor_total
 
-    st.success("✅ Premiação aplicada com sucesso!")
+            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+            supabase.table("movimentacoes").insert({
+                "id_time": id_time,
+                "categoria": "Premiação Final",
+                "tipo": "entrada",
+                "valor": valor_total,
+                "descricao": "Premiação final da temporada (Copa + Desempenho + Divisão)"
+            }).execute()
+
+        st.success("✅ Premiação aplicada com sucesso!")
+    elif st.button("💸 Aplicar Premiações Agora") and not confirmar:
+        st.warning("☝️ Você precisa marcar a confirmação antes de aplicar as premiações.")
+else:
+    st.info("ℹ️ Nenhuma premiação foi encontrada para exibir.")
 
