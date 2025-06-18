@@ -49,6 +49,10 @@ if not grupo_data:
     st.info("A fase de grupos ainda não foi gerada.")
     st.stop()
 
+# Buscar resultados já salvos
+res_resultados = supabase.table("resultados_copa").select("*").eq("fase", "grupos").execute()
+resultados_salvos = {(r["mandante_id"], r["visitante_id"]): r for r in res_resultados.data}
+
 # 🏋️ Interface para editar jogos por grupo
 grupos = sorted(set([g["grupo"] for g in grupo_data]))
 tab = st.selectbox("Escolha o grupo para editar resultados:", grupos)
@@ -67,8 +71,11 @@ for idx, jogo in enumerate(jogos):
     visitante_id = jogo.get("visitante")
     mandante_nome = times.get(mandante_id, "Mandante")
     visitante_nome = times.get(visitante_id, "Visitante")
-    gols_m = jogo.get("gols_mandante")
-    gols_v = jogo.get("gols_visitante")
+
+    # Buscar resultado salvo (se existir)
+    resultado_existente = resultados_salvos.get((mandante_id, visitante_id), {})
+    gols_m = resultado_existente.get("gols_mandante", jogo.get("gols_mandante", 0))
+    gols_v = resultado_existente.get("gols_visitante", jogo.get("gols_visitante", 0))
 
     col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
     with col1:
@@ -77,7 +84,7 @@ for idx, jogo in enumerate(jogos):
         gols_m_edit = st.number_input(
             f"Gols {mandante_nome}",
             min_value=0,
-            value=int(gols_m) if gols_m is not None else 0,
+            value=int(gols_m),
             key=f"gm_{idx}",
             format="%d"
         )
@@ -87,7 +94,7 @@ for idx, jogo in enumerate(jogos):
         gols_v_edit = st.number_input(
             f"Gols {visitante_nome}",
             min_value=0,
-            value=int(gols_v) if gols_v is not None else 0,
+            value=int(gols_v),
             key=f"gv_{idx}",
             format="%d"
         )
@@ -97,17 +104,25 @@ for idx, jogo in enumerate(jogos):
     st.markdown("")
 
     if st.button("💾 Salvar Resultado", key=f"salvar_{idx}"):
-        jogos[idx]["gols_mandante"] = gols_m_edit
-        jogos[idx]["gols_visitante"] = gols_v_edit
+        resultado = {
+            "mandante_id": mandante_id,
+            "visitante_id": visitante_id,
+            "gols_mandante": gols_m_edit,
+            "gols_visitante": gols_v_edit,
+            "grupo": tab,
+            "fase": "grupos",
+            "data_atualizacao": datetime.now().isoformat()
+        }
 
-        try:
-            supabase.table("copa_ligafut").update({
-                "jogos": jogos
-            }).eq("grupo", tab).eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
-            st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
-        except Exception as e:
-            st.error(f"Erro ao salvar: {e}")
+        if resultado_existente:
+            supabase.table("resultados_copa").update(resultado)\
+                .eq("mandante_id", mandante_id)\
+                .eq("visitante_id", visitante_id)\
+                .eq("fase", "grupos").execute()
+        else:
+            supabase.table("resultados_copa").insert(resultado).execute()
 
+        st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
     st.markdown("---")
 
 # ===============================
@@ -119,7 +134,6 @@ st.subheader("⚔️ Resultados do Mata-Mata")
 fases_mata = ["oitavas", "quartas", "semifinal", "final"]
 fase_selecionada = st.selectbox("Escolha a fase para editar os resultados:", fases_mata)
 
-# Buscar a fase eliminatória mais recente
 res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).order("data_criacao", desc=True).limit(1).execute()
 fase_data = res_fase.data[0] if res_fase.data else None
 
@@ -129,57 +143,63 @@ if not fase_data:
 
 jogos_mata = fase_data.get("jogos", [])
 
+# Resultados já salvos dessa fase
+res_mata = supabase.table("resultados_copa").select("*").eq("fase", fase_selecionada).execute()
+resultados_mata = {(r["mandante_id"], r["visitante_id"]): r for r in res_mata.data}
+
 for idx, jogo in enumerate(jogos_mata):
     mandante_id = jogo.get("mandante")
     visitante_id = jogo.get("visitante")
     mandante_nome = times.get(mandante_id, "Mandante")
     visitante_nome = times.get(visitante_id, "Visitante")
-    gols_m = jogo.get("gols_mandante")
-    gols_v = jogo.get("gols_visitante")
+
+    resultado_existente = resultados_mata.get((mandante_id, visitante_id), {})
+    gols_m = resultado_existente.get("gols_mandante", jogo.get("gols_mandante", 0))
+    gols_v = resultado_existente.get("gols_visitante", jogo.get("gols_visitante", 0))
 
     col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
         gols_m_edit = st.number_input(
-            f"Gols {mandante_nome}", min_value=0,
-            value=int(gols_m) if gols_m is not None else 0,
-            key=f"mata_gm_{idx}", format="%d"
+            f"Gols {mandante_nome}",
+            min_value=0,
+            value=int(gols_m),
+            key=f"mata_gm_{idx}",
+            format="%d"
         )
     with col3:
         st.markdown("**X**")
     with col4:
         gols_v_edit = st.number_input(
-            f"Gols {visitante_nome}", min_value=0,
-            value=int(gols_v) if gols_v is not None else 0,
-            key=f"mata_gv_{idx}", format="%d"
+            f"Gols {visitante_nome}",
+            min_value=0,
+            value=int(gols_v),
+            key=f"mata_gv_{idx}",
+            format="%d"
         )
     with col5:
         st.markdown(f"**{visitante_nome}**")
 
     st.markdown("")
 
-    # Botão de salvar resultado individual
     if st.button("💾 Salvar Resultado", key=f"salvar_mata_{idx}"):
-        jogos_mata[idx]["gols_mandante"] = gols_m_edit
-        jogos_mata[idx]["gols_visitante"] = gols_v_edit
+        resultado = {
+            "mandante_id": mandante_id,
+            "visitante_id": visitante_id,
+            "gols_mandante": gols_m_edit,
+            "gols_visitante": gols_v_edit,
+            "fase": fase_selecionada,
+            "data_atualizacao": datetime.now().isoformat()
+        }
 
-        try:
-            supabase.table("copa_ligafut").update({
-                "jogos": jogos_mata
-            }).eq("id", fase_data["id"]).execute()
-            st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
-        except Exception as e:
-            st.error(f"Erro ao salvar: {e}")
+        if resultado_existente:
+            supabase.table("resultados_copa").update(resultado)\
+                .eq("mandante_id", mandante_id)\
+                .eq("visitante_id", visitante_id)\
+                .eq("fase", fase_selecionada).execute()
+        else:
+            supabase.table("resultados_copa").insert(resultado).execute()
 
+        st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
     st.markdown("---")
-
-# Botão para salvar todos os resultados da fase
-if st.button("💾 Salvar todos os resultados da fase eliminatória"):
-    try:
-        supabase.table("copa_ligafut").update({
-            "jogos": jogos_mata
-        }).eq("id", fase_data["id"]).execute()
-        st.success("✅ Resultados atualizados com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
