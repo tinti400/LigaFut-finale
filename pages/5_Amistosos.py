@@ -1,78 +1,99 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
+from datetime import datetime
+import uuid
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🏅 Histórico de Temporadas", layout="wide")
-st.markdown("<h1 style='text-align:center;'>🏅 Histórico de Temporadas LigaFut</h1><hr>", unsafe_allow_html=True)
+st.set_page_config(page_title="🤝 Amistosos - LigaFut", layout="wide")
+st.title("🤝 Amistosos de Pré-Temporada")
 
-# 🔄 Buscar dados do histórico
-def buscar_historico():
-    try:
-        res = supabase.table("historico_temporadas").select("*").order("data_finalizacao", desc=True).execute()
-        return res.data if res.data else []
-    except Exception as e:
-        st.error(f"Erro ao buscar dados: {e}")
-        return []
-
-# 📥 Carrega dados
-dados = buscar_historico()
-
-# 🚫 Nenhum registro
-if not dados:
-    st.info("Nenhuma temporada registrada ainda.")
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 📊 Separa por tipo
-ligas = [item for item in dados if item.get("tipo") == "liga"]
-copas = [item for item in dados if item.get("tipo") == "copa"]
+id_time = st.session_state["id_time"]
+nome_time = st.session_state.get("nome_time", "Seu time")
 
-# 🎨 Card
-def exibir_card_temporada(item):
-    tipo = "🏆 Liga" if item.get("tipo") == "liga" else "🥇 Copa"
-    campeao = item.get("campeao", "Desconhecido")
-    ataque = item.get("melhor_ataque", "N/A")
-    defesa = item.get("melhor_defesa", "N/A")
-    divisao = item.get("divisao", "")
-    temporada = item.get("temporada", "?")
-    data_raw = item.get("data_finalizacao") or item.get("data_fim")
+# 🔄 Buscar todos os times
+res_times = supabase.table("times").select("id, nome").execute()
+todos_times = res_times.data or []
 
-    try:
-        data = pd.to_datetime(data_raw).strftime("%d/%m/%Y") if data_raw else "Data indefinida"
-    except Exception:
-        data = "Data inválida"
+# 🔄 Buscar amistosos enviados
+def buscar_convites_enviados():
+    res = supabase.table("amistosos").select("*").eq("time_convidante", id_time).execute()
+    return res.data or []
 
-    st.markdown(f"""
-        <div style='background:#f8f9fa;padding:15px;border-radius:10px;margin-bottom:15px;
-                    box-shadow:0 0 6px rgba(0,0,0,0.1); color:#000'>
-            <h4>{tipo} | Temporada {temporada} - {divisao}</h4>
-            <p><strong>📅 Data:</strong> {data}</p>
-            <p><strong>🏅 Campeão:</strong> {campeao}</p>
-            <p><strong>🔥 Melhor Ataque:</strong> {ataque}</p>
-            <p><strong>🧱 Melhor Defesa:</strong> {defesa}</p>
-        </div>
-    """, unsafe_allow_html=True)
+convites_enviados = buscar_convites_enviados()
+times_ja_convidados = [item["time_convidado"] for item in convites_enviados if item["status"] != "recusado"]
+limite_alcancado = len(times_ja_convidados) >= 3
 
-# 🗂 Tabs para Liga e Copa
-tab1, tab2 = st.tabs(["🏆 Ligas", "🥇 Copas"])
+st.markdown(f"🔄 {len(times_ja_convidados)} de 3 amistosos enviados.")
 
-with tab1:
-    st.subheader("🏆 Campeões da Liga")
-    if ligas:
-        for item in ligas:
-            exibir_card_temporada(item)
+# 📌 Alternativa às abas (selectbox)
+aba = st.selectbox("📂 Escolha a visualização", ["📨 Convidar adversário", "📥 Convites recebidos", "📤 Convites enviados"])
+
+# 📨 Convidar adversário
+if aba == "📨 Convidar adversário":
+    if limite_alcancado:
+        st.warning("Você já enviou o máximo de 3 convites de amistoso.")
     else:
-        st.info("Nenhuma liga registrada.")
+        times_disponiveis = [t for t in todos_times if t["id"] != id_time and t["id"] not in times_ja_convidados]
+        nomes_disponiveis = {t["nome"]: t["id"] for t in times_disponiveis}
 
-with tab2:
-    st.subheader("🥇 Campeões da Copa")
-    if copas:
-        for item in copas:
-            exibir_card_temporada(item)
+        if nomes_disponiveis:
+            adversario_nome = st.selectbox("Escolha o adversário", list(nomes_disponiveis.keys()))
+            valor = st.number_input("Valor da aposta (em milhões)", min_value=1.0, max_value=100.0, step=1.0)
+
+            if st.button("Enviar convite"):
+                time_convidado_id = nomes_disponiveis[adversario_nome]
+                supabase.table("amistosos").insert({
+                    "time_convidante": id_time,
+                    "time_convidado": time_convidado_id,
+                    "valor_aposta": valor,
+                    "status": "pendente"
+                }).execute()
+                st.success(f"Convite enviado para {adversario_nome} com aposta de R${valor:.2f} milhões.")
+                st.rerun()
+        else:
+            st.info("Nenhum adversário disponível para convite no momento.")
+
+# 📥 Convites recebidos
+elif aba == "📥 Convites recebidos":
+    res_recebidos = supabase.table("amistosos").select("*").eq("time_convidado", id_time).eq("status", "pendente").execute()
+    amistosos_recebidos = res_recebidos.data or []
+
+    if not amistosos_recebidos:
+        st.info("Você não recebeu nenhum convite.")
     else:
-        st.info("Nenhuma copa registrada.")
+        for item in amistosos_recebidos:
+            convidante = next((t["nome"] for t in todos_times if t["id"] == item["time_convidante"]), "Desconhecido")
+            valor = item["valor_aposta"]
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"**{convidante}** convidou você para um amistoso apostando **R${valor:.2f} milhões**")
+            with col2:
+                if st.button("✅ Aceitar", key=f"aceitar_{item['id']}"):
+                    supabase.table("amistosos").update({"status": "aceito"}).eq("id", item["id"]).execute()
+                    st.success("Amistoso aceito!")
+                    st.rerun()
+                if st.button("❌ Recusar", key=f"recusar_{item['id']}"):
+                    supabase.table("amistosos").update({"status": "recusado"}).eq("id", item["id"]).execute()
+                    st.info("Convite recusado.")
+                    st.rerun()
+
+# 📤 Convites enviados
+elif aba == "📤 Convites enviados":
+    for item in convites_enviados:
+        convidado = next((t["nome"] for t in todos_times if t["id"] == item["time_convidado"]), "Desconhecido")
+        valor = item["valor_aposta"]
+        status = item["status"]
+        st.markdown(f"- Para **{convidado}** | 💰 R${valor:.2f} milhões | Status: `{status}`")
+
+
+
