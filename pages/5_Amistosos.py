@@ -59,7 +59,7 @@ if aba == "📨 Convidar adversário":
                     "status": "pendente"
                 }).execute()
                 st.success(f"Convite enviado para {adversario_nome} com aposta de R${valor:.2f} milhões.")
-                st.rerun()
+                st.experimental_rerun()
         else:
             st.info("Nenhum adversário disponível para convite no momento.")
 
@@ -81,11 +81,11 @@ elif aba == "📥 Convites recebidos":
                 if st.button("✅ Aceitar", key=f"aceitar_{item['id']}"):
                     supabase.table("amistosos").update({"status": "aceito"}).eq("id", item["id"]).execute()
                     st.success("Amistoso aceito!")
-                    st.rerun()
+                    st.experimental_rerun()
                 if st.button("❌ Recusar", key=f"recusar_{item['id']}"):
                     supabase.table("amistosos").update({"status": "recusado"}).eq("id", item["id"]).execute()
                     st.info("Convite recusado.")
-                    st.rerun()
+                    st.experimental_rerun()
 
 # 📤 Convites enviados
 elif aba == "📤 Convites enviados":
@@ -94,6 +94,7 @@ elif aba == "📤 Convites enviados":
         valor = item["valor_aposta"]
         status = item["status"]
         st.markdown(f"- Para **{convidado}** | 💰 R${valor:.2f} milhões | Status: `{status}`")
+
 
 
 
