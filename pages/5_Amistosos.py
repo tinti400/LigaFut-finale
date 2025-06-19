@@ -74,36 +74,42 @@ if st.button("📩 Enviar Convite"):
 # 📥 Convites recebidos
 st.subheader("📥 Convites Recebidos")
 
-res_convites = supabase.table("amistosos").select("*").eq("time_convidado", id_time).in_("status", ["pendente"]).execute()
+res_convites = supabase.table("amistosos").select("*").eq("time_convidado", id_time).eq("status", "pendente").execute()
 convites_recebidos = res_convites.data or []
 
 for convite in convites_recebidos:
     nome_a = mapa_times.get(convite["time_convidante"], {}).get("nome", "Desconhecido")
+    id_a = convite["time_convidante"]
     valor = convite["valor_aposta"]
     aposta_jog = convite.get("aposta_com_jogador", False)
-    jogador_convidante = convite.get("jogador_convidante", None)
+    jogador_que_ele_quer = convite.get("jogador_convidante", None)
 
     st.markdown(f"---\n### ⚔️ {nome_a} te desafiou para um amistoso!")
     st.markdown(f"💰 Valor apostado: R${valor:.2f} milhões")
 
-    jogador_convidado = None
+    jogador_que_eu_quero = None
     if aposta_jog:
-        st.markdown(f"🎲 Jogador exigido por {nome_a}: **{jogador_convidante}**")
-        nomes_meu_elenco = [f"{j['nome']} ({j['posicao']})" for j in meu_elenco]
-        selecionado = st.selectbox("👤 Escolha 1 jogador seu para apostar", nomes_meu_elenco, key=f"j_resp_{convite['id']}")
-        jogador_convidado = meu_elenco[nomes_meu_elenco.index(selecionado)]
+        st.markdown(f"🎯 {nome_a} quer o jogador: **{jogador_que_ele_quer}**")
+
+        elenco_adv = supabase.table("elenco").select("*").eq("id_time", id_a).execute().data or []
+        nomes_adv = [f"{j['nome']} ({j['posicao']})" for j in elenco_adv]
+        select = st.selectbox("👤 Escolha 1 jogador do adversário para apostar", nomes_adv, key=f"j_adv_{convite['id']}")
+        jogador_que_eu_quero = elenco_adv[nomes_adv.index(select)]["nome"]
 
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("✅ Aceitar apenas valor", key=f"aceitar_valor_{convite['id']}"):
-            saldo_a = mapa_times.get(convite["time_convidante"], {}).get("saldo", 0)
+            saldo_a = mapa_times.get(id_a, {}).get("saldo", 0)
             saldo_b = meu_saldo
             if saldo_a >= valor and saldo_b >= valor:
-                supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", convite["time_convidante"]).execute()
+                supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_a).execute()
                 supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", id_time).execute()
-                registrar_movimentacao_simples(convite["time_convidante"], -valor, "Aposta amistoso")
+                registrar_movimentacao_simples(id_a, -valor, "Aposta amistoso")
                 registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso")
-                supabase.table("amistosos").update({"status": "aceito", "jogador_convidado": None}).eq("id", convite["id"]).execute()
+                supabase.table("amistosos").update({
+                    "status": "aceito",
+                    "jogador_convidado": None
+                }).eq("id", convite["id"]).execute()
                 st.success("Amistoso aceito com valor.")
                 st.experimental_rerun()
             else:
@@ -113,7 +119,7 @@ for convite in convites_recebidos:
         if aposta_jog and st.button("📨 Confirmar proposta com jogadores", key=f"aceitar_jogador_{convite['id']}"):
             supabase.table("amistosos").update({
                 "status": "aguardando_confirmacao",
-                "jogador_convidado": jogador_convidado["nome"]
+                "jogador_convidado": jogador_que_eu_quero
             }).eq("id", convite["id"]).execute()
             st.success("Proposta devolvida com jogador. Aguardando confirmação do adversário.")
             st.experimental_rerun()
@@ -175,9 +181,8 @@ for amistoso in amistosos_ativos:
     vencedor = st.radio(f"👑 Quem venceu?", [nome_a, nome_b], key=f"vencedor_{amistoso['id']}")
     if st.button("✅ Confirmar Resultado", key=f"confirmar_resultado_{amistoso['id']}"):
         id_vencedor = amistoso["time_convidante"] if vencedor == nome_a else amistoso["time_convidado"]
-        premio = valor * 2  # Soma dos dois lados
+        premio = valor * 2
 
-        # Atualiza saldo do vencedor
         res_saldo = supabase.table("times").select("saldo").eq("id", id_vencedor).execute()
         saldo_atual = res_saldo.data[0]["saldo"]
         novo_saldo = saldo_atual + premio
@@ -192,7 +197,6 @@ for amistoso in amistosos_ativos:
 
         st.success(f"✅ Vitória registrada! R$ {premio:.2f} milhões creditados para {vencedor}")
         st.experimental_rerun()
-
 
 
 
