@@ -10,6 +10,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🔒 Verificação de login
 def verificar_login():
     """
     Verifica se o usuário está logado. Caso não esteja, bloqueia o acesso à página.
@@ -18,6 +19,7 @@ def verificar_login():
         st.warning("Você precisa estar logado para acessar esta página.")
         st.stop()
 
+# 🔒 Verificação de sessão única
 def verificar_sessao():
     """
     Verifica se a sessão do usuário é válida (sessão única).
@@ -38,6 +40,7 @@ def verificar_sessao():
         st.error(f"Erro ao verificar sessão: {e}")
         st.stop()
 
+# 💰 Registrar compra ou venda de jogador
 def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     """
     Registra movimentações financeiras no Supabase e atualiza saldo do time.
@@ -70,9 +73,6 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             st.error("❌ Saldo atual não encontrado para este time.")
             return
 
-        st.write(f"[DEBUG] Saldo antes: {saldo_atual}, valor: {valor}, tipo: {tipo}, categoria: {categoria}")
-
-        # Calcula o novo saldo
         novo_saldo = saldo_atual - valor if categoria == "compra" else saldo_atual + valor
 
         # Atualiza o saldo no banco
@@ -81,10 +81,9 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             st.error("❌ Falha ao atualizar o saldo no banco de dados (sem retorno).")
             return
 
-        # Data atual no fuso de Brasília
         agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
 
-        # Monta registro da movimentação
+        # Registro no histórico
         registro = {
             "id_time": id_time,
             "jogador": jogador,
@@ -96,9 +95,51 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             "destino": destino
         }
 
-        # Salva no Supabase
         supabase.table("movimentacoes").insert(registro).execute()
         st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação: {e}")
+
+# 💰 Registrar movimentação simples (amistosos, prêmios, multas)
+def registrar_movimentacao_simples(id_time, valor, descricao):
+    """
+    Registra uma movimentação financeira simples (sem jogador envolvido).
+    Útil para: amistosos, premiações, multas, etc.
+
+    Parâmetros:
+    - id_time: ID do time
+    - valor: valor positivo (entrada) ou negativo (saída)
+    - descricao: motivo da movimentação
+    """
+    try:
+        res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+        if not res.data:
+            st.error("❌ Time não encontrado.")
+            return
+
+        saldo_atual = res.data[0].get("saldo", 0)
+        novo_saldo = saldo_atual + valor
+
+        # Atualiza saldo
+        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+        agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
+
+        registro = {
+            "id_time": id_time,
+            "jogador": None,
+            "tipo": "sistema",
+            "categoria": "ajuste",
+            "valor": abs(valor),
+            "data": agora,
+            "origem": None,
+            "destino": None,
+            "descricao": descricao
+        }
+
+        supabase.table("movimentacoes").insert(registro).execute()
+        st.success(f"✅ {descricao} registrada. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
+
+    except Exception as e:
+        st.error(f"Erro ao registrar movimentação simples: {e}")
