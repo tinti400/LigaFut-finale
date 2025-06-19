@@ -13,8 +13,12 @@ st.markdown("<h1 style='text-align:center;'>🏅 Histórico de Temporadas LigaFu
 
 # 🔄 Buscar dados do histórico
 def buscar_historico():
-    res = supabase.table("historico_temporadas").select("*").order("data_finalizacao", desc=True).execute()
-    return res.data if res.data else []
+    try:
+        res = supabase.table("historico_temporadas").select("*").order("data_finalizacao", desc=True).execute()
+        return res.data if res.data else []
+    except Exception as e:
+        st.error(f"Erro ao buscar dados: {e}")
+        return []
 
 # 📥 Carrega dados
 dados = buscar_historico()
@@ -36,7 +40,12 @@ def exibir_card_temporada(item):
     defesa = item.get("melhor_defesa", "N/A")
     divisao = item.get("divisao", "")
     temporada = item.get("temporada", "?")
-    data = pd.to_datetime(item.get("data_finalizacao")).strftime("%d/%m/%Y")
+    data_raw = item.get("data_finalizacao") or item.get("data_fim")
+
+    try:
+        data = pd.to_datetime(data_raw).strftime("%d/%m/%Y") if data_raw else "Data indefinida"
+    except Exception:
+        data = "Data inválida"
 
     st.markdown(f"""
         <div style='background:#f8f9fa;padding:15px;border-radius:10px;margin-bottom:15px;
@@ -49,15 +58,21 @@ def exibir_card_temporada(item):
         </div>
     """, unsafe_allow_html=True)
 
-# 🗂 Tabs para Copa e Liga
-tab1, tab2 = st.tabs(["🥇 Copas", "🏆 Ligas"])
+# 🗂 Tabs para Liga e Copa
+tab1, tab2 = st.tabs(["🏆 Ligas", "🥇 Copas"])
 
 with tab1:
-    st.subheader("🥇 Campeões da Copa")
-    for item in copas:
-        exibir_card_temporada(item)
+    st.subheader("🏆 Campeões da Liga")
+    if ligas:
+        for item in ligas:
+            exibir_card_temporada(item)
+    else:
+        st.info("Nenhuma liga registrada.")
 
 with tab2:
-    st.subheader("🏆 Campeões da Liga")
-    for item in ligas:
-        exibir_card_temporada(item)
+    st.subheader("🥇 Campeões da Copa")
+    if copas:
+        for item in copas:
+            exibir_card_temporada(item)
+    else:
+        st.info("Nenhuma copa registrada.")
