@@ -2,7 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import uuid
+from utils import registrar_movimentacao
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -21,8 +21,9 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state.get("nome_time", "Seu time")
 
 # 🔄 Buscar todos os times
-res_times = supabase.table("times").select("id, nome").execute()
+res_times = supabase.table("times").select("id, nome, saldo").execute()
 todos_times = res_times.data or []
+mapa_times = {t["id"]: t for t in todos_times}
 
 # 🔄 Buscar amistosos enviados
 def buscar_convites_enviados():
@@ -35,7 +36,7 @@ limite_alcancado = len(times_ja_convidados) >= 3
 
 st.markdown(f"🔄 {len(times_ja_convidados)} de 3 amistosos enviados.")
 
-# 📌 Alternativa às abas (selectbox)
+# 📌 Selectbox no lugar de abas
 aba = st.selectbox("📂 Escolha a visualização", ["📨 Convidar adversário", "📥 Convites recebidos", "📤 Convites enviados"])
 
 # 📨 Convidar adversário
@@ -72,25 +73,44 @@ elif aba == "📥 Convites recebidos":
         st.info("Você não recebeu nenhum convite.")
     else:
         for item in amistosos_recebidos:
-            convidante = next((t["nome"] for t in todos_times if t["id"] == item["time_convidante"]), "Desconhecido")
+            id_amistoso = item["id"]
             valor = item["valor_aposta"]
+            time_a_id = item["time_convidante"]
+            time_b_id = item["time_convidado"]
+
+            convidante = mapa_times.get(time_a_id, {"nome": "Desconhecido"})["nome"]
+
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.markdown(f"**{convidante}** convidou você para um amistoso apostando **R${valor:.2f} milhões**")
             with col2:
-                if st.button("✅ Aceitar", key=f"aceitar_{item['id']}"):
-                    supabase.table("amistosos").update({"status": "aceito"}).eq("id", item["id"]).execute()
-                    st.success("Amistoso aceito!")
-                    st.experimental_rerun()
-                if st.button("❌ Recusar", key=f"recusar_{item['id']}"):
-                    supabase.table("amistosos").update({"status": "recusado"}).eq("id", item["id"]).execute()
+                if st.button("✅ Aceitar", key=f"aceitar_{id_amistoso}"):
+                    saldo_a = mapa_times.get(time_a_id, {}).get("saldo", 0)
+                    saldo_b = mapa_times.get(time_b_id, {}).get("saldo", 0)
+
+                    if saldo_a >= valor and saldo_b >= valor:
+                        # Debitar dos dois times
+                        supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", time_a_id).execute()
+                        supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", time_b_id).execute()
+
+                        registrar_movimentacao(supabase, time_a_id, -valor, "Aposta amistoso")
+                        registrar_movimentacao(supabase, time_b_id, -valor, "Aposta amistoso")
+
+                        supabase.table("amistosos").update({"status": "aceito"}).eq("id", id_amistoso).execute()
+                        st.success("Amistoso aceito! Apostas debitadas dos dois clubes.")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Um dos clubes não tem saldo suficiente para aceitar a aposta.")
+
+                if st.button("❌ Recusar", key=f"recusar_{id_amistoso}"):
+                    supabase.table("amistosos").update({"status": "recusado"}).eq("id", id_amistoso).execute()
                     st.info("Convite recusado.")
                     st.experimental_rerun()
 
 # 📤 Convites enviados
 elif aba == "📤 Convites enviados":
     for item in convites_enviados:
-        convidado = next((t["nome"] for t in todos_times if t["id"] == item["time_convidado"]), "Desconhecido")
+        convidado = mapa_times.get(item["time_convidado"], {"nome": "Desconhecido"})["nome"]
         valor = item["valor_aposta"]
         status = item["status"]
         st.markdown(f"- Para **{convidado}** | 💰 R${valor:.2f} milhões | Status: `{status}`")
