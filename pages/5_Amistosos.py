@@ -60,7 +60,7 @@ if st.button("📩 Enviar Convite"):
         "id": str(uuid.uuid4()),
         "time_convidante": id_time,
         "time_convidado": id_adversario,
-        "valor_aposta": valor_aposta,
+        "valor_aposta": float(valor_aposta),
         "status": "pendente",
         "aposta_com_jogador": apostar_jogador,
         "jogador_convidante": jogador_escolhido["nome"] if jogador_escolhido else None,
@@ -102,8 +102,8 @@ for convite in convites_recebidos:
                 saldo_a = mapa_times.get(id_a, {}).get("saldo", 0)
                 saldo_b = meu_saldo
                 if saldo_a >= valor and saldo_b >= valor:
-                    supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_a).execute()
-                    supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", id_time).execute()
+                    supabase.table("times").update({"saldo": int(saldo_a - valor)}).eq("id", id_a).execute()
+                    supabase.table("times").update({"saldo": int(saldo_b - valor)}).eq("id", id_time).execute()
                     registrar_movimentacao_simples(id_a, -valor, "Aposta amistoso")
                     registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso")
                     supabase.table("amistosos").update({
@@ -137,7 +137,8 @@ for convite in convites_recebidos:
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao recusar convite: {e}")
-# 🕒 Convites aguardando confirmação
+
+# 🕒 Amistosos aguardando confirmação
 st.subheader("🔁 Amistosos aguardando confirmação final")
 
 res_confirmacoes = supabase.table("amistosos").select("*").eq("time_convidante", id_time).eq("status", "aguardando_confirmacao").execute()
@@ -162,8 +163,8 @@ for convite in confirmacoes:
                 saldo_b = mapa_times.get(convite["time_convidado"], {}).get("saldo", 0)
 
                 if saldo_a >= valor and saldo_b >= valor:
-                    supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_time).execute()
-                    supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", convite["time_convidado"]).execute()
+                    supabase.table("times").update({"saldo": int(saldo_a - valor)}).eq("id", id_time).execute()
+                    supabase.table("times").update({"saldo": int(saldo_b - valor)}).eq("id", convite["time_convidado"]).execute()
                     registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso com jogadores")
                     registrar_movimentacao_simples(convite["time_convidado"], -valor, "Aposta amistoso com jogadores")
                     supabase.table("amistosos").update({"status": "aceito"}).eq("id", convite["id"]).execute()
@@ -210,24 +211,21 @@ for amistoso in amistosos_aceitos:
             id_vencedor = id_a if vencedor == nome_a else id_b
             id_perdedor = id_b if id_vencedor == id_a else id_a
 
-            # Atualizar saldo do vencedor
-            supabase.table("times").update({"saldo": supabase.table("times").select("saldo").eq("id", id_vencedor).execute().data[0]["saldo"] + valor * 2}).eq("id", id_vencedor).execute()
+            saldo_vencedor = supabase.table("times").select("saldo").eq("id", id_vencedor).execute().data[0]["saldo"]
+            novo_saldo = int(saldo_vencedor + valor * 2)
+            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_vencedor).execute()
             registrar_movimentacao_simples(id_vencedor, valor * 2, "Vitória em amistoso")
 
-            # Transferência de jogadores (se houver)
             if jogador_a and jogador_b:
                 jogador_transferido = jogador_a if id_vencedor == id_b else jogador_b
                 supabase.table("elenco").update({"id_time": id_vencedor}).eq("nome", jogador_transferido).eq("id_time", id_perdedor).execute()
 
-            # Atualizar status
             supabase.table("amistosos").update({"status": "concluido"}).eq("id", amistoso["id"]).execute()
 
             st.success(f"Amistoso finalizado! {vencedor} venceu e recebeu o prêmio.")
             st.experimental_rerun()
         except Exception as e:
             st.error(f"Erro ao finalizar amistoso: {e}")
-
-
 
 
 
