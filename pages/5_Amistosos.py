@@ -99,30 +99,36 @@ for convite in convites_recebidos:
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("✅ Aceitar apenas valor", key=f"aceitar_valor_{convite['id']}"):
-            saldo_a = mapa_times.get(id_a, {}).get("saldo", 0)
-            saldo_b = meu_saldo
-            if saldo_a >= valor and saldo_b >= valor:
-                supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_a).execute()
-                supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", id_time).execute()
-                registrar_movimentacao_simples(id_a, -valor, "Aposta amistoso")
-                registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso")
-                supabase.table("amistosos").update({
-                    "status": "aceito",
-                    "jogador_convidado": None
-                }).eq("id", convite["id"]).execute()
-                st.success("Amistoso aceito com valor.")
-                st.experimental_rerun()
-            else:
-                st.error("Saldo insuficiente.")
+            try:
+                saldo_a = mapa_times.get(id_a, {}).get("saldo", 0)
+                saldo_b = meu_saldo
+                if saldo_a >= valor and saldo_b >= valor:
+                    supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_a).execute()
+                    supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", id_time).execute()
+                    registrar_movimentacao_simples(id_a, -valor, "Aposta amistoso")
+                    registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso")
+                    supabase.table("amistosos").update({
+                        "status": "aceito",
+                        "jogador_convidado": None
+                    }).eq("id", convite["id"]).execute()
+                    st.success("Amistoso aceito com valor.")
+                    st.experimental_rerun()
+                else:
+                    st.error("Saldo insuficiente.")
+            except Exception as e:
+                st.error(f"Erro ao aceitar convite: {e}")
 
     with col2:
         if aposta_jog and st.button("📨 Confirmar proposta com jogadores", key=f"aceitar_jogador_{convite['id']}"):
-            supabase.table("amistosos").update({
-                "status": "aguardando_confirmacao",
-                "jogador_convidado": jogador_que_eu_quero
-            }).eq("id", convite["id"]).execute()
-            st.success("Proposta devolvida com jogador. Aguardando confirmação do adversário.")
-            st.experimental_rerun()
+            try:
+                supabase.table("amistosos").update({
+                    "status": "aguardando_confirmacao",
+                    "jogador_convidado": jogador_que_eu_quero
+                }).eq("id", convite["id"]).execute()
+                st.success("Proposta devolvida com jogador. Aguardando confirmação do adversário.")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao confirmar aposta com jogadores: {e}")
 
     with col3:
         if st.button("❌ Recusar convite", key=f"recusar_{convite['id']}"):
@@ -147,19 +153,22 @@ for item in pendentes:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("✅ Confirmar aposta", key=f"confirmar_{item['id']}"):
-            saldo_a = meu_saldo
-            saldo_b = mapa_times.get(item["time_convidado"], {}).get("saldo", 0)
-            valor = item["valor_aposta"]
-            if saldo_a >= valor and saldo_b >= valor:
-                supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_time).execute()
-                supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", item["time_convidado"]).execute()
-                registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso confirmada")
-                registrar_movimentacao_simples(item["time_convidado"], -valor, "Aposta amistoso confirmada")
-                supabase.table("amistosos").update({"status": "aceito"}).eq("id", item["id"]).execute()
-                st.success("Aposta com jogadores confirmada!")
-                st.experimental_rerun()
-            else:
-                st.error("Saldo insuficiente.")
+            try:
+                saldo_a = meu_saldo
+                saldo_b = mapa_times.get(item["time_convidado"], {}).get("saldo", 0)
+                valor = item["valor_aposta"]
+                if saldo_a >= valor and saldo_b >= valor:
+                    supabase.table("times").update({"saldo": saldo_a - valor}).eq("id", id_time).execute()
+                    supabase.table("times").update({"saldo": saldo_b - valor}).eq("id", item["time_convidado"]).execute()
+                    registrar_movimentacao_simples(id_time, -valor, "Aposta amistoso confirmada")
+                    registrar_movimentacao_simples(item["time_convidado"], -valor, "Aposta amistoso confirmada")
+                    supabase.table("amistosos").update({"status": "aceito"}).eq("id", item["id"]).execute()
+                    st.success("Aposta com jogadores confirmada!")
+                    st.experimental_rerun()
+                else:
+                    st.error("Saldo insuficiente.")
+            except Exception as e:
+                st.error(f"Erro ao confirmar aposta: {e}")
     with col2:
         if st.button("❌ Cancelar amistoso", key=f"cancelar_{item['id']}"):
             supabase.table("amistosos").update({"status": "recusado"}).eq("id", item["id"]).execute()
@@ -197,6 +206,7 @@ for amistoso in amistosos_ativos:
 
         st.success(f"✅ Vitória registrada! R$ {premio:.2f} milhões creditados para {vencedor}")
         st.experimental_rerun()
+
 
 
 
