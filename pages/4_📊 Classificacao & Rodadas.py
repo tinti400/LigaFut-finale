@@ -141,44 +141,39 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Exibição das rodadas com layout visual
+# 📅 Filtro de rodada
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
+rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
+rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
+
 for rodada in rodadas:
-    numero = rodada.get("numero", "")
-    jogos = rodada.get("jogos", [])
-    if not jogos:
+    if rodada["numero"] != rodada_selecionada:
         continue
 
-    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {numero}</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
+    for jogo in rodada.get("jogos", []):
+        m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
+        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+        m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-    for jogo in jogos:
-        mandante_id = jogo.get("mandante")
-        visitante_id = jogo.get("visitante")
-        gols_mandante = jogo.get("gols_mandante", "")
-        gols_visitante = jogo.get("gols_visitante", "")
-
-        mandante = times_map.get(mandante_id, {})
-        visitante = times_map.get(visitante_id, {})
-
-        mandante_logo = mandante.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        visitante_logo = visitante.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-
-        mandante_nome = mandante.get("nome", "Desconhecido")
-        visitante_nome = visitante.get("nome", "Desconhecido")
+        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        m_nome = m.get("nome", "Desconhecido")
+        v_nome = v.get("nome", "Desconhecido")
 
         col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
         with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{mandante_logo}' width='30'> <b>{mandante_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
         with col2:
-            st.markdown(f"<h5 style='text-align: center;'>{gols_mandante}</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
         with col4:
-            st.markdown(f"<h5 style='text-align: center;'>{gols_visitante}</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{visitante_logo}' width='30'> <b>{visitante_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
 
 # 🧹 Admin: resetar rodadas
 if eh_admin:
