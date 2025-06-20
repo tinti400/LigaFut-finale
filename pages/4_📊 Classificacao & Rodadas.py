@@ -123,77 +123,9 @@ rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Tabela
-dados = []
-for i, (tid, t) in enumerate(classificacao, start=1):
-    logo_bruto = t.get("logo", "")
-    url_logo = logo_bruto if logo_bruto.startswith("http") else f"https://hceqyuvryhtihhbvacyo.supabase.co/storage/v1/object/public/logos/{logo_bruto.lstrip('/')}"
-    time_html = f"""
-    <div style='display: flex; align-items: center;'>
-        <img src='{url_logo}' width='25' style='margin-right: 6px;'>
-        <div style='line-height: 1.1; text-align: left;'>
-            <span style='font-weight: bold;'>{t['nome'].strip().capitalize()}</span><br>
-            <span style='font-size: 10px; color: gray;'>{t.get('tecnico', '')}</span>
-        </div>
-    </div>
-    """
-    dados.append({
-        "Posição": i,
-        "Time": time_html,
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    })
-
-# 📋 Estilização da tabela
-def aplicar_estilo_linha(df):
-    html = """
-    <style>
-        td, th { text-align: center; vertical-align: middle; }
-        th { background-color: #f0f0f0; }
-    </style>
-    <table border='1' class='dataframe' style='width: 100%; border-collapse: collapse;'>
-    """
-    html += "<thead><tr>" + "".join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
-    total = len(df)
-    for i, row in df.iterrows():
-        cor = "#d4edda" if i < 4 else "#f8d7da" if i >= total - 2 else ""
-        html += f"<tr style='background-color: {cor};'>" if cor else "<tr>"
-        for val in row:
-            html += f"<td>{val}</td>"
-        html += "</tr>"
-    html += "</tbody></table>"
-    return html
-
-if dados:
-    df = pd.DataFrame(dados)
-    st.markdown(aplicar_estilo_linha(df), unsafe_allow_html=True)
-else:
-    st.info("Sem dados suficientes para exibir a classificação.")
-
-# 🔧 Ações administrativas
-if eh_admin:
-    st.markdown("---")
-    st.subheader("🔧 Ações administrativas")
-    if st.button("🧹 Resetar Tabela de Classificação (apagar rodadas)"):
-        try:
-            res = supabase.table(nome_tabela_rodadas).select("id").execute()
-            for doc in res.data:
-                supabase.table(nome_tabela_rodadas).delete().eq("id", doc["id"]).execute()
-            st.success("✅ Rodadas apagadas com sucesso.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao apagar rodadas: {e}")
-
-# 📅 Rodadas
+# 📅 Exibição das rodadas
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
-
 if rodadas:
     rodadas_ordenadas = sorted(rodadas, key=lambda r: r.get("numero", 0))
     lista_rodadas = [f"Rodada {r.get('numero', '?')}" for r in rodadas_ordenadas]
@@ -221,33 +153,3 @@ if rodadas:
         """, unsafe_allow_html=True)
 else:
     st.info("Nenhuma rodada encontrada.")
-
-# 🏁 Final de temporada
-def todos_os_jogos_preenchidos(rodadas):
-    return all(j.get("gols_mandante") is not None and j.get("gols_visitante") is not None for r in rodadas for j in r.get("jogos", []))
-
-if todos_os_jogos_preenchidos(rodadas):
-    st.success("🏁 Temporada concluída! Gerando histórico...")
-
-    campeao = classificacao[0][1]["nome"]
-    melhor_ataque = max(classificacao, key=lambda x: x[1]["gp"])[1]["nome"]
-    melhor_defesa = min(classificacao, key=lambda x: x[1]["gc"])[1]["nome"]
-    temporada_data = {
-        "data_fim": datetime.now().isoformat(),
-        "divisao": divisao,
-        "campeao": campeao,
-        "melhor_ataque": melhor_ataque,
-        "melhor_defesa": melhor_defesa
-    }
-
-    try:
-        ja_salvo = supabase.table("historico_temporadas").select("*").eq("divisao", divisao).eq("data_fim", temporada_data["data_fim"]).execute()
-        if not ja_salvo.data:
-            supabase.table("historico_temporadas").insert(temporada_data).execute()
-    except Exception as e:
-        st.error(f"Erro ao salvar histórico da temporada: {e}")
-
-    st.markdown("## 🏅 Resumo da Temporada")
-    st.markdown(f"**🏆 Campeão:** `{campeao}`")
-    st.markdown(f"**🔥 Melhor Ataque:** `{melhor_ataque}`")
-    st.markdown(f"**🧱 Melhor Defesa:** `{melhor_defesa}`")
