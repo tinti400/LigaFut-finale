@@ -133,7 +133,7 @@ if classificacao:
         html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
         for i, row in df.iterrows():
             cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            html += f"<tr style='background-color: {cor};'>" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
+            html += f"<tr style='background-color: {cor};">" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
         html += "</tbody></table>"
         return html
 
@@ -141,39 +141,48 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Filtro de rodada
+# 📅 Filtro por rodada ou time
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
-rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
-rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
+modo = st.radio("Como deseja filtrar as rodadas?", ["Por rodada", "Por time"])
 
-for rodada in rodadas:
-    if rodada["numero"] != rodada_selecionada:
-        continue
-
-    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
-    for jogo in rodada.get("jogos", []):
-        m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
-        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-        m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
-
-        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        m_nome = m.get("nome", "Desconhecido")
-        v_nome = v.get("nome", "Desconhecido")
-
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-        with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+if modo == "Por rodada":
+    rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
+    rodada_selecionada = st.selectbox("Escolha a rodada", rodadas_disponiveis)
+    for rodada in rodadas:
+        if rodada["numero"] != rodada_selecionada:
+            continue
+        st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
+        for jogo in rodada.get("jogos", []):
+            m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
+            gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+            m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+            with col1: st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo')}' width='30'> <b>{m.get('nome')}</b></div>", unsafe_allow_html=True)
+            with col2: st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
+            with col3: st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+            with col4: st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
+            with col5: st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo')}' width='30'> <b>{v.get('nome')}</b></div>", unsafe_allow_html=True)
+else:
+    nomes_times = {v["nome"]: k for k, v in times_map.items()}
+    nome_selecionado = st.selectbox("Escolha o time", sorted(nomes_times.keys()))
+    id_selecionado = nomes_times[nome_selecionado]
+    rodada_filtrada = [r for r in rodadas if any(j.get("mandante") == id_selecionado or j.get("visitante") == id_selecionado for j in r.get("jogos", []))]
+    for rodada in rodada_filtrada:
+        st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada['numero']}</h4>", unsafe_allow_html=True)
+        for jogo in rodada.get("jogos", []):
+            if jogo.get("mandante") != id_selecionado and jogo.get("visitante") != id_selecionado:
+                continue
+            m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
+            gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+            m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+            with col1: st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo')}' width='30'> <b>{m.get('nome')}</b></div>", unsafe_allow_html=True)
+            with col2: st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
+            with col3: st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+            with col4: st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
+            with col5: st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo')}' width='30'> <b>{v.get('nome')}</b></div>", unsafe_allow_html=True)
 
 # 🧹 Admin: resetar rodadas
 if eh_admin:
@@ -187,3 +196,4 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
+
