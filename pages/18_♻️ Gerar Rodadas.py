@@ -10,7 +10,7 @@ key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 st.set_page_config(page_title="Gerar Rodadas", page_icon="⚙️", layout="centered")
-st.title("⚙️ Gerar Rodadas da Divisão")
+st.title("⚙️ Gerar Rodadas da Temporada")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -29,12 +29,16 @@ except Exception as e:
     st.error(f"Erro ao verificar administrador: {e}")
     st.stop()
 
-# 🔹 Selecionar divisão
-opcao_divisao = st.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2"])
-numero_divisao = opcao_divisao.split()[-1]
-tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
+# 🔽 Selecionar divisão e temporada
+col1, col2 = st.columns(2)
+opcao_divisao = col1.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
+opcao_temporada = col2.selectbox("Selecione a Temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
 
-# 📅 Buscar times pela divisão da tabela usuarios
+numero_divisao = opcao_divisao.split()[-1]
+numero_temporada = opcao_temporada.split()[-1]
+tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+
+# 📅 Buscar times pela divisão
 try:
     usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", opcao_divisao).execute().data
     time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
@@ -42,12 +46,13 @@ except Exception as e:
     st.error(f"Erro ao buscar times: {e}")
     st.stop()
 
-if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao}"):
+# 🔘 Botão para gerar
+if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
     if len(time_ids) < 2:
         st.warning("🚨 É necessário no mínimo 2 times para gerar rodadas.")
         st.stop()
 
-    # 🔄 Apagar rodadas antigas
+    # 🔄 Apagar rodadas antigas da mesma tabela
     try:
         supabase.table(tabela_rodadas).delete().neq("numero", -1).execute()
     except Exception as e:
@@ -80,6 +85,6 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao}"):
     try:
         for i, jogos in enumerate(rodadas, 1):
             supabase.table(tabela_rodadas).insert({"numero": i, "jogos": jogos}).execute()
-        st.success(f"✅ {len(rodadas)} rodadas geradas com sucesso para {opcao_divisao}!")
+        st.success(f"✅ {len(rodadas)} rodadas geradas com sucesso para {opcao_divisao} - {opcao_temporada}!")
     except Exception as e:
         st.error(f"Erro ao salvar rodadas: {e}")
