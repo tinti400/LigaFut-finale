@@ -13,22 +13,22 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
+# 🔒 Login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Admin
+# 📧 Verifica se é admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção da divisão
+# 🔹 Divisão
 divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 📦 Buscar rodadas
+# 📅 Buscar rodadas
 def buscar_resultados():
     try:
         res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
@@ -37,7 +37,7 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 📦 Buscar times
+# 👥 Buscar times com base nos usuários
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -56,18 +56,24 @@ def obter_nomes_times():
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
-# ⚽ Cálculo da classificação
+# 🧠 Classificação com punições
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
+
     for rodada in rodadas:
         for jogo in rodada.get("jogos", []):
-            m, v = jogo.get("mandante"), jogo.get("visitante")
-            gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
-            if None in [m, v, gm, gv]: continue
-            try: gm, gv = int(gm), int(gv)
-            except: continue
+            m = jogo.get("mandante")
+            v = jogo.get("visitante")
+            gm = jogo.get("gols_mandante")
+            gv = jogo.get("gols_visitante")
+            if None in [m, v, gm, gv]:
+                continue
+            try:
+                gm, gv = int(gm), int(gv)
+            except:
+                continue
 
-            for t in [m, v]:
+            for t in (m, v):
                 if t not in tabela:
                     tabela[t] = {
                         "nome": times_map.get(t, {}).get("nome", "Desconhecido"),
@@ -87,7 +93,7 @@ def calcular_classificacao(rodadas, times_map):
                 tabela[m]["pontos"] += 3
                 tabela[m]["v"] += 1
                 tabela[v]["d"] += 1
-            elif gv > gm:
+            elif gm < gv:
                 tabela[v]["pontos"] += 3
                 tabela[v]["v"] += 1
                 tabela[m]["d"] += 1
@@ -106,34 +112,37 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
 
-    # Aplicar punições
     try:
-        punicoes = supabase.table("punicoes").select("id_time", "pontos_retirados").execute().data
-        for p in punicoes:
+        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
+        puni_map = {}
+        for p in res_punicoes.data:
             tid = p["id_time"]
-            if tid in tabela:
-                tabela[tid]["pontos"] -= p["pontos_retirados"]
+            puni_map[tid] = puni_map.get(tid, 0) + p["pontos_retirados"]
+
+        for tid in tabela:
+            if tid in puni_map:
+                tabela[tid]["pontos"] -= puni_map[tid]
     except Exception as e:
         st.error(f"Erro ao aplicar punições: {e}")
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🚀 Executa
+# 🔄 Dados
 rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 🧾 Monta tabela
+# 📊 Tabela
 dados = []
-for i, (tid, t) in enumerate(classificacao, 1):
+for i, (tid, t) in enumerate(classificacao, start=1):
     escudo = f"<img src='{t['logo']}' width='25' style='vertical-align: middle; margin-right: 6px;'>"
     nome_time = t["nome"].strip().capitalize()
     tecnico = t.get("tecnico", "")
     nome_com_tecnico = f"""
-        <div style='line-height: 1.1; text-align: left;'>
-            <span style='font-weight: bold;'>{nome_time}</span><br>
-            <span style='font-size: 10px; color: gray;'>{tecnico}</span>
-        </div>
+    <div style='line-height: 1.1; text-align: left;'>
+        <span style='font-weight: bold;'>{nome_time}</span><br>
+        <span style='font-size: 10px; color: gray;'>{tecnico}</span>
+    </div>
     """
     dados.append({
         "Posição": i,
@@ -148,7 +157,7 @@ for i, (tid, t) in enumerate(classificacao, 1):
         "Saldo de Gols": t["sg"]
     })
 
-# 🧩 Estilo visual da tabela
+# 📋 Estilização da tabela
 def aplicar_estilo_linha(df):
     html = """
     <style>
@@ -157,7 +166,11 @@ def aplicar_estilo_linha(df):
     </style>
     <table border='1' class='dataframe' style='width: 100%; border-collapse: collapse;'>
     """
-    html += "<thead><tr>" + "".join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
+    html += "<thead><tr>"
+    for col in df.columns:
+        html += f"<th>{col}</th>"
+    html += "</tr></thead><tbody>"
+
     total = len(df)
     for i, row in df.iterrows():
         cor = "#d4edda" if i < 4 else "#f8d7da" if i >= total - 2 else ""
@@ -168,14 +181,13 @@ def aplicar_estilo_linha(df):
     html += "</tbody></table>"
     return html
 
-# 📊 Exibir
 if dados:
     df = pd.DataFrame(dados)
     st.markdown(aplicar_estilo_linha(df), unsafe_allow_html=True)
 else:
     st.info("Sem dados suficientes para exibir a classificação.")
 
-# ⚙️ Admin: resetar rodadas
+# 🔧 Admin: reset rodadas
 if eh_admin:
     st.markdown("---")
     st.subheader("🔧 Ações administrativas")
@@ -184,47 +196,66 @@ if eh_admin:
             res = supabase.table(nome_tabela_rodadas).select("id").execute()
             for doc in res.data:
                 supabase.table(nome_tabela_rodadas).delete().eq("id", doc["id"]).execute()
-            st.success("✅ Rodadas apagadas com sucesso.")
+            st.success("✅ Rodadas da divisão apagadas com sucesso.")
             st.rerun()
         except Exception as e:
-            st.error(f"Erro ao apagar rodadas: {e}")
+            st.error(f"Erro ao resetar rodadas: {e}")
 
-# 📅 Rodadas
+# 📅 Rodadas - visualização por página
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
-if rodadas:
+if not rodadas:
+    st.info("Nenhuma rodada encontrada para esta divisão.")
+else:
     rodadas_ordenadas = sorted(rodadas, key=lambda r: r.get("numero", 0))
     lista_rodadas = [f"Rodada {r.get('numero', '?')}" for r in rodadas_ordenadas]
-    selecao = st.selectbox("🔁 Selecione a rodada", lista_rodadas)
+    selecao = st.selectbox("🔁 Selecione a rodada para visualizar", lista_rodadas)
+
     rodada_escolhida = rodadas_ordenadas[lista_rodadas.index(selecao)]
     st.markdown(f"### 🕹️ {selecao}")
 
     for jogo in rodada_escolhida.get("jogos", []):
-        m, v = jogo.get("mandante"), jogo.get("visitante")
-        gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
+        m = jogo.get("mandante")
+        v = jogo.get("visitante")
+        gm = jogo.get("gols_mandante")
+        gv = jogo.get("gols_visitante")
+
         m_info = times_map.get(m, {"nome": "?", "logo": "", "tecnico": ""})
         v_info = times_map.get(v, {"nome": "?", "logo": "", "tecnico": ""})
-        escudo_m = f"<img src='{m_info['logo']}' width='25'>"
-        escudo_v = f"<img src='{v_info['logo']}' width='25'>"
-        nome_m = f"<b>{m_info['nome']}</b><br><span style='font-size:10px;color:gray'>{m_info['tecnico']}</span>"
-        nome_v = f"<b>{v_info['nome']}</b><br><span style='font-size:10px;color:gray'>{v_info['tecnico']}</span>"
+
+        escudo_m = f"<img src='{m_info['logo']}' width='25' style='vertical-align: middle; margin-right: 5px;'>"
+        escudo_v = f"<img src='{v_info['logo']}' width='25' style='vertical-align: middle; margin-left: 5px;'>"
+
+        nome_m = f"""
+        <div style='display: inline-block; text-align: left;'>
+            <b>{m_info['nome']}</b><br>
+            <span style='font-size: 10px; color: gray;'>{m_info.get('tecnico', '')}</span>
+        </div>
+        """
+        nome_v = f"""
+        <div style='display: inline-block; text-align: right;'>
+            <b>{v_info['nome']}</b><br>
+            <span style='font-size: 10px; color: gray;'>{v_info.get('tecnico', '')}</span>
+        </div>
+        """
         placar = f"{gm} x {gv}" if gm is not None and gv is not None else "vs"
 
-        st.markdown(f"""
-        <div style='font-size:16px;display:flex;justify-content:space-between;align-items:center;margin:10px 0;'>
-            {escudo_m} {nome_m}
-            <div style='margin: 0 10px; font-weight: bold;'>{placar}</div>
-            {nome_v} {escudo_v}
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.info("Nenhuma rodada encontrada.")
+        st.markdown(f"<div style='font-size: 16px; display: flex; justify-content: space-between; align-items: center;'>"
+                    f"{escudo_m}{nome_m}"
+                    f"<div style='margin: 0 10px; font-weight: bold;'>{placar}</div>"
+                    f"{nome_v}{escudo_v}"
+                    f"</div>", unsafe_allow_html=True)
 
-# 🏁 Gerar resumo final
+    st.markdown("---")
+
+# 🏁 Checagem de fim de temporada e geração de histórico
 def todos_os_jogos_preenchidos(rodadas):
-    return all(j.get("gols_mandante") is not None and j.get("gols_visitante") is not None
-               for r in rodadas for j in r.get("jogos", []))
+    for rodada in rodadas:
+        for jogo in rodada.get("jogos", []):
+            if jogo.get("gols_mandante") is None or jogo.get("gols_visitante") is None:
+                return False
+    return True
 
 if todos_os_jogos_preenchidos(rodadas):
     st.success("🏁 Temporada concluída! Gerando histórico...")
@@ -232,6 +263,7 @@ if todos_os_jogos_preenchidos(rodadas):
     campeao = classificacao[0][1]["nome"]
     melhor_ataque = max(classificacao, key=lambda x: x[1]["gp"])[1]["nome"]
     melhor_defesa = min(classificacao, key=lambda x: x[1]["gc"])[1]["nome"]
+
     temporada_data = {
         "data_fim": datetime.now().isoformat(),
         "divisao": divisao,
