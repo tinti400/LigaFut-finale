@@ -112,16 +112,25 @@ if st.button("🔒 Atualizar Restrições do Time"):
     except Exception as e:
         st.error(f"Erro ao salvar restrições: {e}")
 
-# 🗑️ Remover punições
+# 🗑️ Remover todas as punições
 st.markdown("---")
 st.subheader("🗑️ Excluir todas as punições do time")
 
 if st.button("🧼 Remover Punições do Time"):
     try:
-        # Remove da tabela de punições
         supabase.table("punicoes").delete().eq("id_time", id_time).execute()
-        # Zera pontuação negativa (se existir no banco)
         supabase.table("times").update({"pontuacao_negativa": 0}).eq("id", id_time).execute()
         st.success("🧼 Todas as punições foram removidas com sucesso.")
     except Exception as e:
         st.error(f"Erro ao excluir punições: {e}")
+
+# ❌ Remover apenas punições de pontos
+st.subheader("🧽 Remover punições de pontos do time")
+
+if st.button("❌ Remover Punições de Pontos"):
+    try:
+        supabase.table("punicoes").delete().eq("id_time", id_time).eq("tipo", "pontos").execute()
+        supabase.table("times").update({"pontuacao_negativa": 0}).eq("id", id_time).execute()
+        st.success("❌ Punições de pontos removidas com sucesso.")
+    except Exception as e:
+        st.error(f"Erro ao remover punições de pontos: {e}")
