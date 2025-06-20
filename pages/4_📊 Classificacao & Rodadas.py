@@ -23,14 +23,10 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção da divisão e temporada
-col1, col2 = st.columns(2)
-divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
-temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2"])
-
+# 🔹 Seleção da divisão
+divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
-numero_temporada = temporada.split()[-1]
-nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
 # 🔄 Buscar rodadas
 def buscar_resultados():
@@ -150,40 +146,39 @@ st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
-if rodadas_disponiveis:
-    rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
+rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
 
-    for rodada in rodadas:
-        if rodada["numero"] != rodada_selecionada:
-            continue
+for rodada in rodadas:
+    if rodada["numero"] != rodada_selecionada:
+        continue
 
-        st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
-        for jogo in rodada.get("jogos", []):
-            m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
-            gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-            m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
+    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
+    for jogo in rodada.get("jogos", []):
+        m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
+        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+        m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-            m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-            v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-            m_nome = m.get("nome", "Desconhecido")
-            v_nome = v.get("nome", "Desconhecido")
+        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        m_nome = m.get("nome", "Desconhecido")
+        v_nome = v.get("nome", "Desconhecido")
 
-            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-            with col1:
-                st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
-            with col3:
-                st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
-            with col4:
-                st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
-            with col5:
-                st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+        with col1:
+            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+        with col4:
+            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
+        with col5:
+            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
 
 # 🧹 Admin: resetar rodadas
 if eh_admin:
     st.markdown("---")
-    if st.button("🧹 Resetar Rodadas desta temporada"):
+    if st.button("🧹 Resetar Rodadas"):
         try:
             docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
             for d in docs:
@@ -192,3 +187,5 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
+
+
