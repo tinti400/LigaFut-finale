@@ -9,16 +9,16 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="Classificação", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Classificação", page_icon="📊", layout="centered")
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Login
+# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Admin
+# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
@@ -29,7 +29,6 @@ numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
 # 🔄 Buscar rodadas
-@st.cache_data(ttl=60)
 def buscar_resultados():
     try:
         res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
@@ -38,8 +37,7 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar times
-@st.cache_data(ttl=60)
+# 👥 Buscar nomes e logos dos times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -110,12 +108,12 @@ def calcular_classificacao(rodadas, times_map):
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# ▶️ Execução
+# 🔄 Dados
 rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Exibir classificação
+# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -135,65 +133,58 @@ if classificacao:
         html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
         for i, row in df.iterrows():
             cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            html += f"<tr style='background-color: {cor};'>" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
+            html += f"<tr style='background-color: {cor};">" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
         html += "</tbody></table>"
         return html
 
     st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
-
 else:
     st.info("Nenhum dado de classificação disponível.")
 
 # 📅 Filtro por rodada ou time
 st.markdown("---")
-filtro = st.radio("Filtrar jogos por:", ["Rodada", "Time"])
+st.subheader("📅 Rodadas da Temporada")
 
-if filtro == "Rodada":
-    rodadas_numeros = [r["numero"] for r in rodadas]
-    num = st.selectbox("Escolha a rodada", rodadas_numeros)
-    rodada = next((r for r in rodadas if r["numero"] == num), None)
-    if rodada:
-        st.markdown(f"### 🗓 Rodada {num}")
+modo = st.radio("Como deseja filtrar as rodadas?", ["Por rodada", "Por time"])
+
+if modo == "Por rodada":
+    rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
+    rodada_selecionada = st.selectbox("Escolha a rodada", rodadas_disponiveis)
+    for rodada in rodadas:
+        if rodada["numero"] != rodada_selecionada:
+            continue
+        st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
         for jogo in rodada.get("jogos", []):
-            m, v = jogo["mandante"], jogo["visitante"]
+            m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
             gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-            time_m = times_map.get(m, {"nome": "Desconhecido", "logo": ""})
-            time_v = times_map.get(v, {"nome": "Desconhecido", "logo": ""})
-            col1, col2, col3 = st.columns([5, 1, 5])
-            with col1:
-                st.markdown(f"<img src='{time_m['logo']}' width='30'> {time_m['nome']}", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"<h5 style='text-align:center'>{gm} x {gv}</h5>", unsafe_allow_html=True)
-            with col3:
-                st.markdown(f"{time_v['nome']} <img src='{time_v['logo']}' width='30'>", unsafe_allow_html=True)
-            st.markdown("---")
+            m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+            with col1: st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo')}' width='30'> <b>{m.get('nome')}</b></div>", unsafe_allow_html=True)
+            with col2: st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
+            with col3: st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+            with col4: st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
+            with col5: st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo')}' width='30'> <b>{v.get('nome')}</b></div>", unsafe_allow_html=True)
 else:
     nomes_times = {v["nome"]: k for k, v in times_map.items()}
-    nome_escolhido = st.selectbox("Selecione um time", sorted(nomes_times.keys()))
-    id_escolhido = nomes_times[nome_escolhido]
-
-    partidas = []
-    for rodada in rodadas:
+    nome_selecionado = st.selectbox("Escolha o time", sorted(nomes_times.keys()))
+    id_selecionado = nomes_times[nome_selecionado]
+    rodada_filtrada = [r for r in rodadas if any(j.get("mandante") == id_selecionado or j.get("visitante") == id_selecionado for j in r.get("jogos", []))]
+    for rodada in rodada_filtrada:
+        st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada['numero']}</h4>", unsafe_allow_html=True)
         for jogo in rodada.get("jogos", []):
-            if jogo["mandante"] == id_escolhido or jogo["visitante"] == id_escolhido:
-                partidas.append((rodada["numero"], jogo))
+            if jogo.get("mandante") != id_selecionado and jogo.get("visitante") != id_selecionado:
+                continue
+            m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
+            gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+            m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+            with col1: st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo')}' width='30'> <b>{m.get('nome')}</b></div>", unsafe_allow_html=True)
+            with col2: st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
+            with col3: st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+            with col4: st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
+            with col5: st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo')}' width='30'> <b>{v.get('nome')}</b></div>", unsafe_allow_html=True)
 
-    for numero, jogo in partidas:
-        m, v = jogo["mandante"], jogo["visitante"]
-        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-        time_m = times_map.get(m, {"nome": "Desconhecido", "logo": ""})
-        time_v = times_map.get(v, {"nome": "Desconhecido", "logo": ""})
-        st.markdown(f"### Rodada {numero}")
-        col1, col2, col3 = st.columns([5, 1, 5])
-        with col1:
-            st.markdown(f"<img src='{time_m['logo']}' width='30'> {time_m['nome']}", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<h5 style='text-align:center'>{gm} x {gv}</h5>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"{time_v['nome']} <img src='{time_v['logo']}' width='30'>", unsafe_allow_html=True)
-        st.markdown("---")
-
-# 🔧 Admin: resetar rodadas
+# 🧹 Admin: resetar rodadas
 if eh_admin:
     st.markdown("---")
     if st.button("🧹 Resetar Rodadas"):
@@ -205,5 +196,4 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
-
 
