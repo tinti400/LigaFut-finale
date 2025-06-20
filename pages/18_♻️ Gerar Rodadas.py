@@ -99,3 +99,16 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
     except Exception as e:
         st.error(f"Erro ao salvar rodadas: {e}")
 
+    # 🧹 Limpar punições para nova temporada (exceto temporada 1)
+    if numero_temporada != "1":
+        try:
+            for time_id in time_ids:
+                supabase.table("times").update({
+                    "restricoes": [],
+                    "pontuacao_negativa": 0
+                }).eq("id", time_id).execute()
+            st.info("🧹 Restrições e punições zeradas para a nova temporada!")
+        except Exception as e:
+            st.error(f"Erro ao limpar punições: {e}")
+
+
