@@ -119,7 +119,6 @@ st.subheader("🗑️ Excluir todas as punições do time")
 if st.button("🧼 Remover Punições do Time"):
     try:
         supabase.table("punicoes").delete().eq("id_time", id_time).execute()
-        supabase.table("times").update({"pontuacao_negativa": 0}).eq("id", id_time).execute()
         st.success("🧼 Todas as punições foram removidas com sucesso.")
     except Exception as e:
         st.error(f"Erro ao excluir punições: {e}")
@@ -130,7 +129,6 @@ st.subheader("🧽 Remover punições de pontos do time")
 if st.button("❌ Remover Punições de Pontos"):
     try:
         supabase.table("punicoes").delete().eq("id_time", id_time).eq("tipo", "pontos").execute()
-        supabase.table("times").update({"pontuacao_negativa": 0}).eq("id", id_time).execute()
         st.success("❌ Punições de pontos removidas com sucesso.")
     except Exception as e:
         st.error(f"Erro ao remover punições de pontos: {e}")
