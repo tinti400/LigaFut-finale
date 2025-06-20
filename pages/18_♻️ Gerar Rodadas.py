@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 import itertools
-import random
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -46,7 +45,7 @@ except Exception as e:
     st.error(f"Erro ao buscar times: {e}")
     st.stop()
 
-# 🔘 Botão para gerar rodadas
+# ✅ Botão de gerar rodadas
 if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
     if len(time_ids) < 2:
         st.warning("🚨 É necessário no mínimo 2 times para gerar rodadas.")
@@ -59,39 +58,51 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
         st.error(f"Erro ao apagar rodadas antigas: {e}")
         st.stop()
 
-    # ⚽ Gerar confrontos com turno e returno organizados
-    confrontos = list(itertools.combinations(time_ids, 2))
+    # ✅ Algoritmo Round-Robin (Turno e Returno)
+    def gerar_rodadas_round_robin(time_ids):
+        if len(time_ids) % 2 != 0:
+            time_ids.append("folga")  # para número ímpar
 
-    def montar_rodadas(jogos):
-        max_por_rodada = len(time_ids) // 2
-        rodadas = []
-        todos_jogos = jogos[:]
+        n = len(time_ids)
+        metade = n // 2
+        rodadas_turno = []
+        lista = time_ids[:]
 
-        while todos_jogos:
-            rodada = []
-            usados = set()
-            for j in todos_jogos[:]:
-                if j["mandante"] not in usados and j["visitante"] not in usados:
-                    rodada.append(j)
-                    usados.update([j["mandante"], j["visitante"]])
-                    todos_jogos.remove(j)
-                    if len(rodada) == max_por_rodada:
-                        break
-            rodadas.append(rodada)
-        return rodadas
+        for rodada in range(n - 1):
+            jogos = []
+            for i in range(metade):
+                time_a = lista[i]
+                time_b = lista[-(i + 1)]
+                if "folga" not in (time_a, time_b):
+                    jogos.append({
+                        "mandante": time_a,
+                        "visitante": time_b,
+                        "gols_mandante": None,
+                        "gols_visitante": None
+                    })
+            rodadas_turno.append(jogos)
+            # gira a roda mantendo o primeiro fixo
+            lista = [lista[0]] + [lista[-1]] + lista[1:-1]
 
-    # Turno (mando normal)
-    jogos_ida = [{"mandante": a, "visitante": b, "gols_mandante": None, "gols_visitante": None} for a, b in confrontos]
-    rodadas_ida = montar_rodadas(jogos_ida)
+        # Returno: inverte mandos
+        rodadas_returno = []
+        for jogos in rodadas_turno:
+            jogos_volta = []
+            for jogo in jogos:
+                jogos_volta.append({
+                    "mandante": jogo["visitante"],
+                    "visitante": jogo["mandante"],
+                    "gols_mandante": None,
+                    "gols_visitante": None
+                })
+            rodadas_returno.append(jogos_volta)
 
-    # Returno (mando invertido)
-    jogos_volta = [{"mandante": b, "visitante": a, "gols_mandante": None, "gols_visitante": None} for a, b in confrontos]
-    rodadas_volta = montar_rodadas(jogos_volta)
+        return rodadas_turno + rodadas_returno
 
-    # Junta mantendo a ordem correta: turno → returno
-    rodadas = rodadas_ida + rodadas_volta
+    # ⚽ Gera as rodadas completas
+    rodadas = gerar_rodadas_round_robin(time_ids)
 
-    # 💾 Salvar rodadas
+    # 💾 Salvar no Supabase
     try:
         for i, jogos in enumerate(rodadas, 1):
             supabase.table(tabela_rodadas).insert({"numero": i, "jogos": jogos}).execute()
@@ -99,7 +110,7 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
     except Exception as e:
         st.error(f"Erro ao salvar rodadas: {e}")
 
-    # 🧹 Limpar punições para nova temporada (exceto temporada 1)
+    # 🧹 Limpa punições (exceto temporada 1)
     if numero_temporada != "1":
         try:
             for time_id in time_ids:
