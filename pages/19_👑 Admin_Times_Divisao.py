@@ -23,6 +23,9 @@ if not res_admin.data:
     st.error("Acesso restrito a administradores.")
     st.stop()
 
+# 📥 Opções válidas de divisão
+divisoes_opcoes = ["Divisão 1", "Divisão 2", "Divisão 3"]
+
 # 🔍 Buscar todos usuários com time vinculado
 usuarios = supabase.table("usuarios").select("id, usuario, time_id, Divisão").execute().data
 times = supabase.table("times").select("id, nome").execute().data
@@ -30,11 +33,13 @@ mapa_times = {t["id"]: t["nome"] for t in times}
 
 # 📋 Mostrar tabela de usuários
 st.markdown("### 👥 Lista de Usuários com Times")
-divisoes_opcoes = ["Divisão 1", "Divisão 2", "Divisão 3"]
 
 for usuario in usuarios:
     time_id = usuario.get("time_id")
-    if not time_id:
+    divisao_atual = usuario.get("Divisão")
+
+    # Ignorar usuários sem time ou divisão válida
+    if not time_id or divisao_atual not in divisoes_opcoes:
         continue
 
     nome_time = mapa_times.get(time_id, "Desconhecido")
@@ -42,15 +47,14 @@ for usuario in usuarios:
     col1, col2, col3 = st.columns([3, 3, 2])
     col1.markdown(f"**👤 Usuário:** {usuario['usuario']}")
     col2.markdown(f"**🏷️ Time:** {nome_time}")
-    
+
     nova_divisao = col3.selectbox(
         "Divisão:",
         divisoes_opcoes,
-        index=divisoes_opcoes.index(usuario.get("Divisão", "Divisão 1")),
+        index=divisoes_opcoes.index(divisao_atual),
         key=f"divisao_{usuario['id']}"
     )
-    
-    # Botão para salvar alteração
+
     if st.button(f"💾 Salvar para {usuario['usuario']}", key=f"save_{usuario['id']}"):
         try:
             supabase.table("usuarios").update({"Divisão": nova_divisao}).eq("id", usuario["id"]).execute()
@@ -58,3 +62,4 @@ for usuario in usuarios:
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao atualizar: {e}")
+
