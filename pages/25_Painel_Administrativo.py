@@ -3,7 +3,6 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import json
 
 st.set_page_config(page_title="🛠️ Painel Administrativo", layout="centered")
 st.title("🛠️ Painel Administrativo - LigaFut")
@@ -93,16 +92,13 @@ if st.button("✅ Aplicar Punição"):
 st.markdown("---")
 st.subheader("🚫 Restrições de Acesso do Time")
 
-# Carregar estado atual (se já houver)
 r = restricoes_atuais if isinstance(restricoes_atuais, dict) else {}
 
-# Checkboxes para restrições
 bloq_leilao = st.checkbox("Proibir de participar do Leilão", value=r.get("leilao", False))
 bloq_mercado = st.checkbox("Proibir de usar o Mercado de Transferências", value=r.get("mercado", False))
 bloq_roubo = st.checkbox("Proibir no Evento de Roubo", value=r.get("roubo", False))
 bloq_multa = st.checkbox("Proibir no Evento de Multa", value=r.get("multa", False))
 
-# Botão para aplicar restrições
 if st.button("🔒 Atualizar Restrições do Time"):
     nova_restricao = {
         "leilao": bloq_leilao,
@@ -110,11 +106,22 @@ if st.button("🔒 Atualizar Restrições do Time"):
         "roubo": bloq_roubo,
         "multa": bloq_multa
     }
-
     try:
         supabase.table("times").update({"restricoes": nova_restricao}).eq("id", id_time).execute()
         st.success("🔒 Restrições atualizadas com sucesso.")
     except Exception as e:
         st.error(f"Erro ao salvar restrições: {e}")
 
+# 🗑️ Remover punições
+st.markdown("---")
+st.subheader("🗑️ Excluir todas as punições do time")
 
+if st.button("🧼 Remover Punições do Time"):
+    try:
+        # Remove da tabela de punições
+        supabase.table("punicoes").delete().eq("id_time", id_time).execute()
+        # Zera pontuação negativa (se existir no banco)
+        supabase.table("times").update({"pontuacao_negativa": 0}).eq("id", id_time).execute()
+        st.success("🧼 Todas as punições foram removidas com sucesso.")
+    except Exception as e:
+        st.error(f"Erro ao excluir punições: {e}")
