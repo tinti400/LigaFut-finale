@@ -13,12 +13,12 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Login
+# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Admin
+# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
@@ -28,7 +28,7 @@ divisao = st.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2"])
 numero_divisao = divisao.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}"
 
-# 🗕️ Buscar rodadas
+# 🔄 Buscar rodadas
 def buscar_resultados():
     try:
         res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
@@ -37,7 +37,7 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar times
+# 👥 Buscar nomes e logos dos times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -56,7 +56,7 @@ def obter_nomes_times():
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
-# 🧠 Classificação com punições
+# 🧠 Calcular classificação
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
 
@@ -141,19 +141,46 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Exibição das rodadas
+# 📅 Exibição das rodadas com layout visual
 st.markdown("---")
-st.subheader("📅 Rodadas")
-for rodada in rodadas:
-    st.markdown(f"**Rodada {rodada.get('numero', '')}**")
-    for jogo in rodada.get("jogos", []):
-        mandante = times_map.get(jogo["mandante"], {}).get("nome", "Desconhecido")
-        visitante = times_map.get(jogo["visitante"], {}).get("nome", "Desconhecido")
-        gm = jogo.get("gols_mandante", "")
-        gv = jogo.get("gols_visitante", "")
-        st.markdown(f"- {mandante} {gm} x {gv} {visitante}")
+st.subheader("📅 Rodadas da Temporada")
 
-# 🔧 Admin: resetar rodadas
+for rodada in rodadas:
+    numero = rodada.get("numero", "")
+    jogos = rodada.get("jogos", [])
+    if not jogos:
+        continue
+
+    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {numero}</h4>", unsafe_allow_html=True)
+
+    for jogo in jogos:
+        mandante_id = jogo.get("mandante")
+        visitante_id = jogo.get("visitante")
+        gols_mandante = jogo.get("gols_mandante", "")
+        gols_visitante = jogo.get("gols_visitante", "")
+
+        mandante = times_map.get(mandante_id, {})
+        visitante = times_map.get(visitante_id, {})
+
+        mandante_logo = mandante.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        visitante_logo = visitante.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+
+        mandante_nome = mandante.get("nome", "Desconhecido")
+        visitante_nome = visitante.get("nome", "Desconhecido")
+
+        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+        with col1:
+            st.markdown(f"<div style='text-align: right;'><img src='{mandante_logo}' width='30'> <b>{mandante_nome}</b></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<h5 style='text-align: center;'>{gols_mandante}</h5>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+        with col4:
+            st.markdown(f"<h5 style='text-align: center;'>{gols_visitante}</h5>", unsafe_allow_html=True)
+        with col5:
+            st.markdown(f"<div style='text-align: left;'><img src='{visitante_logo}' width='30'> <b>{visitante_nome}</b></div>", unsafe_allow_html=True)
+
+# 🧹 Admin: resetar rodadas
 if eh_admin:
     st.markdown("---")
     if st.button("🧹 Resetar Rodadas"):
