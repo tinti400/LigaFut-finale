@@ -113,7 +113,7 @@ rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Tabela
+# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -140,6 +140,18 @@ if classificacao:
     st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
 else:
     st.info("Nenhum dado de classificação disponível.")
+
+# 📅 Exibição das rodadas
+st.markdown("---")
+st.subheader("📅 Rodadas")
+for rodada in rodadas:
+    st.markdown(f"**Rodada {rodada.get('numero', '')}**")
+    for jogo in rodada.get("jogos", []):
+        mandante = times_map.get(jogo["mandante"], {}).get("nome", "Desconhecido")
+        visitante = times_map.get(jogo["visitante"], {}).get("nome", "Desconhecido")
+        gm = jogo.get("gols_mandante", "")
+        gv = jogo.get("gols_visitante", "")
+        st.markdown(f"- {mandante} {gm} x {gv} {visitante}")
 
 # 🔧 Admin: resetar rodadas
 if eh_admin:
