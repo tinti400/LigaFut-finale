@@ -4,13 +4,7 @@ from supabase import create_client
 from datetime import datetime
 from dateutil.parser import parse
 
-st.set_page_config(page_title="Painel do Técnico", layout="wide")
-# -*- coding: utf-8 -*-
-import streamlit as st
-from supabase import create_client
-from datetime import datetime
-from dateutil.parser import parse
-
+# ✅ Deve ser o primeiro comando de Streamlit
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
 # 🔐 Conexão com Supabase
@@ -52,23 +46,19 @@ try:
         entradas, saidas = [], []
         total_entrada, total_saida = 0, 0
 
-        nome_time_norm = str(nome_time or "").strip().lower()
+        nome_time_lower = nome_time.strip().lower()
 
         for m in dados:
-            origem_norm = str(m.get("origem", "") or "").strip().lower()
-            destino_norm = str(m.get("destino", "") or "").strip().lower()
-            bid_norm = str(m.get("bid", "") or "").strip().lower()
-            valor = m.get("valor", 0)
+            origem = (m.get("origem") or "").strip().lower()
+            destino = (m.get("destino") or "").strip().lower()
+            id_mov = m.get("id_time")
 
-            # ✅ Verifica se o time está envolvido direta ou indiretamente (por BID)
-            envolvido = (
-                m.get("id_time") == id_time
-                or nome_time_norm in origem_norm
-                or nome_time_norm in destino_norm
-                or nome_time_norm in bid_norm
-            )
-
-            if not envolvido:
+            # Verifica se o time está envolvido na movimentação
+            if (
+                id_mov != id_time
+                and nome_time_lower not in origem
+                and nome_time_lower not in destino
+            ):
                 continue
 
             try:
@@ -77,30 +67,27 @@ try:
                 data_formatada = "Data inválida"
 
             jogador = m.get("jogador", "Desconhecido")
+            valor = m.get("valor", 0)
             tipo = m.get("tipo", "")
             categoria = m.get("categoria", "")
-            origem = m.get("origem", "")
-            destino = m.get("destino", "")
-            detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
+            detalhes = f"do {origem.title()}" if destino == nome_time_lower else f"para {destino.title()}"
+            icone = "🟢" if destino == nome_time_lower else "🔴"
 
             linha = {
                 "Data": data_formatada,
-                "Jogador": f"{jogador}",
+                "Jogador": f"{icone} {jogador}",
                 "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
                 "Tipo": tipo.capitalize(),
                 "Categoria": categoria,
                 "Detalhes": detalhes
             }
 
-            # ✅ Define se é entrada ou saída com base no destino, origem ou bid
-            if destino_norm == nome_time_norm or (valor > 0 and nome_time_norm in bid_norm):
-                linha["Jogador"] = f"🟢 {jogador}"
+            if destino == nome_time_lower:
                 entradas.append(linha)
                 total_entrada += valor
-            elif origem_norm == nome_time_norm or (valor < 0 and nome_time_norm in bid_norm):
-                linha["Jogador"] = f"🔴 {jogador}"
+            elif origem == nome_time_lower:
                 saidas.append(linha)
-                total_saida += abs(valor)
+                total_saida += valor
 
         # 📅 Última movimentação registrada
         try:
@@ -114,8 +101,8 @@ try:
             st.markdown("#### 📋 Movimentações de Entrada")
             for entrada in entradas:
                 with st.container():
-                    col1, col2, col3 = st.columns([3, 2, 2])
-                    col1.markdown(f"{entrada['Jogador']}")
+                    col1, col2, col3 = st.columns([3, 3, 2])
+                    col1.markdown(f"🟢 **{entrada['Jogador']}**")
                     col2.markdown(f"**{entrada['Categoria']}** — {entrada['Detalhes']}")
                     col3.markdown(
                         f"📅 {entrada['Data']}  \n💰 **<span style='color:green'>{entrada['Valor (R$)']}</span>**",
@@ -127,8 +114,8 @@ try:
             st.markdown("#### 📋 Movimentações de Saída")
             for saida in saidas:
                 with st.container():
-                    col1, col2, col3 = st.columns([3, 2, 2])
-                    col1.markdown(f"{saida['Jogador']}")
+                    col1, col2, col3 = st.columns([3, 3, 2])
+                    col1.markdown(f"🔴 **{saida['Jogador']}**")
                     col2.markdown(f"**{saida['Categoria']}** — {saida['Detalhes']}")
                     col3.markdown(
                         f"📅 {saida['Data']}  \n💸 **<span style='color:red'>{saida['Valor (R$)']}</span>**",
