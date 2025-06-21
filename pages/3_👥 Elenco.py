@@ -25,7 +25,10 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 is_admin = len(res_admin.data) > 0
 
-st.title(f"👥 Elenco do {nome_time}")
+st.markdown(f"""
+    <h1 style='text-align:center;'>👥 Elenco do {nome_time}</h1>
+    <hr style='border:1px solid #444;'>
+""", unsafe_allow_html=True)
 
 # 💰 Buscar saldo
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
@@ -45,86 +48,33 @@ st.markdown(
         <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
         <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total do elenco: <strong>R$ {valor_total:,.0f}</strong></h4>
     </div>
+    <hr>
     """.replace(",", "."),
     unsafe_allow_html=True
 )
 
-st.markdown("---")
+# 🔽 Filtro de classificação
+classificacoes = ["Todos", "Titular", "Reserva", "Negociavel", "Sem classificação"]
+classificacao_selecionada = st.selectbox("📌 Filtrar por classificação:", classificacoes)
 
-# 🧹 Limpar elenco (ADM)
-if is_admin and jogadores:
-    if st.button("🧹 Limpar elenco COMPLETO"):
-        try:
-            supabase.table("elenco").delete().eq("id_time", id_time).execute()
-            st.success("✅ Elenco limpo com sucesso!")
-            st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Erro ao limpar elenco: {e}")
-
-# 📥 Importação com botão
-st.subheader("📤 Importar jogadores via planilha Excel (.xlsx)")
-arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
-
-if arquivo:
-    st.success("✅ Arquivo carregado. Agora clique no botão abaixo para importar.")
-    if st.button("📤 Processar Planilha"):
-        try:
-            df = pd.read_excel(arquivo)
-            obrigatorios = {"nome", "posição", "overall", "valor"}
-            colunas_arquivo = set(map(str.lower, df.columns))
-
-            if not obrigatorios.issubset(colunas_arquivo):
-                st.error("A planilha deve conter as colunas: nome, posição, overall, valor.")
-            else:
-                for _, row in df.iterrows():
-                    supabase.table("elenco").insert({
-                        "id_time": id_time,
-                        "nome": row["nome"],
-                        "posicao": row["posição"],
-                        "overall": int(row["overall"]),
-                        "valor": int(float(row["valor"])),
-                        "nacionalidade": row.get("nacionalidade", "Desconhecida"),
-                        "origem": row.get("origem", "Importado"),
-                        "imagem_url": row.get("imagem_url", ""),
-                        "classificacao": row.get("classificacao", "")
-                    }).execute()
-                st.success("✅ Jogadores importados com sucesso!")
-                st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Erro ao importar: {e}")
-
-st.markdown("---")
-
-# 📂 Classificação dos jogadores
-aba = st.selectbox("👥 Selecione a classificação para exibir:",
-                   ["🟢 Titulares", "🟡 Reservas", "🔴 Negociáveis", "⚪ Sem Classificação"])
-
-classificacoes = {
-    "🟢 Titulares": "titular",
-    "🟡 Reservas": "reserva",
-    "🔴 Negociáveis": "negociavel",
-    "⚪ Sem Classificação": None
-}
-
-filtro = classificacoes[aba]
-
-if filtro is None:
+# Filtrar jogadores
+if classificacao_selecionada == "Sem classificação":
     jogadores_filtrados = [j for j in jogadores if not j.get("classificacao")]
+elif classificacao_selecionada == "Todos":
+    jogadores_filtrados = jogadores
 else:
-    jogadores_filtrados = [j for j in jogadores if j.get("classificacao") == filtro]
+    jogadores_filtrados = [j for j in jogadores if j.get("classificacao") == classificacao_selecionada.lower()]
 
+# 🔃 Atualizar classificação
 for jogador in jogadores_filtrados:
-    col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2, 2])
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 2.5, 2])
 
     with col1:
         imagem = jogador.get("imagem_url", "")
         if imagem:
-            st.markdown(
-                f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>",
-                unsafe_allow_html=True
-            )
+            st.markdown(f"<img src='{imagem}' width='60' style='border-radius: 8px; border: 1px solid #ccc;'>", unsafe_allow_html=True)
         else:
-            st.markdown("<div style='width:60px;height:60px;border-radius:50%;border:2px solid #ddd;background:#eee;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='width:60px;height:60px;border-radius:8px;border:1px solid #ccc;background:#eee;'></div>", unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"**{jogador.get('nome', 'Sem nome')}**")
@@ -137,22 +87,18 @@ for jogador in jogadores_filtrados:
         st.markdown(f"⭐ {jogador.get('overall', '-')}")
 
     with col5:
-        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
-        origem = jogador.get("origem", "Desconhecida")
-        st.markdown(f"💰 **{valor_formatado}**")
-        st.markdown(f"🏟️ {origem}")
+        classificacao_atual = jogador.get("classificacao", "Sem classificação")
+        nova_classificacao = st.selectbox("", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
+                                          index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao_atual.capitalize()) if classificacao_atual else 3,
+                                          key=f"class_{jogador['id']}")
+        if nova_classificacao.lower() != classificacao_atual:
+            supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
+            st.experimental_rerun()
 
     with col6:
-        classificacao_atual = jogador.get("classificacao", "")
-        nova_classificacao = st.selectbox("Classificar", ["", "titular", "reserva", "negociavel"],
-                                           index=["", "titular", "reserva", "negociavel"].index(classificacao_atual),
-                                           key=f"class_{jogador['id']}")
-        if nova_classificacao != classificacao_atual:
-            try:
-                supabase.table("elenco").update({"classificacao": nova_classificacao}).eq("id", jogador["id"]).execute()
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao atualizar classificação: {e}")
+        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
+        origem = jogador.get("origem", "Desconhecida")
+        st.markdown(f"💰 **{valor_formatado}**\n🏟️ {origem}")
 
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
