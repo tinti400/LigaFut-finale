@@ -5,6 +5,11 @@ from utils import registrar_movimentacao
 
 st.set_page_config(page_title="Mercado de Transferências - LigaFut", layout="wide")
 
+# 🔒 Verifica se o usuário está logado
+if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
 # 🔐 Conexão
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
@@ -46,6 +51,8 @@ st.markdown(f"### 💰 Saldo atual: **R$ {saldo_time:,.0f}**".replace(",", "."))
 # 🔍 Filtros
 st.markdown("### 🔍 Filtros de Pesquisa")
 filtro_nome = st.text_input("Nome do jogador").strip().lower()
+filtro_nacionalidade = st.text_input("Nacionalidade").strip().lower()
+filtro_posicao = st.text_input("Posição").strip().lower()
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
 
 # 🗕️ Carrega jogadores do mercado
@@ -53,7 +60,11 @@ res = supabase.table("mercado_transferencias").select("*").execute()
 mercado = res.data if res.data else []
 
 # 🔍 Aplica filtros
-jogadores_filtrados = [j for j in mercado if filtro_nome in j["nome"].lower()] if filtro_nome else mercado
+jogadores_filtrados = [j for j in mercado if
+    (filtro_nome in j["nome"].lower()) and
+    (filtro_nacionalidade in j.get("nacionalidade", "").lower()) and
+    (filtro_posicao in j.get("posicao", "").lower())
+] if filtro_nome or filtro_nacionalidade or filtro_posicao else mercado
 
 # 📊 Ordenação
 if filtro_ordenacao == "Maior Overall":
@@ -69,10 +80,8 @@ elif filtro_ordenacao == "Nome Z-A":
 jogadores_por_pagina = 15
 total_jogadores = len(jogadores_filtrados)
 total_paginas = (total_jogadores - 1) // jogadores_por_pagina + 1
-
 if "pagina_mercado" not in st.session_state:
     st.session_state["pagina_mercado"] = 1
-
 pagina_atual = st.session_state["pagina_mercado"]
 inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
@@ -86,10 +95,8 @@ qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
-selecionados = set()
-
 for jogador in jogadores_pagina:
-    col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
+    col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
     with col1:
         try:
             st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
@@ -99,16 +106,13 @@ for jogador in jogadores_pagina:
         st.markdown(f"**{jogador.get('nome')}**")
         st.markdown(f"Posição: {jogador.get('posicao')}")
         st.markdown(f"Overall: {jogador.get('overall')}")
-        st.markdown(f"Idade: {jogador.get('idade') or 'N/D'}")
-        st.markdown(f"Nacionalidade: {jogador.get('nacionalidade') or 'N/D'}")
+        st.markdown(f"Nacionalidade: {jogador.get('nacionalidade', 'N/D')}")
+        st.markdown(f"Time de origem: {jogador.get('time_origem', 'N/D')}")
     with col3:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
-        st.markdown(f"Time de origem: {jogador.get('time_origem') or 'N/D'}")
-        st.markdown(f"Clube anterior: {jogador.get('origem') or 'N/D'}")
     with col4:
         if qtde_elenco >= 35:
             st.warning("⚠️ Elenco cheio (35 jogadores)")
-            st.button("❌ Comprar (bloqueado)", key=f"bloqueado_{jogador['id']}", disabled=True)
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
                 check = supabase.table("mercado_transferencias").select("id").eq("id", jogador["id"]).execute()
@@ -119,18 +123,12 @@ for jogador in jogadores_pagina:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
-                        jogador_atual = jogador
                         supabase.table("elenco").insert({
-                            "nome": jogador_atual["nome"],
-                            "posicao": jogador_atual["posicao"],
-                            "overall": jogador_atual["overall"],
-                            "valor": jogador_atual["valor"],
-                            "id_time": id_time,
-                            "foto": jogador_atual.get("foto", ""),
-                            "origem": jogador_atual.get("origem", "Desconhecido"),
-                            "nacionalidade": jogador_atual.get("nacionalidade", ""),
-                            "idade": jogador_atual.get("idade", None),
-                            "imagem_url": jogador_atual.get("imagem_url", "")
+                            "nome": jogador["nome"],
+                            "posicao": jogador["posicao"],
+                            "overall": jogador["overall"],
+                            "valor": jogador["valor"],
+                            "id_time": id_time
                         }).execute()
 
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
@@ -149,27 +147,6 @@ for jogador in jogadores_pagina:
                         st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Erro ao comprar jogador: {e}")
-
-    if is_admin:
-        if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
-            selecionados.add(jogador["id"])
-
-# 🩵 Ações em massa para admin
-if is_admin:
-    st.markdown("---")
-    st.markdown("### 🩵 Ações em massa (admin)")
-    if selecionados:
-        st.warning(f"{len(selecionados)} jogadores selecionados.")
-        if st.button("🗑️ Excluir selecionados do mercado"):
-            try:
-                for id_jogador in selecionados:
-                    supabase.table("mercado_transferencias").delete().eq("id", id_jogador).execute()
-                st.success("✅ Jogadores excluídos com sucesso!")
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir múltiplos jogadores: {e}")
-    else:
-        st.info("Selecione jogadores acima para habilitar a exclusão.")
 
 # 🔁 Paginação
 col_nav1, col_nav2, col_nav3 = st.columns(3)
