@@ -1,90 +1,92 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import verificar_login
 import pandas as pd
+from utils import verificar_login, formatar_valor
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
+# 🔒 Verifica login
 verificar_login()
-
-# 📥 Dados do time logado
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 💰 Buscar saldo
-res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+# 💰 Busca saldo
+saldo = 0
+res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+if res.data:
+    saldo = res.data[0].get("saldo", 0)
 
-# 🎯 Cabeçalho
-st.markdown("<h1 style='text-align: center;'>🧑‍💼 Painel do Técnico</h1><hr>", unsafe_allow_html=True)
-st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
+st.markdown("<h2 style='text-align: center;'>📊 Painel do Técnico</h2><hr>", unsafe_allow_html=True)
+st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: {formatar_valor(saldo)}")
 
-# 📂 Tipo de movimentação
-aba = st.radio("Selecione a visualização", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
+# 📌 Seletor de aba
+aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
 
-# 🔄 Carrega todas as movimentações registradas
-movs = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
+# 🔄 Carregar movimentações
+try:
+    dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
+    entradas, saidas = [], []
 
-# 🔍 Processamento
-entradas, saidas = [], []
-total_entrada = total_saida = 0
+    for m in dados:
+        jogador = m.get("jogador", "Desconhecido")
+        valor = m.get("valor", 0)
+        tipo = m.get("tipo", "").capitalize()
+        categoria = m.get("categoria", "-")
+        origem = m.get("origem", "-")
+        destino = m.get("destino", "-")
+        data = m.get("data", "-")
 
-for m in movs:
-    jogador = m.get("jogador", "Desconhecido")
-    valor = m.get("valor", 0)
-    tipo = m.get("tipo", "")
-    categoria = m.get("categoria", "")
-    data = m.get("data", "")[:16].replace("T", " ")
-    origem = m.get("origem", "")
-    destino = m.get("destino", "")
+        envolvido = nome_time.lower() in (str(origem).lower() + str(destino).lower())
+        if not envolvido:
+            continue
 
-    entrada = destino and destino.strip().lower() == nome_time.strip().lower()
-    saida = origem and origem.strip().lower() == nome_time.strip().lower()
+        registro = {
+            "Jogador": jogador,
+            "Valor (R$)": formatar_valor(valor),
+            "Tipo": tipo,
+            "Categoria": categoria,
+            "Origem": origem,
+            "Destino": destino,
+            "Data": data
+        }
 
-    registro = {
-        "Jogador": jogador,
-        "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
-        "Tipo": tipo.capitalize(),
-        "Categoria": categoria.capitalize(),
-        "Origem": origem or "-",
-        "Destino": destino or "-",
-        "Data": data or "-"
-    }
+        if destino.lower() == nome_time.lower():
+            entradas.append(registro)
+        elif origem.lower() == nome_time.lower():
+            saidas.append(registro)
 
-    if entrada:
-        entradas.append(registro)
-        total_entrada += valor
-    elif saida:
-        saidas.append(registro)
-        total_saida += valor
+    if aba == "📥 Entradas":
+        st.markdown("### ✅ Jogadores recebidos")
+        df = pd.DataFrame(entradas) if entradas else pd.DataFrame(columns=["Jogador", "Valor (R$)", "Tipo", "Categoria", "Origem", "Destino", "Data"])
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Nenhuma entrada registrada.")
 
-# 📊 Exibição
-if aba == "📥 Entradas":
-    st.markdown("### 📥 Jogadores que chegaram")
-    df = pd.DataFrame(entradas)
-    st.dataframe(df, use_container_width=True)
+    elif aba == "💸 Saídas":
+        st.markdown("### ❌ Jogadores vendidos")
+        df = pd.DataFrame(saidas) if saidas else pd.DataFrame(columns=["Jogador", "Valor (R$)", "Tipo", "Categoria", "Origem", "Destino", "Data"])
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Nenhuma saída registrada.")
 
-elif aba == "💸 Saídas":
-    st.markdown("### 💸 Jogadores que saíram")
-    df = pd.DataFrame(saidas)
-    st.dataframe(df, use_container_width=True)
+    elif aba == "📊 Resumo":
+        total_entrada = sum(float(m.get("valor", 0)) for m in entradas)
+        total_saida = sum(float(m.get("valor", 0)) for m in saidas)
+        saldo_final = total_entrada - total_saida
 
-else:
-    st.markdown("### 📊 Resumo Financeiro")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total em Entradas", f"R$ {total_entrada:,.0f}".replace(",", "."))
-    col2.metric("💸 Total em Saídas", f"R$ {total_saida:,.0f}".replace(",", "."))
-    lucro_prejuizo = total_entrada - total_saida
-    if lucro_prejuizo >= 0:
-        col3.success(f"📈 Lucro: R$ {lucro_prejuizo:,.0f}".replace(",", "."))
-    else:
-        col3.error(f"📉 Prejuízo: R$ {abs(lucro_prejuizo):,.0f}".replace(",", "."))
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Total Entradas", formatar_valor(total_entrada))
+        col2.metric("💸 Total Saídas", formatar_valor(total_saida))
+        col3.metric("📈 Saldo Líquido", formatar_valor(saldo_final))
 
+except Exception as e:
+    st.error(f"Erro ao carregar movimentações: {e}")
 
