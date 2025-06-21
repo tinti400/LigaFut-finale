@@ -102,7 +102,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
         pagar_salario_e_premiacao_resultado(id_m, id_v, gols_m, gols_v, int(numero_divisao))
 
         st.success(f"✅ Resultado salvo e movimentações feitas: {nome_m} {gols_m} x {gols_v} {nome_v}")
-        st.rerun()
+        st.experimental_rerun()
 
 # 🔎 Histórico geral
 st.markdown("---")
@@ -133,4 +133,5 @@ if historico:
     st.dataframe(df, use_container_width=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
+
 
