@@ -1,92 +1,73 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+# -*- coding: utf-8 -*-
+import streamlit as st
+from supabase import create_client
 import pandas as pd
 from utils import verificar_login, formatar_valor
+from datetime import datetime
 
-st.set_page_config(page_title="Painel do Técnico", layout="wide")
+# 🛠️ Configuração da página
+st.set_page_config(page_title="Painel do Técnico", page_icon="📋", layout="wide")
+st.markdown("## 📋 Painel do Técnico")
 
-# 🔐 Conexão Supabase
+# 🔐 Verificar login
+verificar_login()
+
+# 🔌 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🔒 Verifica login
-verificar_login()
+# 📌 Dados da sessão
 id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
+nome_time = st.session_state.get("nome_time", "Seu Time")
 
-# 💰 Busca saldo
-saldo = 0
-res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-if res.data:
-    saldo = res.data[0].get("saldo", 0)
+st.markdown(f"### 👤 Técnico do {nome_time}")
 
-st.markdown("<h2 style='text-align: center;'>📊 Painel do Técnico</h2><hr>", unsafe_allow_html=True)
-st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: {formatar_valor(saldo)}")
-
-# 📌 Seletor de aba
-aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
-
-# 🔄 Carregar movimentações
+# 🔎 Buscar movimentações com base no nome do time (entrada e saída)
 try:
-    dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
-    entradas, saidas = [], []
+    res = supabase.table("movimentacoes").select("*").order("data", desc=True).limit(1000).execute()
+    movimentacoes = res.data or []
 
-    for m in dados:
-        jogador = m.get("jogador", "Desconhecido")
-        valor = m.get("valor", 0)
-        tipo = m.get("tipo", "").capitalize()
-        categoria = m.get("categoria", "-")
-        origem = m.get("origem", "-")
-        destino = m.get("destino", "-")
-        data = m.get("data", "-")
+    entradas = []
+    saidas = []
 
-        envolvido = nome_time.lower() in (str(origem).lower() + str(destino).lower())
-        if not envolvido:
-            continue
+    for m in movimentacoes:
+        origem = m.get("origem", "") or ""
+        destino = m.get("destino", "") or ""
 
-        registro = {
-            "Jogador": jogador,
-            "Valor (R$)": formatar_valor(valor),
-            "Tipo": tipo,
-            "Categoria": categoria,
-            "Origem": origem,
-            "Destino": destino,
-            "Data": data
-        }
+        origem_norm = origem.strip().lower()
+        destino_norm = destino.strip().lower()
+        nome_time_norm = nome_time.strip().lower()
 
-        if destino.lower() == nome_time.lower():
-            entradas.append(registro)
-        elif origem.lower() == nome_time.lower():
-            saidas.append(registro)
+        if nome_time_norm in destino_norm:
+            entradas.append(m)
+        elif nome_time_norm in origem_norm:
+            saidas.append(m)
 
-    if aba == "📥 Entradas":
-        st.markdown("### ✅ Jogadores recebidos")
-        df = pd.DataFrame(entradas) if entradas else pd.DataFrame(columns=["Jogador", "Valor (R$)", "Tipo", "Categoria", "Origem", "Destino", "Data"])
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("Nenhuma entrada registrada.")
+    st.markdown("### 🟢 Entradas")
+    if entradas:
+        df_entradas = pd.DataFrame(entradas)
+        df_entradas = df_entradas[["jogador", "valor", "tipo", "categoria", "origem", "data"]]
+        df_entradas["valor"] = df_entradas["valor"].apply(lambda v: f"R$ {v:,.0f}".replace(",", "."))
+        df_entradas["data"] = pd.to_datetime(df_entradas["data"]).dt.strftime('%d/%m/%Y %H:%M')
+        st.dataframe(df_entradas)
+    else:
+        st.info("Nenhuma entrada encontrada.")
 
-    elif aba == "💸 Saídas":
-        st.markdown("### ❌ Jogadores vendidos")
-        df = pd.DataFrame(saidas) if saidas else pd.DataFrame(columns=["Jogador", "Valor (R$)", "Tipo", "Categoria", "Origem", "Destino", "Data"])
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("Nenhuma saída registrada.")
-
-    elif aba == "📊 Resumo":
-        total_entrada = sum(float(m.get("valor", 0)) for m in entradas)
-        total_saida = sum(float(m.get("valor", 0)) for m in saidas)
-        saldo_final = total_entrada - total_saida
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total Entradas", formatar_valor(total_entrada))
-        col2.metric("💸 Total Saídas", formatar_valor(total_saida))
-        col3.metric("📈 Saldo Líquido", formatar_valor(saldo_final))
+    st.markdown("### 🔴 Saídas")
+    if saidas:
+        df_saidas = pd.DataFrame(saidas)
+        df_saidas = df_saidas[["jogador", "valor", "tipo", "categoria", "destino", "data"]]
+        df_saidas["valor"] = df_saidas["valor"].apply(lambda v: f"R$ {v:,.0f}".replace(",", "."))
+        df_saidas["data"] = pd.to_datetime(df_saidas["data"]).dt.strftime('%d/%m/%Y %H:%M')
+        st.dataframe(df_saidas)
+    else:
+        st.info("Nenhuma saída encontrada.")
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+
 
