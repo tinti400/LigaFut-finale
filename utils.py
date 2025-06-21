@@ -76,7 +76,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
         }
 
         supabase.table("movimentacoes").insert(registro).execute()
-        st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
+        st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: {formatar_valor(novo_saldo)}")
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação: {e}")
@@ -110,7 +110,15 @@ def registrar_movimentacao_simples(id_time, valor, descricao):
         }
 
         supabase.table("movimentacoes").insert(registro).execute()
-        st.success(f"✅ {descricao} registrada. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
+        st.success(f"✅ {descricao} registrada. Novo saldo: {formatar_valor(novo_saldo)}")
 
     except Exception as e:
         st.error(f"Erro ao registrar movimentação simples: {e}")
+
+# 💵 Formatar valores em R$ (ex: 1.500.000 → R$ 1.500.000)
+def formatar_valor(valor):
+    try:
+        valor = float(valor)
+        return f"R$ {valor:,.0f}".replace(",", ".")
+    except:
+        return "R$ 0"
