@@ -3,7 +3,6 @@ from datetime import datetime
 import pytz
 from supabase import create_client
 
-# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -64,7 +63,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
-            "valor": valor,
+            "valor": abs(valor),
             "data": agora,
             "origem": origem,
             "destino": destino
@@ -131,6 +130,8 @@ def pagar_salarios(id_time):
 # 🏆 Premiação por resultado (escala divisional + gols)
 def pagar_salario_e_premiacao_resultado(id_time, resultado, gols_feitos, gols_sofridos, divisao):
     try:
+        resultado = resultado.lower().strip()  # ✅ Corrigido aqui
+
         divisao_num = str(divisao).replace("Divisão ", "").strip()
 
         premios = {
@@ -150,4 +151,3 @@ def pagar_salario_e_premiacao_resultado(id_time, resultado, gols_feitos, gols_so
 
     except Exception as e:
         st.error(f"Erro ao aplicar premiação e salários: {e}")
-
