@@ -1,71 +1,45 @@
-# -*- coding: utf-8 -*-
 import streamlit as st
+import pandas as pd
 from supabase import create_client
 from utils import verificar_login, formatar_valor
-import pandas as pd
 
-st.set_page_config(page_title="📋 Painel Técnico", page_icon="📋", layout="wide")
-st.markdown("## 📋 Painel Técnico - Histórico de Movimentações")
-
-# 🔒 Verifica login
+st.set_page_config(page_title="📋 Últimas Movimentações", layout="wide")
 verificar_login()
 
-# 🔗 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 📌 Dados da sessão
 id_time = st.session_state["id_time"]
-nome_time = st.session_state.get("nome_time", "Seu Time")
-nome_normalizado = nome_time.strip().lower()
 
-# 🔄 Buscar movimentações
+# 🔄 Buscar últimas 8 movimentações do time, ordenadas pela data mais recente
 try:
-    res = supabase.table("movimentacoes").select("*").order("id", desc=True).limit(500).execute()
-    movimentacoes = res.data or []
-
-    entradas, saidas = [], []
-
-    for m in movimentacoes:
-        origem = (m.get("origem") or "").strip().lower()
-        destino = (m.get("destino") or "").strip().lower()
-        if nome_normalizado in destino:
-            entradas.append(m)
-        elif nome_normalizado in origem:
-            saidas.append(m)
-
-    entradas = entradas[:4]
-    saidas = saidas[:4]
-
-    def criar_df(lista, tipo_mov):
-        dados = []
-        for mov in lista:
-            dados.append({
-                "👤 Jogador": mov.get("jogador", "Desconhecido"),
-                "💰 Valor": formatar_valor(mov.get("valor", 0)),
-                "📦 Tipo": mov.get("tipo", "-").capitalize(),
-                "📁 Categoria": mov.get("categoria", "-").capitalize(),
-                "🏷️ Origem" if tipo_mov == "entrada" else "🏷️ Destino": mov.get("origem") if tipo_mov == "entrada" else mov.get("destino"),
-            })
-        return pd.DataFrame(dados)
-
-    st.markdown("### 🟢 Últimas Entradas")
-    if entradas:
-        df_entradas = criar_df(entradas, "entrada")
-        st.dataframe(df_entradas, use_container_width=True)
-    else:
-        st.info("Nenhuma entrada registrada.")
-
-    st.markdown("### 🔴 Últimas Saídas")
-    if saídas := saidas:
-        df_saidas = criar_df(saídas, "saida")
-        st.dataframe(df_saidas, use_container_width=True)
-    else:
-        st.info("Nenhuma saída registrada.")
-
+    res = supabase.table("movimentacoes").select("*").eq("id_time", id_time).order("data", desc=True).limit(8).execute()
+    movimentacoes = res.data if res.data else []
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
+    movimentacoes = []
+
+# Exibir visual igual ao painel de elenco
+st.markdown("### 💼 Últimas Movimentações")
+if movimentacoes:
+    for mov in movimentacoes:
+        tipo = "🟢 Entrada" if mov["categoria"] == "compra" else "🔴 Saída"
+        col1, col2, col3, col4, col5 = st.columns([1.5, 2.5, 1.2, 2, 1.5])
+        with col1:
+            st.markdown(f"**{mov.get('posição', '—')}**")
+        with col2:
+            st.markdown(f"{mov['jogador']}")
+        with col3:
+            st.markdown(f"{mov.get('overall', '—')}")
+        with col4:
+            st.markdown(formatar_valor(mov["valor"]))
+        with col5:
+            st.markdown(tipo)
+        st.markdown("---")
+else:
+    st.info("Nenhuma movimentação encontrada.")
+
 
 
 
