@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from datetime import datetime
 from dateutil.parser import parse
 
-# ✅ Deve ser o primeiro comando de Streamlit
-st.set_page_config(page_title="Painel do Técnico", layout="wide")
+st.set_page_config(page_title="📊 Painel do Técnico", layout="wide")
 
-# 🔐 Conexão com Supabase
+# 🔐 Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -29,116 +27,79 @@ except Exception as e:
     st.error(f"Erro ao carregar saldo: {e}")
     saldo = 0
 
-# 🎯 Cabeçalho
-st.markdown("<h1 style='text-align: center;'>🧑‍💼 Painel do Técnico</h1><hr>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>📊 Painel do Técnico</h1><hr>", unsafe_allow_html=True)
 st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
 
-# 🔄 Tabs com movimentações
-aba = st.radio("📂 Selecione o tipo de movimentação", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
+# 📂 Tipo de movimentação
+aba = st.radio("Filtrar:", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
 
 try:
-    # 📦 Carrega todas as movimentações
+    # 📦 Carregar todas as movimentações
     dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
-
     if not dados:
-        st.info("Nenhuma movimentação registrada ainda.")
-    else:
-        entradas, saidas = [], []
-        total_entrada, total_saida = 0, 0
+        st.info("Nenhuma movimentação registrada.")
+        st.stop()
 
-        nome_time_lower = nome_time.strip().lower()
+    entradas, saidas = [], []
+    total_entrada, total_saida = 0, 0
+    nome_norm = nome_time.strip().lower()
 
-        for m in dados:
-            origem = (m.get("origem") or "").strip().lower()
-            destino = (m.get("destino") or "").strip().lower()
-            id_mov = m.get("id_time")
+    for mov in dados:
+        origem = mov.get("origem", "") or ""
+        destino = mov.get("destino", "") or ""
+        jogador = mov.get("jogador", "Desconhecido")
+        valor = mov.get("valor", 0)
+        tipo = mov.get("tipo", "").capitalize()
+        categoria = mov.get("categoria", "-")
 
-            # Verifica se o time está envolvido na movimentação
-            if (
-                id_mov != id_time
-                and nome_time_lower not in origem
-                and nome_time_lower not in destino
-            ):
-                continue
+        # Normaliza para comparação
+        origem_norm = origem.strip().lower()
+        destino_norm = destino.strip().lower()
 
-            try:
-                data_formatada = parse(m["data"]).strftime("%d/%m %H:%M") if m.get("data") else "Data inválida"
-            except:
-                data_formatada = "Data inválida"
+        linha = {
+            "jogador": jogador,
+            "valor": valor,
+            "categoria": categoria,
+            "tipo": tipo,
+            "origem": origem,
+            "destino": destino,
+        }
 
-            jogador = m.get("jogador", "Desconhecido")
-            valor = m.get("valor", 0)
-            tipo = m.get("tipo", "")
-            categoria = m.get("categoria", "")
-            detalhes = f"do {origem.title()}" if destino == nome_time_lower else f"para {destino.title()}"
-            icone = "🟢" if destino == nome_time_lower else "🔴"
+        if destino_norm == nome_norm:
+            entradas.append(linha)
+            total_entrada += valor
+        elif origem_norm == nome_norm:
+            saidas.append(linha)
+            total_saida += valor
 
-            linha = {
-                "Data": data_formatada,
-                "Jogador": f"{icone} {jogador}",
-                "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
-                "Tipo": tipo.capitalize(),
-                "Categoria": categoria,
-                "Detalhes": detalhes
-            }
+    # 🎯 Exibição
+    def exibir_movimentacoes(lista, icone, cor):
+        for item in lista:
+            st.markdown("---")
+            col1, col2, col3 = st.columns([3, 3, 2])
+            col1.markdown(f"**{icone} {item['jogador']}**")
+            col2.markdown(f"🧾 {item['tipo']} - {item['categoria']}")
+            if icone == "🟢":
+                col3.markdown(f"💰 <span style='color:green'>R$ {item['valor']:,.0f}</span>", unsafe_allow_html=True)
+            else:
+                col3.markdown(f"💸 <span style='color:red'>R$ {item['valor']:,.0f}</span>", unsafe_allow_html=True)
 
-            if destino == nome_time_lower:
-                entradas.append(linha)
-                total_entrada += valor
-            elif origem == nome_time_lower:
-                saidas.append(linha)
-                total_saida += valor
-
-        # 📅 Última movimentação registrada
-        try:
-            ultima_data = parse(dados[0]["data"]).strftime('%d/%m/%Y %H:%M')
-        except:
-            ultima_data = "—"
-        st.caption(f"📅 Última movimentação registrada: {ultima_data}")
-
-        # 🧾 Exibição por aba
-        if aba == "📥 Entradas":
-            st.markdown("#### 📋 Movimentações de Entrada")
-            for entrada in entradas:
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 3, 2])
-                    col1.markdown(f"🟢 **{entrada['Jogador']}**")
-                    col2.markdown(f"**{entrada['Categoria']}** — {entrada['Detalhes']}")
-                    col3.markdown(
-                        f"📅 {entrada['Data']}  \n💰 **<span style='color:green'>{entrada['Valor (R$)']}</span>**",
-                        unsafe_allow_html=True
-                    )
-                    st.markdown("---")
-
-        elif aba == "💸 Saídas":
-            st.markdown("#### 📋 Movimentações de Saída")
-            for saida in saidas:
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 3, 2])
-                    col1.markdown(f"🔴 **{saida['Jogador']}**")
-                    col2.markdown(f"**{saida['Categoria']}** — {saida['Detalhes']}")
-                    col3.markdown(
-                        f"📅 {saida['Data']}  \n💸 **<span style='color:red'>{saida['Valor (R$)']}</span>**",
-                        unsafe_allow_html=True
-                    )
-                    st.markdown("---")
-
-        elif aba == "📊 Resumo":
-            st.markdown("💡 **Resumo mostra o total de entradas e saídas registradas neste painel.**")
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                st.success(f"💰 Total Entradas\n\nR$ {total_entrada:,.0f}".replace(",", "."))
-
-            with col2:
-                st.error(f"💸 Total Saídas\n\nR$ {total_saida:,.0f}".replace(",", "."))
-
-            with col3:
-                saldo_liquido = total_entrada - total_saida
-                if saldo_liquido >= 0:
-                    st.success(f"📈 Lucro\n\nR$ {saldo_liquido:,.0f}".replace(",", "."))
-                else:
-                    st.error(f"📉 Prejuízo\n\nR$ {abs(saldo_liquido):,.0f}".replace(",", "."))
+    if aba == "📥 Entradas":
+        st.markdown("### 📥 Entradas")
+        exibir_movimentacoes(entradas, "🟢", "green")
+    elif aba == "💸 Saídas":
+        st.markdown("### 💸 Saídas")
+        exibir_movimentacoes(saidas, "🔴", "red")
+    elif aba == "📊 Resumo":
+        saldo_liquido = total_entrada - total_saida
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Total de Entradas", f"R$ {total_entrada:,.0f}".replace(",", "."))
+        col2.metric("💸 Total de Saídas", f"R$ {total_saida:,.0f}".replace(",", "."))
+        col3.metric(
+            "📈 Lucro/Prejuízo",
+            f"R$ {saldo_liquido:,.0f}".replace(",", "."),
+            delta=f"{'+' if saldo_liquido >= 0 else '-'}R$ {abs(saldo_liquido):,.0f}".replace(",", ".")
+        )
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
