@@ -35,19 +35,16 @@ saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
 
-# Estatísticas
+# 📊 Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 
-st.markdown(
-    f"""
-    <div style='text-align:center;'>
-        <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
-        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total do elenco: <strong>R$ {valor_total:,.0f}</strong></h4>
-    </div>
-    """.replace(",", "."),
-    unsafe_allow_html=True
-)
+st.markdown(f"""
+<div style='text-align:center;'>
+    <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
+    <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total do elenco: <strong>R$ {valor_total:,.0f}</strong></h4>
+</div>
+""".replace(",", "."), unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -57,113 +54,98 @@ if is_admin and jogadores:
         try:
             supabase.table("elenco").delete().eq("id_time", id_time).execute()
             st.success("✅ Elenco limpo com sucesso!")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"Erro ao limpar elenco: {e}")
 
-# 📥 Importação com botão
-st.subheader("📤 Importar jogadores via planilha Excel (.xlsx)")
-arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
+# Separar jogadores por classificação
+titulares = [j for j in jogadores if j.get("classificacao") == "titular"]
+reservas = [j for j in jogadores if j.get("classificacao") == "reserva"]
+negociaveis = [j for j in jogadores if j.get("classificacao") == "negociavel"]
+sem_classificacao = [j for j in jogadores if j.get("classificacao") not in ["titular", "reserva", "negociavel"]]
 
-if arquivo:
-    st.success("✅ Arquivo carregado. Agora clique no botão abaixo para importar.")
-    if st.button("📤 Processar Planilha"):
-        try:
-            df = pd.read_excel(arquivo)
-            obrigatorios = {"nome", "posição", "overall", "valor"}
-            colunas_arquivo = set(map(str.lower, df.columns))
+# Tabs
+aba1, aba2, aba3, aba4 = st.tabs(["🟢 Titulares", "🟡 Reservas", "🔴 Negociáveis", "⚪ Sem Classificação"])
 
-            if not obrigatorios.issubset(colunas_arquivo):
-                st.error("A planilha deve conter as colunas: nome, posição, overall, valor.")
-            else:
-                for _, row in df.iterrows():
-                    supabase.table("elenco").insert({
-                        "id_time": id_time,
-                        "nome": row["nome"],
-                        "posicao": row["posição"],
-                        "overall": int(row["overall"]),
-                        "valor": int(float(row["valor"])),
-                        "nacionalidade": row.get("nacionalidade", "Desconhecida"),
-                        "origem": "Importado"
-                    }).execute()
-                st.success("✅ Jogadores importados com sucesso!")
-                st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Erro ao importar: {e}")
+abas_e_jogadores = {
+    aba1: titulares,
+    aba2: reservas,
+    aba3: negociaveis,
+    aba4: sem_classificacao
+}
 
-st.markdown("---")
+# Exibir jogadores por aba
+for aba, lista_jogadores in abas_e_jogadores.items():
+    with aba:
+        if not lista_jogadores:
+            st.info("Nenhum jogador nesta categoria.")
+            continue
 
-aba = st.radio("📋 Selecione a visualização do elenco:", ["Titulares", "Reservas", "Negociáveis"], horizontal=True)
+        for jogador in lista_jogadores:
+            col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2, 2.5])
 
-filtro = "titular" if aba == "Titulares" else "reserva" if aba == "Reservas" else "negociavel"
-jogadores_filtrados = [j for j in jogadores if j.get("classificacao", "titular") == filtro]
+            with col1:
+                imagem = jogador.get("imagem_url", "")
+                if imagem:
+                    st.markdown(f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='width:60px;height:60px;border-radius:50%;border:2px solid #ddd;background:#eee;'></div>", unsafe_allow_html=True)
 
-# 📋 Exibir jogadores por categoria
-for jogador in jogadores_filtrados:
-    col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2, 2.5])
+            with col2:
+                st.markdown(f"**{jogador.get('nome', 'Sem nome')}**")
+                st.markdown(f"🌍 {jogador.get('nacionalidade', 'Desconhecida')}")
 
-    with col1:
-        imagem = jogador.get("imagem_url", "")
-        if imagem:
-            st.markdown(
-                f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>",
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown("<div style='width:60px;height:60px;border-radius:50%;border:2px solid #ddd;background:#eee;'></div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown(f"📌 {jogador.get('posicao', '-')}")
 
-    with col2:
-        st.markdown(f"**{jogador.get('nome', 'Sem nome')}**")
-        st.markdown(f"🌍 {jogador.get('nacionalidade', 'Desconhecida')}")
+            with col4:
+                st.markdown(f"⭐ {jogador.get('overall', '-')}")
 
-    with col3:
-        st.markdown(f"📌 {jogador.get('posicao', '-')}")
+            with col5:
+                valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
+                origem = jogador.get("origem", "Desconhecida")
+                st.markdown(f"💰 **{valor_formatado}**")
+                st.markdown(f"🏟️ {origem}")
 
-    with col4:
-        st.markdown(f"⭐ {jogador.get('overall', '-')}")
-
-    with col5:
-        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
-        origem = jogador.get("origem", "Desconhecida")
-        st.markdown(f"💰 **{valor_formatado}**")
-        st.markdown(f"🏟️ {origem}")
-
-    with col6:
-        classificacao_atual = jogador.get("classificacao", "titular")
-        nova_classificacao = st.selectbox(
-            "",
-            ["titular", "reserva", "negociavel"],
-            index=["titular", "reserva", "negociavel"].index(classificacao_atual) if classificacao_atual in ["titular", "reserva", "negociavel"] else 0,
-            key=f"classificacao_{jogador['id']}"
-        )
-        if nova_classificacao != classificacao_atual:
-            supabase.table("elenco").update({"classificacao": nova_classificacao}).eq("id", jogador["id"]).execute()
-            st.experimental_rerun()
-
-    with col7:
-        if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
-            try:
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-                supabase.table("mercado_transferencias").insert({
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": jogador["valor"],
-                    "id_time": id_time,
-                    "time_origem": nome_time,
-                    "imagem_url": jogador.get("imagem_url", ""),
-                    "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
-                    "origem": origem
-                }).execute()
-                registrar_movimentacao(
-                    id_time=id_time,
-                    jogador=jogador["nome"],
-                    valor=round(jogador["valor"] * 0.7),
-                    tipo="mercado",
-                    categoria="venda",
-                    destino="Mercado"
+            with col6:
+                classificacao_atual = jogador.get("classificacao", "")
+                nova_classificacao = st.selectbox(
+                    "Classificar",
+                    ["titular", "reserva", "negociavel"],
+                    index=["titular", "reserva", "negociavel"].index(classificacao_atual) if classificacao_atual in ["titular", "reserva", "negociavel"] else 0,
+                    key=f"class_{jogador['id']}"
                 )
-                st.success(f"{jogador['nome']} foi vendido com sucesso!")
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
+                if nova_classificacao != classificacao_atual:
+                    try:
+                        supabase.table("elenco").update({"classificacao": nova_classificacao}).eq("id", jogador["id"]).execute()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao atualizar classificação: {e}")
+
+            with col7:
+                if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+                    try:
+                        supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+                        supabase.table("mercado_transferencias").insert({
+                            "nome": jogador["nome"],
+                            "posicao": jogador["posicao"],
+                            "overall": jogador["overall"],
+                            "valor": jogador["valor"],
+                            "id_time": id_time,
+                            "time_origem": nome_time,
+                            "imagem_url": jogador.get("imagem_url", ""),
+                            "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
+                            "origem": origem
+                        }).execute()
+                        registrar_movimentacao(
+                            id_time=id_time,
+                            jogador=jogador["nome"],
+                            valor=round(jogador["valor"] * 0.7),
+                            tipo="mercado",
+                            categoria="venda",
+                            destino="Mercado"
+                        )
+                        st.success(f"{jogador['nome']} foi vendido com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao vender jogador: {e}")
