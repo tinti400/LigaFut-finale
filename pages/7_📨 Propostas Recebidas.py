@@ -13,7 +13,7 @@ supabase = create_client(url, key)
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🔴 Contador de propostas pendentes
+# 🔴 Buscar propostas pendentes
 res = supabase.table("propostas").select("*").eq("destino_id", id_time).eq("status", "pendente").execute()
 propostas = res.data if res.data else []
 notificacoes_recebidas = len(propostas)
@@ -70,10 +70,10 @@ else:
                     id_time_destino = proposta["id_time_alvo"]
                     jogador_nome = proposta["jogador_nome"]
 
-                    # remover jogador do time atual
+                    # Remover jogador do time atual
                     supabase.table("elenco").delete().eq("id_time", id_time_destino).eq("nome", jogador_nome).execute()
 
-                    # inserir jogador no time comprador
+                    # Adicionar jogador ao time comprador
                     novo_jogador = {
                         "nome": jogador_nome,
                         "posicao": proposta["jogador_posicao"],
@@ -86,7 +86,7 @@ else:
                     }
                     supabase.table("elenco").insert(novo_jogador).execute()
 
-                    # troca de jogadores oferecidos (se houver)
+                    # Inserir jogadores oferecidos no time atual (se houver)
                     for jogador in jogadores_oferecidos:
                         supabase.table("elenco").delete().eq("id_time", id_time_origem).eq("nome", jogador["nome"]).execute()
                         jogador_trocado = {
@@ -101,20 +101,16 @@ else:
                         }
                         supabase.table("elenco").insert(jogador_trocado).execute()
 
-                    # registrar movimentações
+                    # Registrar movimentações financeiras
                     if valor > 0:
                         registrar_movimentacao(id_time_origem, jogador_nome, "Transferência", "Compra", valor)
                         registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
 
-                    # atualizar status da proposta
-                    supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
-
-                    # cancelar outras propostas para o mesmo jogador
-                    supabase.table("propostas").update({"status": "cancelada"}) \
+                    # ❌ Apagar TODAS as propostas pendentes desse jogador (inclusive a aceita)
+                    supabase.table("propostas").delete() \
                         .eq("jogador_nome", jogador_nome) \
                         .eq("destino_id", id_time) \
-                        .eq("status", "pendente") \
-                        .neq("id", proposta["id"]).execute()
+                        .eq("status", "pendente").execute()
 
                     st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
                     st.experimental_rerun()
@@ -124,8 +120,10 @@ else:
 
             if col2.button("❌ Recusar", key=f"recusar_{proposta['id']}"):
                 try:
-                    supabase.table("propostas").update({"status": "recusada"}).eq("id", proposta["id"]).execute()
-                    st.warning("❌ Proposta recusada.")
+                    # ❌ Apagar a proposta recusada
+                    supabase.table("propostas").delete().eq("id", proposta["id"]).execute()
+                    st.warning("❌ Proposta recusada e removida do histórico.")
                     st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao recusar a proposta: {e}")
+
