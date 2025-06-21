@@ -1,12 +1,3 @@
-import streamlit as st
-from datetime import datetime
-import pytz
-from supabase import create_client
-
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
-
 # 🔒 Verificação de login
 def verificar_login():
     if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -63,7 +54,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
             "jogador": jogador,
             "tipo": tipo,
             "categoria": categoria,
-            "valor": abs(valor),
+            "valor": valor,
             "data": agora,
             "origem": origem,
             "destino": destino
@@ -128,26 +119,32 @@ def pagar_salarios(id_time):
         st.error(f"Erro ao pagar salários: {e}")
 
 # 🏆 Premiação por resultado (escala divisional + gols)
-def pagar_salario_e_premiacao_resultado(id_time, resultado, gols_feitos, gols_sofridos, divisao):
+def pagar_salario_e_premiacao_resultado(id_time_m, id_time_v, gols_m, gols_v, divisao):
     try:
-        resultado = resultado.lower().strip()  # ✅ Corrigido aqui
-
-        divisao_num = str(divisao).replace("Divisão ", "").strip()
-
-        premios = {
-            "1": {"vitoria": 9_000_000, "empate": 5_000_000, "derrota": 2_500_000},
-            "2": {"vitoria": 6_000_000, "empate": 3_500_000, "derrota": 1_500_000},
-            "3": {"vitoria": 4_000_000, "empate": 2_500_000, "derrota": 1_000_000}
+        divisao = str(divisao)
+        tabela_premios = {
+            "1": {"vitoria": 12_000_000, "empate": 9_000_000, "derrota": 4_500_000},
+            "2": {"vitoria": 9_000_000,  "empate": 6_000_000, "derrota": 3_000_000},
+            "3": {"vitoria": 6_000_000,  "empate": 4_500_000, "derrota": 2_000_000}
         }
 
-        premio_base = premios.get(divisao_num, {}).get(resultado, 0)
-        bonus_gols = gols_feitos * 200_000
-        penalidade_sofrido = gols_sofridos * 25_000
-        total_premio = premio_base + bonus_gols - penalidade_sofrido
+        def premiar_time(id_time, resultado, gols_feitos, gols_sofridos):
+            base = tabela_premios.get(divisao, {}).get(resultado, 0)
+            bonus = gols_feitos * 200_000
+            desconto = gols_sofridos * 25_000
+            total = base + bonus - desconto
+            registrar_movimentacao_simples(id_time, total, f"Premiação por {resultado}")
+            pagar_salarios(id_time)
 
-        registrar_movimentacao_simples(id_time, total_premio, f"Premiação por {resultado}")
-
-        pagar_salarios(id_time)
+        if gols_m > gols_v:
+            premiar_time(id_time_m, "vitoria", gols_m, gols_v)
+            premiar_time(id_time_v, "derrota", gols_v, gols_m)
+        elif gols_v > gols_m:
+            premiar_time(id_time_v, "vitoria", gols_v, gols_m)
+            premiar_time(id_time_m, "derrota", gols_m, gols_v)
+        else:
+            premiar_time(id_time_m, "empate", gols_m, gols_v)
+            premiar_time(id_time_v, "empate", gols_v, gols_m)
 
     except Exception as e:
         st.error(f"Erro ao aplicar premiação e salários: {e}")
