@@ -38,6 +38,10 @@ try:
         elif nome_normalizado in origem:
             saidas.append(m)
 
+    # Limita para as 4 últimas de cada
+    entradas = entradas[:4]
+    saidas = saidas[:4]
+
     def exibir_tabela(titulo, dados, tipo_movimentacao):
         if not dados:
             st.info(f"Nenhuma movimentação de {titulo.lower()} registrada.")
@@ -68,8 +72,8 @@ try:
 
         st.markdown("---")
 
-    exibir_tabela("🟢 Entradas", entradas, "entrada")
-    exibir_tabela("🔴 Saídas", saidas, "saida")
+    exibir_tabela("🟢 Últimas Entradas", entradas, "entrada")
+    exibir_tabela("🔴 Últimas Saídas", saidas, "saida")
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
