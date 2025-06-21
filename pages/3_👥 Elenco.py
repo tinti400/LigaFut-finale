@@ -50,7 +50,7 @@ st.markdown(
     f"""
     <div style='text-align:center;'>
         <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
-        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total: <strong>R$ {valor_total:,.0f}</strong> | 💵 Salário total: <strong>R$ {salario_total:,.0f}</strong></h4>
+        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total: <strong>R$ {valor_total:,.0f}</strong> | 💵 Salário total: <strong style="color:#28a745;">R$ {salario_total:,.0f}</strong></h4>
     </div>
     <hr>
     """.replace(",", "."),
@@ -95,24 +95,24 @@ for jogador in jogadores_filtrados:
         nova_classificacao = st.selectbox("", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
                                           index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao_atual.capitalize()) if classificacao_atual else 3,
                                           key=f"class_{jogador['id']}")
-
         if nova_classificacao.lower() != classificacao_atual:
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
     with col6:
-        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
+        valor = jogador.get("valor", 0)
+        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * 0.01)
         origem = jogador.get("origem", "Desconhecida")
-        salario_bruto = jogador.get("salario")
-        if salario_bruto is None:
-            salario_bruto = int(jogador.get("valor", 0) * 0.01)
-        salario_formatado = "R$ {:,.0f}".format(salario_bruto).replace(",", ".")
         st.markdown(
             f"""
-            💰 **{valor_formatado}**<br>
-            🏠 {origem}<br>
-            💳 Salário: {salario_formatado}
-            """, unsafe_allow_html=True)
+            <div style='line-height:1.4'>
+                💰 <strong>R$ {valor:,.0f}</strong><br>
+                🏠 {origem}<br>
+                💳 <span style='color:#28a745;'>Salário: R$ {salario_jogador:,.0f}</span>
+            </div>
+            """.replace(",", "."),
+            unsafe_allow_html=True
+        )
 
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
@@ -129,7 +129,7 @@ for jogador in jogadores_filtrados:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": jogador.get("origem", "Desconhecida"),
                     "classificacao": jogador.get("classificacao", ""),
-                    "salario": salario_bruto
+                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
                 }).execute()
                 registrar_movimentacao(
                     id_time=id_time,
