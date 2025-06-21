@@ -95,6 +95,7 @@ for jogador in jogadores_filtrados:
         nova_classificacao = st.selectbox("", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
                                           index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao_atual.capitalize()) if classificacao_atual else 3,
                                           key=f"class_{jogador['id']}")
+
         if nova_classificacao.lower() != classificacao_atual:
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
@@ -102,8 +103,16 @@ for jogador in jogadores_filtrados:
     with col6:
         valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
         origem = jogador.get("origem", "Desconhecida")
-        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
-        st.markdown(f"💰 **{valor_formatado}**<br>🏠 {origem}<br>💳 Salário: R$ {salario_jogador:,.0f}".replace(",", "."), unsafe_allow_html=True)
+        salario_bruto = jogador.get("salario")
+        if salario_bruto is None:
+            salario_bruto = int(jogador.get("valor", 0) * 0.01)
+        salario_formatado = "R$ {:,.0f}".format(salario_bruto).replace(",", ".")
+        st.markdown(
+            f"""
+            💰 **{valor_formatado}**<br>
+            🏠 {origem}<br>
+            💳 Salário: {salario_formatado}
+            """, unsafe_allow_html=True)
 
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
@@ -120,7 +129,7 @@ for jogador in jogadores_filtrados:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": jogador.get("origem", "Desconhecida"),
                     "classificacao": jogador.get("classificacao", ""),
-                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
+                    "salario": salario_bruto
                 }).execute()
                 registrar_movimentacao(
                     id_time=id_time,
