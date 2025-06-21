@@ -61,13 +61,13 @@ if is_admin and jogadores:
         except Exception as e:
             st.error(f"Erro ao limpar elenco: {e}")
 
-# 📥 Importação com botão
-st.subheader("📤 Importar jogadores via planilha Excel (.xlsx)")
+# 📅 Importação com botão
+st.subheader("📄 Importar jogadores via planilha Excel (.xlsx)")
 arquivo = st.file_uploader("Selecione a planilha", type=["xlsx"])
 
 if arquivo:
     st.success("✅ Arquivo carregado. Agora clique no botão abaixo para importar.")
-    if st.button("📤 Processar Planilha"):
+    if st.button("📄 Processar Planilha"):
         try:
             df = pd.read_excel(arquivo)
             obrigatorios = {"nome", "posição", "overall", "valor"}
@@ -84,7 +84,8 @@ if arquivo:
                         "overall": int(row["overall"]),
                         "valor": int(float(row["valor"])),
                         "nacionalidade": row.get("nacionalidade", "Desconhecida"),
-                        "origem": "Importado"
+                        "origem": "Importado",
+                        "classificacao": "reserva"
                     }).execute()
                 st.success("✅ Jogadores importados com sucesso!")
                 st.experimental_rerun()
@@ -93,17 +94,14 @@ if arquivo:
 
 st.markdown("---")
 
-# 📋 Exibir jogadores
+# 📊 Exibir jogadores com classificação
 for jogador in jogadores:
-    col1, col2, col3, col4, col5, col6 = st.columns([1, 2.5, 1.5, 1.5, 2.5, 2])
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 2, 1.5, 1.5, 2, 1.5, 2])
 
     with col1:
         imagem = jogador.get("imagem_url", "")
         if imagem:
-            st.markdown(
-                f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>",
-                unsafe_allow_html=True
-            )
+            st.markdown(f"<img src='{imagem}' width='60' style='border-radius: 50%; border: 2px solid #ddd;'/>", unsafe_allow_html=True)
         else:
             st.markdown("<div style='width:60px;height:60px;border-radius:50%;border:2px solid #ddd;background:#eee;'></div>", unsafe_allow_html=True)
 
@@ -121,9 +119,21 @@ for jogador in jogadores:
         valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
         origem = jogador.get("origem", "Desconhecida")
         st.markdown(f"💰 **{valor_formatado}**")
-        st.markdown(f"🏟️ {origem}")
+        st.markdown(f"🏠 {origem}")
 
     with col6:
+        classificacao_atual = jogador.get("classificacao", "reserva")
+        nova_classificacao = st.selectbox(
+            "Classificar",
+            ["titular", "reserva", "negociavel"],
+            index=["titular", "reserva", "negociavel"].index(classificacao_atual),
+            key=f"classificacao_{jogador['id']}"
+        )
+        if nova_classificacao != classificacao_atual:
+            supabase.table("elenco").update({"classificacao": nova_classificacao}).eq("id", jogador["id"]).execute()
+            st.experimental_rerun()
+
+    with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
@@ -136,7 +146,8 @@ for jogador in jogadores:
                     "time_origem": nome_time,
                     "imagem_url": jogador.get("imagem_url", ""),
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
-                    "origem": origem
+                    "origem": origem,
+                    "classificacao": jogador.get("classificacao", "reserva")
                 }).execute()
                 registrar_movimentacao(
                     id_time=id_time,
