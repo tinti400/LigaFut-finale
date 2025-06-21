@@ -50,7 +50,7 @@ if st.button("📩 Enviar proposta"):
                 "id_time_origem": id_time_origem,
                 "nome_time_origem": nome_time_origem,
                 "id_time_alvo": id_time_alvo,
-                "destino_id": id_time_alvo,  # ✅ necessário para aparecer no outro lado
+                "destino_id": id_time_alvo,  # ✅ necessário para o outro lado
                 "nome_time_alvo": nome_time_alvo,
                 "jogador_nome": jogador_data["nome"],
                 "jogador_posicao": jogador_data["posicao"],
@@ -59,7 +59,10 @@ if st.button("📩 Enviar proposta"):
                 "valor_oferecido": valor_oferecido,
                 "status": "pendente",
                 "created_at": datetime.now().isoformat(),
-                "jogadores_oferecidos": []  # vazio por padrão
+                "jogadores_oferecidos": [],  # vazio por padrão
+                "nacionalidade": jogador_data.get("nacionalidade", "Desconhecida"),
+                "imagem_url": jogador_data.get("imagem_url", ""),
+                "origem": jogador_data.get("origem", nome_time_alvo)
             }
             supabase.table("propostas").insert(nova_proposta).execute()
             st.success("✅ Proposta enviada com sucesso!")
@@ -85,21 +88,33 @@ try:
         for p in propostas:
             with st.container():
                 st.markdown("---")
-                st.markdown(f"**🎯 Jogador Alvo:** {p['jogador_nome']} ({p['jogador_posicao']})")
-                st.markdown(f"**🎽 Time Alvo:** {p['nome_time_alvo']}")
-                st.markdown(f"**💰 Valor Oferecido:** R$ {p['valor_oferecido']:,.0f}".replace(",", "."))
-                st.markdown(f"**📅 Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
-                st.markdown(f"**📌 Status:** {p['status'].capitalize()}")
+                col1, col2 = st.columns([1, 3])
+
+                with col1:
+                    imagem = p.get("imagem_url") or "https://cdn-icons-png.flaticon.com/512/147/147144.png"
+                    st.image(imagem, width=80)
+
+                with col2:
+                    st.markdown(f"### {p['jogador_nome']} ({p['jogador_posicao']})")
+                    st.write(f"🌍 **Nacionalidade:** {p.get('nacionalidade', 'Desconhecida')}")
+                    st.write(f"📌 **Posição:** {p['jogador_posicao']}")
+                    st.write(f"⭐ **Overall:** {p['jogador_overall']}")
+                    st.write(f"💰 **Valor:** R$ {p['jogador_valor']:,.0f}".replace(",", "."))
+                    st.write(f"🏟️ **Origem:** {p.get('origem', 'Desconhecida')}")
+                    st.write(f"🎯 **Time Alvo:** {p['nome_time_alvo']}")
+                    st.write(f"📦 **Valor Oferecido:** R$ {p['valor_oferecido']:,.0f}".replace(",", "."))
+                    st.write(f"📅 **Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
+                    st.write(f"📌 **Status:** {p['status'].capitalize()}")
 
                 if p["status"] == "pendente":
                     col1, col2 = st.columns(2)
 
                     with col1:
                         novo_valor = st.number_input(
-                            f"Editar valor (R$) - {p['jogador_nome']}", 
-                            min_value=0, 
-                            step=100000, 
-                            value=p["valor_oferecido"], 
+                            f"Editar valor (R$) - {p['jogador_nome']}",
+                            min_value=0,
+                            step=100000,
+                            value=p["valor_oferecido"],
                             key=f"editar_valor_{p['id']}"
                         )
                         if st.button("✏️ Salvar Alteração", key=f"salvar_{p['id']}"):
@@ -123,3 +138,5 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao buscar propostas enviadas: {e}")
+
+	
