@@ -57,10 +57,7 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
         novo_saldo = saldo_atual - valor if categoria == "compra" else saldo_atual + valor
         novo_saldo = int(novo_saldo)
 
-        update = supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-        if not update.data:
-            st.error("❌ Falha ao atualizar o saldo no banco de dados (sem retorno).")
-            return
+        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
         agora = datetime.now(pytz.timezone("America/Sao_Paulo")).isoformat()
 
@@ -76,12 +73,12 @@ def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None
         }
 
         supabase.table("movimentacoes").insert(registro).execute()
-        st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: {formatar_valor(novo_saldo)}")
+        st.success(f"✅ Movimentação registrada com sucesso. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar movimentação: {e}")
 
-# 💰 Registrar movimentação simples (amistosos, prêmios, multas)
+# 💰 Registrar movimentação simples (ajustes, salários, prêmios, multas)
 def registrar_movimentacao_simples(id_time, valor, descricao):
     try:
         res = supabase.table("times").select("saldo").eq("id", id_time).execute()
@@ -110,15 +107,29 @@ def registrar_movimentacao_simples(id_time, valor, descricao):
         }
 
         supabase.table("movimentacoes").insert(registro).execute()
-        st.success(f"✅ {descricao} registrada. Novo saldo: {formatar_valor(novo_saldo)}")
+        st.success(f"✅ {descricao} registrada. Novo saldo: R$ {novo_saldo:,.0f}".replace(",", "."))
 
     except Exception as e:
         st.error(f"Erro ao registrar movimentação simples: {e}")
 
-# 💵 Formatar valores em R$ (ex: 1.500.000 → R$ 1.500.000)
-def formatar_valor(valor):
+# 📉 Função para pagar salários (1% do valor de cada jogador)
+def pagar_salarios(id_time):
     try:
-        valor = float(valor)
-        return f"R$ {valor:,.0f}".replace(",", ".")
-    except:
-        return "R$ 0"
+        elenco = supabase.table("elenco").select("valor").eq("id_time", id_time).execute()
+        if not elenco.data:
+            st.warning("🔍 Elenco não encontrado para este time.")
+            return
+
+        total_salarios = 0
+        for jogador in elenco.data:
+            valor = jogador.get("valor", 0)
+            salario = int(valor * 0.01)
+            total_salarios += salario
+
+        if total_salarios > 0:
+            registrar_movimentacao_simples(id_time, -total_salarios, "Pagamento de salários")
+        else:
+            st.info("💡 Nenhum salário a pagar (valores zerados).")
+
+    except Exception as e:
+        st.error(f"Erro ao pagar salários: {e}")
