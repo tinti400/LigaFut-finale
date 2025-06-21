@@ -3,7 +3,6 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 from dateutil.parser import parse
-import pandas as pd
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
@@ -51,9 +50,18 @@ try:
         for m in dados:
             origem_norm = str(m.get("origem", "") or "").strip().lower()
             destino_norm = str(m.get("destino", "") or "").strip().lower()
+            bid_norm = str(m.get("bid", "") or "").strip().lower()
+            valor = m.get("valor", 0)
 
-            # ✅ Verifica se o time está envolvido
-            if m.get("id_time") != id_time and origem_norm != nome_time_norm and destino_norm != nome_time_norm:
+            # ✅ Verifica se o time está envolvido direta ou indiretamente (por BID)
+            envolvido = (
+                m.get("id_time") == id_time
+                or nome_time_norm in origem_norm
+                or nome_time_norm in destino_norm
+                or nome_time_norm in bid_norm
+            )
+
+            if not envolvido:
                 continue
 
             try:
@@ -62,32 +70,30 @@ try:
                 data_formatada = "Data inválida"
 
             jogador = m.get("jogador", "Desconhecido")
-            valor = m.get("valor", 0)
             tipo = m.get("tipo", "")
             categoria = m.get("categoria", "")
-            tipo_lower = tipo.lower()
-            categoria_lower = categoria.lower()
             origem = m.get("origem", "")
             destino = m.get("destino", "")
-
             detalhes = f"do {origem}" if origem else f"para {destino}" if destino else "-"
-            icone = "🟢" if destino_norm == nome_time_norm else "🔴"
 
             linha = {
                 "Data": data_formatada,
-                "Jogador": f"{icone} {jogador}",
+                "Jogador": f"{jogador}",
                 "Valor (R$)": f"R$ {abs(valor):,.0f}".replace(",", "."),
                 "Tipo": tipo.capitalize(),
                 "Categoria": categoria,
                 "Detalhes": detalhes
             }
 
-            if destino_norm == nome_time_norm:
+            # ✅ Define se é entrada ou saída com base no destino, origem ou bid
+            if destino_norm == nome_time_norm or (valor > 0 and nome_time_norm in bid_norm):
+                linha["Jogador"] = f"🟢 {jogador}"
                 entradas.append(linha)
                 total_entrada += valor
-            elif origem_norm == nome_time_norm:
+            elif origem_norm == nome_time_norm or (valor < 0 and nome_time_norm in bid_norm):
+                linha["Jogador"] = f"🔴 {jogador}"
                 saidas.append(linha)
-                total_saida += valor
+                total_saida += abs(valor)
 
         # 📅 Última movimentação registrada
         try:
@@ -102,7 +108,7 @@ try:
             for entrada in entradas:
                 with st.container():
                     col1, col2, col3 = st.columns([3, 2, 2])
-                    col1.markdown(f"🟢 **{entrada['Jogador']}**")
+                    col1.markdown(f"{entrada['Jogador']}")
                     col2.markdown(f"**{entrada['Categoria']}** — {entrada['Detalhes']}")
                     col3.markdown(
                         f"📅 {entrada['Data']}  \n💰 **<span style='color:green'>{entrada['Valor (R$)']}</span>**",
@@ -115,7 +121,7 @@ try:
             for saida in saidas:
                 with st.container():
                     col1, col2, col3 = st.columns([3, 2, 2])
-                    col1.markdown(f"🔴 **{saida['Jogador']}**")
+                    col1.markdown(f"{saida['Jogador']}")
                     col2.markdown(f"**{saida['Categoria']}** — {saida['Detalhes']}")
                     col3.markdown(
                         f"📅 {saida['Data']}  \n💸 **<span style='color:red'>{saida['Valor (R$)']}</span>**",
@@ -142,6 +148,3 @@ try:
 
 except Exception as e:
     st.error(f"Erro ao carregar movimentações: {e}")
-
-
-
