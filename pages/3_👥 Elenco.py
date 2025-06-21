@@ -41,20 +41,23 @@ jogadores = res.data if res.data else []
 # Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
-salario_total = sum(j.get("salario", int(j.get("valor", 0)*0.01)) for j in jogadores)
+salario_total = sum(
+    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * 0.01)
+    for j in jogadores
+)
 
 st.markdown(
     f"""
     <div style='text-align:center;'>
         <h3 style='color:green;'>💰 Saldo em caixa: <strong>R$ {saldo:,.0f}</strong></h3>
-        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total do elenco: <strong>R$ {valor_total:,.0f}</strong> | 💵 Custo salarial total: <strong>R$ {salario_total:,.0f}</strong></h4>
+        <h4>👥 Jogadores no elenco: <strong>{quantidade}</strong> | 📈 Valor total: <strong>R$ {valor_total:,.0f}</strong> | 💵 Salário total: <strong>R$ {salario_total:,.0f}</strong></h4>
     </div>
     <hr>
     """.replace(",", "."),
     unsafe_allow_html=True
 )
 
-# 🔽 Filtro de classificação
+# 🕽️ Filtro de classificação
 classificacoes = ["Todos", "Titular", "Reserva", "Negociavel", "Sem classificação"]
 classificacao_selecionada = st.selectbox("📌 Filtrar por classificação:", classificacoes)
 
@@ -68,7 +71,7 @@ else:
 
 # 🔃 Atualizar classificação
 for jogador in jogadores_filtrados:
-    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1.2, 2.5, 1.2, 1, 1.3, 1.5, 1.5, 2])
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 2.5, 2])
 
     with col1:
         imagem = jogador.get("imagem_url", "")
@@ -88,23 +91,21 @@ for jogador in jogadores_filtrados:
         st.markdown(f"⭐ {jogador.get('overall', '-')}")
 
     with col5:
-        valor = jogador.get("valor", 0)
-        st.markdown(f"💰 R$ {valor:,.0f}".replace(",", "."))
-
-    with col6:
-        salario = jogador.get("salario", int(valor*0.01))
-        st.markdown(f"💵 R$ {salario:,.0f}".replace(",", "."))
-
-    with col7:
         classificacao_atual = jogador.get("classificacao", "Sem classificação")
         nova_classificacao = st.selectbox("", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
                                           index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao_atual.capitalize()) if classificacao_atual else 3,
                                           key=f"class_{jogador['id']}")
         if nova_classificacao.lower() != classificacao_atual:
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
-            st.rerun()
+            st.experimental_rerun()
 
-    with col8:
+    with col6:
+        valor_formatado = "R$ {:,.0f}".format(jogador.get("valor", 0)).replace(",", ".")
+        origem = jogador.get("origem", "Desconhecida")
+        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
+        st.markdown(f"💰 **{valor_formatado}**<br>🏠 {origem}<br>💳 Salário: R$ {salario_jogador:,.0f}".replace(",", "."), unsafe_allow_html=True)
+
+    with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
@@ -119,7 +120,7 @@ for jogador in jogadores_filtrados:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": jogador.get("origem", "Desconhecida"),
                     "classificacao": jogador.get("classificacao", ""),
-                    "salario": jogador.get("salario", int(jogador["valor"]*0.01))
+                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
                 }).execute()
                 registrar_movimentacao(
                     id_time=id_time,
@@ -130,6 +131,6 @@ for jogador in jogadores_filtrados:
                     destino="Mercado"
                 )
                 st.success(f"{jogador['nome']} foi vendido com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
