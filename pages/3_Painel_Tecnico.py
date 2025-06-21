@@ -5,6 +5,13 @@ from datetime import datetime
 from dateutil.parser import parse
 
 st.set_page_config(page_title="Painel do Técnico", layout="wide")
+# -*- coding: utf-8 -*-
+import streamlit as st
+from supabase import create_client
+from datetime import datetime
+from dateutil.parser import parse
+
+st.set_page_config(page_title="Painel do Técnico", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
