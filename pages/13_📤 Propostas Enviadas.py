@@ -15,7 +15,7 @@ supabase = create_client(url, key)
 id_time_origem = st.session_state["id_time"]
 nome_time_origem = st.session_state["nome_time"]
 
-# 🔴 Contador de propostas enviadas pendentes
+# 🔴 Contador de propostas pendentes
 count_enviadas = supabase.table("propostas").select("*").eq("id_time_origem", id_time_origem).eq("status", "pendente").execute()
 notificacoes_enviadas = len(count_enviadas.data) if count_enviadas.data else 0
 
@@ -50,7 +50,7 @@ if st.button("📩 Enviar proposta"):
                 "id_time_origem": id_time_origem,
                 "nome_time_origem": nome_time_origem,
                 "id_time_alvo": id_time_alvo,
-                "destino_id": id_time_alvo,  # ✅ necessário para o outro lado
+                "destino_id": id_time_alvo,
                 "nome_time_alvo": nome_time_alvo,
                 "jogador_nome": jogador_data["nome"],
                 "jogador_posicao": jogador_data["posicao"],
@@ -59,7 +59,7 @@ if st.button("📩 Enviar proposta"):
                 "valor_oferecido": valor_oferecido,
                 "status": "pendente",
                 "created_at": datetime.now().isoformat(),
-                "jogadores_oferecidos": [],  # vazio por padrão
+                "jogadores_oferecidos": [],
                 "nacionalidade": jogador_data.get("nacionalidade", "Desconhecida"),
                 "imagem_url": jogador_data.get("imagem_url", ""),
                 "origem": jogador_data.get("origem", nome_time_alvo)
@@ -86,6 +86,10 @@ try:
         st.info("Você ainda não enviou nenhuma proposta.")
     else:
         for p in propostas:
+            # Exibir apenas enquanto estiver pendente
+            if p["status"] != "pendente":
+                continue
+
             with st.container():
                 st.markdown("---")
                 col1, col2 = st.columns([1, 3])
@@ -106,35 +110,34 @@ try:
                     st.write(f"📅 **Enviada em:** {datetime.fromisoformat(p['created_at']).strftime('%d/%m/%Y %H:%M')}")
                     st.write(f"📌 **Status:** {p['status'].capitalize()}")
 
-                if p["status"] == "pendente":
-                    col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2)
 
-                    with col1:
-                        novo_valor = st.number_input(
-                            f"Editar valor (R$) - {p['jogador_nome']}",
-                            min_value=0,
-                            step=100000,
-                            value=p["valor_oferecido"],
-                            key=f"editar_valor_{p['id']}"
-                        )
-                        if st.button("✏️ Salvar Alteração", key=f"salvar_{p['id']}"):
-                            try:
-                                supabase.table("propostas").update({
-                                    "valor_oferecido": novo_valor
-                                }).eq("id", p["id"]).execute()
-                                st.success("✏️ Valor da proposta atualizado!")
-                                st.experimental_rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao editar proposta: {e}")
+                with col1:
+                    novo_valor = st.number_input(
+                        f"Editar valor (R$) - {p['jogador_nome']}",
+                        min_value=0,
+                        step=100000,
+                        value=p["valor_oferecido"],
+                        key=f"editar_valor_{p['id']}"
+                    )
+                    if st.button("✏️ Salvar Alteração", key=f"salvar_{p['id']}"):
+                        try:
+                            supabase.table("propostas").update({
+                                "valor_oferecido": novo_valor
+                            }).eq("id", p["id"]).execute()
+                            st.success("✏️ Valor da proposta atualizado!")
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao editar proposta: {e}")
 
-                    with col2:
-                        if st.button("❌ Cancelar proposta", key=f"cancelar_{p['id']}"):
-                            try:
-                                supabase.table("propostas").update({"status": "cancelada"}).eq("id", p["id"]).execute()
-                                st.warning("❌ Proposta cancelada.")
-                                st.experimental_rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao cancelar proposta: {e}")
+                with col2:
+                    if st.button("❌ Cancelar proposta", key=f"cancelar_{p['id']}"):
+                        try:
+                            supabase.table("propostas").delete().eq("id", p["id"]).execute()
+                            st.warning("❌ Proposta cancelada e removida.")
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao cancelar proposta: {e}")
 
 except Exception as e:
     st.error(f"Erro ao buscar propostas enviadas: {e}")
