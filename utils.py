@@ -1,5 +1,3 @@
-# utils.py
-
 import streamlit as st
 from datetime import datetime
 import pytz
@@ -112,7 +110,7 @@ def registrar_movimentacao_simples(id_time, valor, descricao):
     except Exception as e:
         st.error(f"Erro ao registrar movimentação simples: {e}")
 
-# 📉 Função para pagar salários (1% do valor de cada jogador)
+# 📉 Pagar salários (1% do valor de cada jogador)
 def pagar_salarios(id_time):
     try:
         elenco = supabase.table("elenco").select("valor").eq("id_time", id_time).execute()
@@ -120,11 +118,7 @@ def pagar_salarios(id_time):
             st.warning("🔍 Elenco não encontrado para este time.")
             return
 
-        total_salarios = 0
-        for jogador in elenco.data:
-            valor = jogador.get("valor", 0)
-            salario = int(valor * 0.01)
-            total_salarios += salario
+        total_salarios = sum(int(j.get("valor", 0) * 0.01) for j in elenco.data)
 
         if total_salarios > 0:
             registrar_movimentacao_simples(id_time, -total_salarios, "Pagamento de salários")
@@ -133,3 +127,27 @@ def pagar_salarios(id_time):
 
     except Exception as e:
         st.error(f"Erro ao pagar salários: {e}")
+
+# 🏆 Premiação por resultado (escala divisional + gols)
+def pagar_salario_e_premiacao_resultado(id_time, resultado, gols_feitos, gols_sofridos, divisao):
+    try:
+        divisao_num = str(divisao).replace("Divisão ", "").strip()
+
+        premios = {
+            "1": {"vitoria": 9_000_000, "empate": 5_000_000, "derrota": 2_500_000},
+            "2": {"vitoria": 6_000_000, "empate": 3_500_000, "derrota": 1_500_000},
+            "3": {"vitoria": 4_000_000, "empate": 2_500_000, "derrota": 1_000_000}
+        }
+
+        premio_base = premios.get(divisao_num, {}).get(resultado, 0)
+        bonus_gols = gols_feitos * 200_000
+        penalidade_sofrido = gols_sofridos * 25_000
+        total_premio = premio_base + bonus_gols - penalidade_sofrido
+
+        registrar_movimentacao_simples(id_time, total_premio, f"Premiação por {resultado}")
+
+        pagar_salarios(id_time)
+
+    except Exception as e:
+        st.error(f"Erro ao aplicar premiação e salários: {e}")
+
