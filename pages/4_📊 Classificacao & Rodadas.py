@@ -4,7 +4,7 @@ import pandas as pd
 from supabase import create_client
 from datetime import datetime
 
-# 🔐 Conexão com Supabase
+# Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -13,17 +13,14 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção da divisão e temporada
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
@@ -31,7 +28,6 @@ numero_divisao = divisao.split()[-1]
 numero_temporada = temporada.split()[-1]
 nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
 
-# 🔄 Buscar rodadas
 def buscar_resultados():
     try:
         res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
@@ -40,7 +36,6 @@ def buscar_resultados():
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
-# 👥 Buscar nomes e logos dos times
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -59,7 +54,6 @@ def obter_nomes_times():
         st.error(f"Erro ao buscar nomes dos times: {e}")
         return {}
 
-# 🧠 Calcular classificação
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
 
@@ -111,12 +105,10 @@ def calcular_classificacao(rodadas, times_map):
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🔄 Dados
 rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -144,10 +136,9 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Filtro de rodada
+# Rodadas
 st.markdown("---")
-st.subheader("📅 Rodadas da Temporada")
-
+st.subheader("🗓️ Rodadas da Temporada")
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
 rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
 
@@ -160,15 +151,9 @@ for rodada in rodadas:
         m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
         gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
-
-        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        m_nome = m.get("nome", "Desconhecido")
-        v_nome = v.get("nome", "Desconhecido")
-
         col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
         with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo','')}' width='30'> <b>{m.get('nome','')}</b></div>", unsafe_allow_html=True)
         with col2:
             st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
         with col3:
@@ -176,12 +161,12 @@ for rodada in rodadas:
         with col4:
             st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo','')}' width='30'> <b>{v.get('nome','')}</b></div>", unsafe_allow_html=True)
 
-# 🧹 Admin: resetar rodadas
+# Admin resetar
 if eh_admin:
     st.markdown("---")
-    if st.button("🧹 Resetar Rodadas"):
+    if st.button("🪟 Resetar Rodadas"):
         try:
             docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
             for d in docs:
@@ -190,4 +175,3 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
-
