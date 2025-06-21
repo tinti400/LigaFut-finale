@@ -1,105 +1,89 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from dateutil.parser import parse
+from datetime import datetime
+import pandas as pd
 
-st.set_page_config(page_title="📊 Painel do Técnico", layout="wide")
+st.set_page_config(page_title="Painel do Técnico", layout="wide")
+st.markdown("<h1 style='text-align: center;'>📊 Painel do Técnico</h1>", unsafe_allow_html=True)
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
 # ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 📥 Dados do time logado
 id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
+nome_time = st.session_state.get("nome_time", "")
 
-# 🔢 Buscar saldo
-try:
-    saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-    saldo = saldo_res.data[0]["saldo"] if saldo_res.data else 0
-except Exception as e:
-    st.error(f"Erro ao carregar saldo: {e}")
-    saldo = 0
+# 🎯 Filtro
+opcao_filtro = st.radio("Filtrar:", ["Entradas", "Saídas", "Resumo"], horizontal=True)
 
-st.markdown("<h1 style='text-align: center;'>📊 Painel do Técnico</h1><hr>", unsafe_allow_html=True)
-st.markdown(f"### 🏷️ Time: {nome_time} &nbsp;&nbsp;&nbsp;&nbsp; 💰 Saldo: R$ {saldo:,.0f}".replace(",", "."))
+# 🔄 Buscar movimentações
+res_mov = supabase.table("movimentacoes").select("*").order("data", desc=True).execute()
+movs = res_mov.data
 
-# 📂 Tipo de movimentação
-aba = st.radio("Filtrar:", ["📥 Entradas", "💸 Saídas", "📊 Resumo"])
+# 🔍 Normalizar nomes
+nome_time_norm = nome_time.strip().lower()
 
-try:
-    # 📦 Carregar todas as movimentações
-    dados = supabase.table("movimentacoes").select("*").order("data", desc=True).execute().data
-    if not dados:
-        st.info("Nenhuma movimentação registrada.")
-        st.stop()
+def formatar_valor(valor):
+    return f"R$ {valor:,.0f}".replace(",", ".")
 
-    entradas, saidas = [], []
-    total_entrada, total_saida = 0, 0
-    nome_norm = nome_time.strip().lower()
+def exibir_mov(m):
+    jogador = m.get("jogador")
+    valor = m.get("valor", 0)
+    tipo = m.get("tipo", "-")
+    categoria = m.get("categoria", "-")
+    origem = m.get("origem", "-")
+    destino = m.get("destino", "-")
+    data = m.get("data", "")
+    if data:
+        data = datetime.fromisoformat(data).strftime("%d/%m/%Y %H:%M")
 
-    for mov in dados:
-        origem = mov.get("origem", "") or ""
-        destino = mov.get("destino", "") or ""
-        jogador = mov.get("jogador", "Desconhecido")
-        valor = mov.get("valor", 0)
-        tipo = mov.get("tipo", "").capitalize()
-        categoria = mov.get("categoria", "-")
+    html = f"""
+    <div style='border:1px solid #ddd;padding:10px;margin-bottom:10px;border-radius:10px'>
+        <div><b>🧍 Jogador:</b> {jogador}</div>
+        <div><b>🗓️ Data:</b> {data}</div>
+        <div><b>📦 Tipo:</b> {tipo} — <b>📁 Categoria:</b> {categoria}</div>
+        <div><b>🔄 Origem:</b> {origem} → <b>🏁 Destino:</b> {destino}</div>
+        <div><b>💰 Valor:</b> <span style='color:green'>{formatar_valor(valor)}</span></div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
-        # Normaliza para comparação
-        origem_norm = origem.strip().lower()
-        destino_norm = destino.strip().lower()
+# 🔍 Filtrar por time
+movs_filtradas = []
+for m in movs:
+    origem_norm = m.get("origem", "").strip().lower()
+    destino_norm = m.get("destino", "").strip().lower()
 
-        linha = {
-            "jogador": jogador,
-            "valor": valor,
-            "categoria": categoria,
-            "tipo": tipo,
-            "origem": origem,
-            "destino": destino,
-        }
+    if origem_norm != nome_time_norm and destino_norm != nome_time_norm:
+        continue
 
-        if destino_norm == nome_norm:
-            entradas.append(linha)
-            total_entrada += valor
-        elif origem_norm == nome_norm:
-            saidas.append(linha)
-            total_saida += valor
+    if opcao_filtro == "Entradas" and destino_norm == nome_time_norm:
+        movs_filtradas.append(m)
+    elif opcao_filtro == "Saídas" and origem_norm == nome_time_norm:
+        movs_filtradas.append(m)
+    elif opcao_filtro == "Resumo":
+        movs_filtradas.append(m)
 
-    # 🎯 Exibição
-    def exibir_movimentacoes(lista, icone, cor):
-        for item in lista:
-            st.markdown("---")
-            col1, col2, col3 = st.columns([3, 3, 2])
-            col1.markdown(f"**{icone} {item['jogador']}**")
-            col2.markdown(f"🧾 {item['tipo']} - {item['categoria']}")
-            if icone == "🟢":
-                col3.markdown(f"💰 <span style='color:green'>R$ {item['valor']:,.0f}</span>", unsafe_allow_html=True)
-            else:
-                col3.markdown(f"💸 <span style='color:red'>R$ {item['valor']:,.0f}</span>", unsafe_allow_html=True)
+# 💡 Exibir time e saldo
+res_time = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
+saldo_time = res_time.data.get("saldo", 0)
+st.markdown(f"""
+<div style='padding:10px 0 20px 0;'>
+    <h3>📍 <b>Time:</b> {nome_time} &nbsp;&nbsp;&nbsp; 💰 <b>Saldo:</b> R$ {saldo_time:,.3f}</h3>
+</div>
+""", unsafe_allow_html=True)
 
-    if aba == "📥 Entradas":
-        st.markdown("### 📥 Entradas")
-        exibir_movimentacoes(entradas, "🟢", "green")
-    elif aba == "💸 Saídas":
-        st.markdown("### 💸 Saídas")
-        exibir_movimentacoes(saidas, "🔴", "red")
-    elif aba == "📊 Resumo":
-        saldo_liquido = total_entrada - total_saida
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total de Entradas", f"R$ {total_entrada:,.0f}".replace(",", "."))
-        col2.metric("💸 Total de Saídas", f"R$ {total_saida:,.0f}".replace(",", "."))
-        col3.metric(
-            "📈 Lucro/Prejuízo",
-            f"R$ {saldo_liquido:,.0f}".replace(",", "."),
-            delta=f"{'+' if saldo_liquido >= 0 else '-'}R$ {abs(saldo_liquido):,.0f}".replace(",", ".")
-        )
+# 📋 Exibir resultados
+if not movs_filtradas:
+    st.info("Nenhuma movimentação encontrada.")
+else:
+    for mov in movs_filtradas:
+        exibir_mov(mov)
 
-except Exception as e:
-    st.error(f"Erro ao carregar movimentações: {e}")
