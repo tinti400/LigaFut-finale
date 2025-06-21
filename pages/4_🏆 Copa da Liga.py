@@ -145,63 +145,7 @@ exibir_fase_mata("Quartas", quartas, col2)
 exibir_fase_mata("Semifinal", semis, col3)
 exibir_fase_mata("Final", final, col4)
 
-# 📅 Jogos e placares
-st.markdown("<hr>", unsafe_allow_html=True)
-st.subheader("📅 Jogos por Grupo")
-cols = st.columns(4)
-for idx, (grupo, jogos) in enumerate(sorted(grupos_por_nome.items())):
-    with cols[idx % 4]:
-        st.markdown(f"### {grupo}")
-        for jogo in jogos:
-            exibir_card(jogo)
-
-# 🏆 Campeão
-st.markdown("### 🏆 Campeão")
-if final and final[0].get("jogos"):
-    jogo_final = final[0]["jogos"][0]
-    gm = jogo_final.get("gols_mandante")
-    gv = jogo_final.get("gols_visitante")
-    if gm is not None and gv is not None:
-        vencedor_id = jogo_final["mandante"] if gm > gv else jogo_final["visitante"]
-        vencedor = times.get(vencedor_id, {"nome": "?"})
-
-        todos_jogos = []
-        for rodada in grupos_por_nome.values():
-            todos_jogos.extend(rodada)
-        for fase in [oitavas, quartas, semis, final]:
-            for rodada in fase:
-                todos_jogos.extend(rodada.get("jogos", []))
-
-        if all(j.get("gols_mandante") is not None and j.get("gols_visitante") is not None for j in todos_jogos):
-            gols_por_time = {}
-            for jogo in todos_jogos:
-                for time, gols in [(jogo["mandante"], jogo["gols_mandante"]), (jogo["visitante"], jogo["gols_visitante"])]:
-                    if time not in gols_por_time:
-                        gols_por_time[time] = {"feitos": 0, "tomados": 0}
-                    gols_por_time[time]["feitos"] += gols
-                    gols_por_time[time]["tomados"] += jogo["gols_mandante"] if time == jogo["visitante"] else jogo["gols_visitante"]
-
-            melhor_ataque = max(gols_por_time.items(), key=lambda x: x[1]["feitos"])[0]
-            melhor_defesa = min(gols_por_time.items(), key=lambda x: x[1]["tomados"])[0]
-
-            st.success(f"🏆 Campeão: **{vencedor['nome']}**")
-            st.info(f"🔥 Melhor ataque: {times[melhor_ataque]['nome']}")
-            st.info(f"🛡️ Melhor defesa: {times[melhor_defesa]['nome']}")
-
-            supabase.table("historico_copa").insert({
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "campeao_id": vencedor_id,
-                "melhor_ataque_id": melhor_ataque,
-                "melhor_defesa_id": melhor_defesa
-            }).execute()
-        else:
-            st.info("Aguarde: nem todos os resultados foram preenchidos.")
-    else:
-        st.info("Final ainda sem placar.")
-else:
-    st.info("Final ainda não cadastrada.")
-
-# ⚔️ Avançar para o Mata-Mata (Sorteio)
+# ⚔️ Sorteio das Oitavas
 st.markdown("---")
 st.subheader("⚔️ Sorteio das Oitavas")
 
@@ -242,12 +186,64 @@ if st.button("🔄 Avançar para o Mata-Mata (Sorteio)"):
 
         confrontos.extend([jogo_ida, jogo_volta])
 
-    data_hoje = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     supabase.table("copa_ligafut").insert({
         "fase": "oitavas",
-        "data_criacao": data_hoje,
+        "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "jogos": confrontos
     }).execute()
 
     st.success("✅ Confrontos das oitavas sorteados e salvos com sucesso!")
     st.experimental_rerun()
+
+# 🚀 Avançar fases
+def avancar_fase(fase_atual, proxima_fase):
+    dados_fase = buscar_fase(fase_atual, data_atual)
+    if not dados_fase:
+        st.error(f"Nenhuma rodada encontrada para {fase_atual}.")
+        return
+
+    jogos = dados_fase[0]["jogos"]
+    if any(j["gols_mandante"] is None or j["gols_visitante"] is None for j in jogos):
+        st.warning("Preencha todos os resultados antes de avançar.")
+        return
+
+    classificados = []
+    for i in range(0, len(jogos), 2):
+        ida, volta = jogos[i], jogos[i+1]
+        total_a = ida["gols_mandante"] + volta["gols_visitante"]
+        total_b = ida["gols_visitante"] + volta["gols_mandante"]
+        if total_a > total_b:
+            classificados.append(ida["mandante"])
+        elif total_b > total_a:
+            classificados.append(ida["visitante"])
+        else:
+            classificados.append(random.choice([ida["mandante"], ida["visitante"]]))
+
+    if len(classificados) < 2:
+        st.error("Erro ao identificar classificados.")
+        return
+
+    jogos_novos = []
+    random.shuffle(classificados)
+    for i in range(0, len(classificados), 2):
+        a, b = classificados[i], classificados[i+1]
+        jogos_novos.extend([
+            {"mandante": a, "visitante": b, "gols_mandante": None, "gols_visitante": None},
+            {"mandante": b, "visitante": a, "gols_mandante": None, "gols_visitante": None},
+        ])
+
+    supabase.table("copa_ligafut").insert({
+        "fase": proxima_fase,
+        "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "jogos": jogos_novos
+    }).execute()
+    st.success(f"✅ Avançou de {fase_atual} para {proxima_fase}!")
+    st.experimental_rerun()
+
+st.subheader("🚀 Avançar Fases")
+if st.button("➡️ Avançar para Quartas"):
+    avancar_fase("oitavas", "quartas")
+if st.button("➡️ Avançar para Semifinal"):
+    avancar_fase("quartas", "semifinal")
+if st.button("➡️ Avançar para Final"):
+    avancar_fase("semifinal", "final")
