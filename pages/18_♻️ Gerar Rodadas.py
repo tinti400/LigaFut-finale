@@ -6,7 +6,10 @@ import random
 from itertools import combinations
 from datetime import datetime
 
-# 🔐 Conexão Supabase
+st.set_page_config(page_title="♻️ Gerar Rodadas", layout="wide")
+st.title("♻️ Gerar Rodadas - LigaFut")
+
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -15,25 +18,18 @@ supabase = create_client(url, key)
 def nome_tabela_rodadas(temporada, divisao):
     return f"rodadas_temporada_{temporada}_divisao_{divisao}"
 
-# 🧠 Verifica se a tabela existe
-def tabela_existe(nome_tabela):
-    url_api = f"{url}/rest/v1/{nome_tabela}?limit=1"
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}"
-    }
-    response = requests.get(url_api, headers=headers)
-    return response.status_code != 404
-
-# 🧼 Apaga rodadas antigas se a tabela existir
+# 🧼 Apaga rodadas antigas com tratamento
 def apagar_rodadas_antigas(tabela):
-    if tabela_existe(tabela):
+    try:
         supabase.table(tabela).delete().execute()
-        st.success(f"Rodadas antigas apagadas da tabela `{tabela}`.")
-    else:
-        st.info(f"Tabela `{tabela}` ainda não existe (nada a apagar).")
+        st.success(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
+    except Exception as e:
+        if "does not exist" in str(e).lower():
+            st.info(f"ℹ️ Tabela `{tabela}` ainda não existe (nada a apagar).")
+        else:
+            st.error(f"❌ Erro ao apagar rodadas da tabela `{tabela}`: {e}")
 
-# ⚽ Função para gerar rodadas (turno e returno)
+# ⚽ Gera rodadas com turno e returno
 def gerar_rodadas(times):
     random.shuffle(times)
     jogos_turno = list(combinations(times, 2))
@@ -59,11 +55,12 @@ def gerar_rodadas(times):
 # 🔁 Loop por temporada e divisão
 for temporada in [1, 2, 3]:
     for divisao in [1, 2, 3]:
-        st.markdown(f"### Temporada {temporada} | Divisão {divisao}")
+        st.markdown(f"## 📅 Temporada {temporada} | Divisão {divisao}")
 
         tabela_rodadas = nome_tabela_rodadas(temporada, divisao)
         apagar_rodadas_antigas(tabela_rodadas)
 
+        # 🔄 Buscar times da divisão e temporada
         res = supabase.table("times").select("id").eq("divisao", divisao).eq("temporada", temporada).execute()
         lista_times = [item["id"] for item in res.data]
 
@@ -81,4 +78,4 @@ for temporada in [1, 2, 3]:
             }
             supabase.table(tabela_rodadas).insert(dados).execute()
 
-        st.success(f"✅ {len(rodadas)} rodadas geradas para {tabela_rodadas}.")
+        st.success(f"✅ {len(rodadas)} rodadas geradas para `{tabela_rodadas}`.")
