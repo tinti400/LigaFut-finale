@@ -18,10 +18,10 @@ supabase = create_client(url, key)
 def nome_tabela_rodadas(temporada, divisao):
     return f"rodadas_temporada_{temporada}_divisao_{divisao}"
 
-# 🧼 Apaga rodadas antigas com tratamento
+# 🧼 Apaga rodadas antigas com tratamento seguro (evita erro DELETE requires WHERE)
 def apagar_rodadas_antigas(tabela):
     try:
-        supabase.table(tabela).delete().execute()
+        supabase.table(tabela).delete().neq("id", "").execute()
         st.success(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
     except Exception as e:
         if "does not exist" in str(e).lower():
