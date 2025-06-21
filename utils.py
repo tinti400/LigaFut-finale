@@ -1,85 +1,80 @@
+from supabase import create_client
 from datetime import datetime
 import uuid
 import streamlit as st
-from supabase import create_client
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-def verificar_login():
-    if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-        st.warning("Você precisa estar logado para acessar esta página.")
-        st.stop()
-
-# 💰 Registrar movimentações financeiras simples
-def registrar_movimentacao_simples(id_time, tipo, valor, descricao):
+# 💸 Registrar movimentação
+def registrar_movimentacao(id_time, jogador, tipo, categoria, valor, origem=None, destino=None):
     try:
-        supabase.table("movimentacoes_financeiras").insert({
+        supabase.table("movimentacoes").insert({
             "id": str(uuid.uuid4()),
             "id_time": id_time,
+            "jogador": jogador,
             "tipo": tipo,
-            "valor": float(valor),
-            "descricao": str(descricao),
+            "categoria": categoria,
+            "valor": valor,
+            "origem": origem,
+            "destino": destino,
             "data": datetime.now().isoformat()
         }).execute()
     except Exception as e:
-        st.error(f"Erro ao registrar movimentação: {e}")
+        print(f"Erro ao registrar movimentação: {e}")
 
-# 💸 Salário + Premiação por resultado
-def pagar_salario_e_premiacao_resultado(id_time_1, id_time_2, gols_1, gols_2, divisao):
-    def processar_time(id_time, gols_pro, gols_sofridos, resultado):
-        # Valores base por divisão
-        valores = {
-            1: {"vitoria": 12_000_000, "empate": 9_000_000, "derrota": 4_500_000},
-            2: {"vitoria": 9_000_000, "empate": 6_000_000, "derrota": 3_000_000},
-            3: {"vitoria": 6_000_000, "empate": 4_500_000, "derrota": 2_000_000},
-        }
+# 🧾 Movimentação simples (sem jogador)
+def registrar_movimentacao_simples(id_time, tipo, valor, descricao):
+    try:
+        supabase.table("movimentacoes").insert({
+            "id": str(uuid.uuid4()),
+            "id_time": id_time,
+            "tipo": tipo,
+            "categoria": "ajuste",
+            "valor": valor,
+            "descricao": descricao,
+            "data": datetime.now().isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"Erro ao registrar movimentação simples: {e}")
 
-        bonus_gols = gols_pro * 200_000
-        desconto_gols = gols_sofridos * 25_000
+# 💰 Pagar salários fixos por rodada
+def pagar_salarios_fixos(id_time, divisao):
+    valor_por_jogador = 1_000_000 if divisao == 1 else 750_000
+    res = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+    total_jogadores = len(res.data) if res.data else 0
+    total_pagamento = valor_por_jogador * total_jogadores
 
-        premio = 0
-        if resultado == "vitoria":
-            premio = valores[divisao]["vitoria"]
-        elif resultado == "empate":
-            premio = valores[divisao]["empate"]
-        else:
-            premio = valores[divisao]["derrota"]
+    # Registrar movimentação
+    registrar_movimentacao_simples(id_time, "salario", -total_pagamento, f"Pagamento de salário fixo para {total_jogadores} jogadores")
 
-        # 💵 Valor final da premiação
-        total_receber = premio + bonus_gols - desconto_gols
+    # Atualizar saldo
+    supabase.table("times").update({
+        "saldo": f"saldo - {total_pagamento}"
+    }).eq("id", id_time).execute()
 
-        # Buscar salários
-        elenco = supabase.table("elencos").select("salario").eq("id_time", id_time).execute().data
-        total_salarios = sum(jogador.get("salario", 0) for jogador in elenco)
+# 🏆 Premiação por vitória/empate
+def pagar_premiacao_por_resultado(id_time_mandante, id_time_visitante, gols_mandante, gols_visitante, divisao):
+    premio_vitoria = 2_500_000 if divisao == 1 else 1_500_000
+    premio_empate = 1_000_000
 
-        # Atualiza saldo do time
-        res_time = supabase.table("times").select("saldo").eq("id", id_time).execute()
-        if res_time.data:
-            saldo_atual = res_time.data[0]["saldo"]
-            novo_saldo = saldo_atual + total_receber - total_salarios
+    def premiar(id_time, valor, resultado):
+        registrar_movimentacao_simples(
+            id_time,
+            "premiacao",
+            valor,
+            f"Premiação por {resultado}"
+        )
+        supabase.table("times").update({
+            "saldo": f"saldo + {valor}"
+        }).eq("id", id_time).execute()
 
-            supabase.table("times").update({
-                "saldo": novo_saldo
-            }).eq("id", id_time).execute()
-
-        # Registrar movimentações
-        registrar_movimentacao_simples(id_time, "entrada", premio, f"Premiação por {resultado}")
-        registrar_movimentacao_simples(id_time, "entrada", bonus_gols, f"Bônus por {gols_pro} gol(s) feito(s)")
-        if desconto_gols > 0:
-            registrar_movimentacao_simples(id_time, "saida", desconto_gols, f"Desconto por {gols_sofridos} gol(s) sofrido(s)")
-        if total_salarios > 0:
-            registrar_movimentacao_simples(id_time, "saida", total_salarios, f"Pagamento de salários ({len(elenco)} jogadores)")
-
-    # Resultado de cada time
-    if gols_1 > gols_2:
-        r1, r2 = "vitoria", "derrota"
-    elif gols_1 < gols_2:
-        r1, r2 = "derrota", "vitoria"
+    if gols_mandante > gols_visitante:
+        premiar(id_time_mandante, premio_vitoria, "vitória")
+    elif gols_mandante < gols_visitante:
+        premiar(id_time_visitante, premio_vitoria, "vitória")
     else:
-        r1 = r2 = "empate"
-
-    processar_time(id_time_1, gols_1, gols_2, r1)
-    processar_time(id_time_2, gols_2, gols_1, r2)
+        premiar(id_time_mandante, premio_empate, "empate")
+        premiar(id_time_visitante, premio_empate, "empate")
