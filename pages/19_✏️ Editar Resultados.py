@@ -2,95 +2,135 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-from utils import verificar_login, pagar_salario_e_premiacao_resultado
+import pandas as pd
+from utils import pagar_salario_e_premiacao_resultado, verificar_login
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="✏️ Editar Resultados", layout="wide")
-st.title("✏️ Editar Resultados das Rodadas")
+st.set_page_config(page_title="🏕️ Gerenciar Resultados", layout="wide")
+st.title("🏕️ Gerenciar Resultados das Rodadas")
 
-# ✅ Verifica login
+# ✅ Verifica login e admin
 verificar_login()
 
-# Selecionar temporada e divisão
-temporada = st.selectbox("Selecione a temporada", ["1", "2", "3"], index=0)
-divisao = st.selectbox("Selecione a divisão", ["1", "2", "3"], index=0)
-numero_divisao = int(divisao)
-
-# 🔄 Buscar rodadas
-rodadas = supabase.table(f"rodadas_temporada_{temporada}_divisao_{divisao}").select("*").order("numero").execute().data
-
-if not rodadas:
-    st.info("Nenhuma rodada encontrada.")
+email_usuario = st.session_state.get("usuario", "")
+res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+if not res_admin.data:
+    st.error("Acesso restrito apenas para administradores.")
     st.stop()
 
-rodada_numeros = [f"Rodada {r['numero']}" for r in rodadas]
-rodada_selecionada = st.selectbox("Selecione a rodada", rodada_numeros)
-indice_rodada = rodada_numeros.index(rodada_selecionada)
-rodada = rodadas[indice_rodada]
-jogos = rodada["jogos"]
+# 🔽 Seleção da divisão e temporada
+col1, col2 = st.columns(2)
+divisao = col1.selectbox("Divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
+temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
+numero_divisao = divisao.split()[-1]
+numero_temporada = temporada.split()[-1]
+tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
 
-# Buscar nomes dos times
-times_res = supabase.table("times").select("id, nome").execute()
-times_dict = {t["id"]: t["nome"] for t in times_res.data}
+# 🔄 Buscar times
+def buscar_times_nomes_logos():
+    times_data = supabase.table("times").select("id", "nome", "logo").execute().data
+    return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in times_data}
 
-st.markdown("### 📝 Preencher Resultados")
-for idx, jogo in enumerate(jogos):
-    col1, col2, col3, col4, col5 = st.columns([4, 1, 1, 1, 4])
+times_info = buscar_times_nomes_logos()
+
+# 🔄 Rodadas
+rodadas_data = supabase.table(tabela_rodadas).select("*").order("numero").execute().data
+if not rodadas_data:
+    st.warning("Nenhuma rodada encontrada.")
+    st.stop()
+
+rodada_nums = [r["numero"] for r in rodadas_data]
+rodada_atual = st.selectbox("Escolha a rodada para editar:", rodada_nums)
+rodada = next(r for r in rodadas_data if r["numero"] == rodada_atual)
+
+# 🔍 Filtro por time
+todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in rodada["jogos"]]
+nomes_filtrados = {id_: times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids}
+nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada", ["Todos"] + list(set(nomes_filtrados.values())))
+
+# 🎯 Edição dos jogos
+for idx, jogo in enumerate(rodada["jogos"]):
+    id_m, id_v = jogo["mandante"], jogo["visitante"]
+    if "FOLGA" in [id_m, id_v]:
+        continue
+
+    nome_m = times_info.get(id_m, {}).get("nome", "Desconhecido")
+    logo_m = times_info.get(id_m, {}).get("logo", "")
+    nome_v = times_info.get(id_v, {}).get("nome", "Desconhecido")
+    logo_v = times_info.get(id_v, {}).get("logo", "")
+
+    if nome_time_filtro != "Todos" and nome_time_filtro not in [nome_m, nome_v]:
+        continue
+
+    st.markdown("---")
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 0.5, 1, 2])
 
     with col1:
-        mandante_nome = times_dict.get(jogo["mandante"], "Desconhecido")
-        st.markdown(f"**{mandante_nome}**")
+        st.image(logo_m or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
+        st.markdown(f"**{nome_m}**", unsafe_allow_html=True)
 
     with col2:
-        gols_mandante = st.number_input("Gols", min_value=0, key=f"gols_mandante_{idx}", value=jogo.get("gols_mandante", 0))
+        gols_m = st.number_input(f"Gols {nome_m}", value=jogo.get("gols_mandante") or 0, min_value=0, key=f"gm_{idx}")
 
     with col3:
-        st.markdown("x")
+        st.markdown("<h4 style='text-align:center;'>X</h4>", unsafe_allow_html=True)
 
     with col4:
-        gols_visitante = st.number_input("Gols ", min_value=0, key=f"gols_visitante_{idx}", value=jogo.get("gols_visitante", 0))
+        gols_v = st.number_input(f"Gols {nome_v}", value=jogo.get("gols_visitante") or 0, min_value=0, key=f"gv_{idx}")
 
     with col5:
-        visitante_nome = times_dict.get(jogo["visitante"], "Desconhecido")
-        st.markdown(f"**{visitante_nome}**")
+        st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
+        st.markdown(f"**{nome_v}**", unsafe_allow_html=True)
 
-if st.button("💾 Salvar Resultados e Atualizar"):
-    novos_jogos = []
-    for idx, jogo in enumerate(jogos):
-        gols_mandante = st.session_state.get(f"gols_mandante_{idx}", 0)
-        gols_visitante = st.session_state.get(f"gols_visitante_{idx}", 0)
+    if st.button("💾 Salvar", key=f"btn_{idx}"):
+        # Atualizar gols
+        novos_jogos = []
+        for j in rodada["jogos"]:
+            if j["mandante"] == id_m and j["visitante"] == id_v:
+                j["gols_mandante"] = gols_m
+                j["gols_visitante"] = gols_v
+            novos_jogos.append(j)
 
-        # Atualizar no array
-        novo_jogo = {
-            "mandante": jogo["mandante"],
-            "visitante": jogo["visitante"],
-            "gols_mandante": gols_mandante,
-            "gols_visitante": gols_visitante,
-        }
-        novos_jogos.append(novo_jogo)
+        supabase.table(tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_atual).execute()
 
-        # Pagar salário + premiação + bônus para os dois times
-        try:
-            pagar_salario_e_premiacao_resultado(
-                jogo["mandante"],
-                jogo["visitante"],
-                gols_mandante,
-                gols_visitante,
-                numero_divisao
-            )
-        except Exception as e:
-            st.error(f"Erro ao processar pagamento: {e}")
+        # Premiação e salários
+        pagar_salario_e_premiacao_resultado(id_m, id_v, gols_m, gols_v, int(numero_divisao))
 
-    # Atualizar rodada na tabela
-    supabase.table(f"rodadas_temporada_{temporada}_divisao_{divisao}").update({
-        "jogos": novos_jogos
-    }).eq("id", rodada["id"]).execute()
+        st.success(f"✅ Resultado salvo: {nome_m} {gols_m} x {gols_v} {nome_v}")
+        st.experimental_rerun()
 
-    st.success("✅ Resultados salvos e pagamentos processados.")
-    st.experimental_rerun()
+# 🔎 Histórico geral
+st.markdown("---")
+st.subheader("📜 Histórico do Time em Todas Rodadas")
+nomes_times = {v["nome"]: k for k, v in times_info.items()}
+time_nome = st.selectbox("Selecione um time:", sorted(nomes_times.keys()))
+id_escolhido = nomes_times[time_nome]
+
+historico = []
+for r in rodadas_data:
+    for j in r["jogos"]:
+        if id_escolhido in [j["mandante"], j["visitante"]]:
+            nome_m = times_info.get(j["mandante"], {}).get("nome", "?")
+            nome_v = times_info.get(j["visitante"], {}).get("nome", "?")
+            gm = j.get("gols_mandante")
+            gv = j.get("gols_visitante")
+            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "Não definido"
+
+            historico.append({
+                "Rodada": r["numero"],
+                "Mandante": nome_m,
+                "Visitante": nome_v,
+                "Placar": placar
+            })
+
+if historico:
+    df = pd.DataFrame(historico).sort_values("Rodada")
+    st.dataframe(df, use_container_width=True)
+else:
+    st.info("❌ Nenhum jogo encontrado para este time.")
 
 
