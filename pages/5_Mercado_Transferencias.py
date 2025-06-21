@@ -89,58 +89,66 @@ st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 selecionados = set()
 
 for jogador in jogadores_pagina:
-    col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
+    col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
     with col1:
-        st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
+        try:
+            st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
+        except:
+            st.image("https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
     with col2:
         st.markdown(f"**{jogador.get('nome')}**")
         st.markdown(f"Posição: {jogador.get('posicao')}")
         st.markdown(f"Overall: {jogador.get('overall')}")
+        st.markdown(f"Idade: {jogador.get('idade') or 'N/D'}")
+        st.markdown(f"Nacionalidade: {jogador.get('nacionalidade') or 'N/D'}")
     with col3:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
+        st.markdown(f"Time de origem: {jogador.get('time_origem') or 'N/D'}")
+        st.markdown(f"Clube anterior: {jogador.get('origem') or 'N/D'}")
     with col4:
         if qtde_elenco >= 35:
             st.warning("⚠️ Elenco cheio (35 jogadores)")
             st.button("❌ Comprar (bloqueado)", key=f"bloqueado_{jogador['id']}", disabled=True)
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
-                # Verificação atômica
-                check = supabase.table("mercado_transferencias").select("*").eq("id", jogador["id"]).execute()
+                check = supabase.table("mercado_transferencias").select("id").eq("id", jogador["id"]).execute()
                 if not check.data:
                     st.error("❌ Este jogador já foi comprado por outro time.")
                     st.experimental_rerun()
+                elif saldo_time < jogador["valor"]:
+                    st.error("❌ Saldo insuficiente.")
                 else:
-                    jogador_atual = check.data[0]
-                    if saldo_time < jogador_atual["valor"]:
-                        st.error("❌ Saldo insuficiente.")
-                    else:
-                        try:
-                            supabase.table("elenco").insert({
-                                "nome": jogador_atual["nome"],
-                                "posicao": jogador_atual["posicao"],
-                                "overall": jogador_atual["overall"],
-                                "valor": jogador_atual["valor"],
-                                "id_time": id_time,
-                                "foto": jogador_atual.get("foto", ""),
-                                "origem": jogador_atual.get("time_origem", "Desconhecido")
-                            }).execute()
+                    try:
+                        jogador_atual = jogador
+                        supabase.table("elenco").insert({
+                            "nome": jogador_atual["nome"],
+                            "posicao": jogador_atual["posicao"],
+                            "overall": jogador_atual["overall"],
+                            "valor": jogador_atual["valor"],
+                            "id_time": id_time,
+                            "foto": jogador_atual.get("foto", ""),
+                            "origem": jogador_atual.get("origem", "Desconhecido"),
+                            "nacionalidade": jogador_atual.get("nacionalidade", ""),
+                            "idade": jogador_atual.get("idade", None),
+                            "imagem_url": jogador_atual.get("imagem_url", "")
+                        }).execute()
 
-                            supabase.table("mercado_transferencias").delete().eq("id", jogador_atual["id"]).execute()
+                        supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                            registrar_movimentacao(
-                                id_time=id_time,
-                                jogador=jogador_atual["nome"],
-                                tipo="mercado",
-                                categoria="compra",
-                                valor=jogador_atual["valor"],
-                                origem=jogador_atual.get("time_origem"),
-                                destino=nome_time
-                            )
+                        registrar_movimentacao(
+                            id_time=id_time,
+                            jogador=jogador["nome"],
+                            tipo="mercado",
+                            categoria="compra",
+                            valor=jogador["valor"],
+                            origem=jogador.get("time_origem"),
+                            destino=nome_time
+                        )
 
-                            st.success(f"{jogador_atual['nome']} comprado com sucesso!")
-                            st.experimental_rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao comprar jogador: {e}")
+                        st.success(f"{jogador['nome']} comprado com sucesso!")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao comprar jogador: {e}")
 
     if is_admin:
         if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
