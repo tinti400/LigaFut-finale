@@ -4,7 +4,7 @@ from supabase import create_client
 from datetime import datetime
 import random
 import pandas as pd
-from utils import registrar_movimentacao_simples, registrar_pagamento_salario
+from utils import pagar_salario_e_premiacao_resultado, verificar_login
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -15,9 +15,7 @@ st.set_page_config(page_title="🏕️ Gerenciar Resultados", layout="wide")
 st.title("🏕️ Gerenciar Resultados das Rodadas")
 
 # ✅ Verifica login e admin
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado.")
-    st.stop()
+verificar_login()
 
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
@@ -33,7 +31,7 @@ numero_divisao = divisao.split()[-1]
 numero_temporada = temporada.split()[-1]
 tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
 
-# 🔄 Times e nomes
+# 🔄 Buscar times
 def buscar_times_nomes_logos():
     times_data = supabase.table("times").select("id", "nome", "logo").execute().data
     return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in times_data}
@@ -54,26 +52,6 @@ rodada = next(r for r in rodadas_data if r["numero"] == rodada_atual)
 todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in rodada["jogos"]]
 nomes_filtrados = {id_: times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids}
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada", ["Todos"] + list(set(nomes_filtrados.values())))
-
-# 🧮 Função para calcular e aplicar premiação
-def processar_pagamentos(id_time, gols_feitos, gols_sofridos, resultado):
-    if resultado == "vitoria":
-        valor_base = 9000000 if numero_divisao == "1" else 6000000 if numero_divisao == "2" else 4000000
-    elif resultado == "empate":
-        valor_base = 5000000 if numero_divisao == "1" else 3500000 if numero_divisao == "2" else 2500000
-    else:  # derrota
-        valor_base = 2500000 if numero_divisao == "1" else 1500000 if numero_divisao == "2" else 1000000
-
-    bonus_gols = gols_feitos * 200000
-    penalidade_gols = gols_sofridos * 25000
-    total = valor_base + bonus_gols - penalidade_gols
-
-    # 💰 Credita premiação
-    supabase.table("times").update({"saldo": f"saldo + {total}"}).eq("id", id_time).execute()
-    registrar_movimentacao_simples(id_time, total, f"Premiação rodada (Resultado: {resultado.title()}, Gols: +{bonus_gols:,} / -{penalidade_gols:,})")
-
-    # 💸 Debita salários
-    registrar_pagamento_salario(supabase, id_time)
 
 # 🎯 Edição dos jogos
 for idx, jogo in enumerate(rodada["jogos"]):
@@ -110,6 +88,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
         st.markdown(f"**{nome_v}**", unsafe_allow_html=True)
 
     if st.button("💾 Salvar", key=f"btn_{idx}"):
+        # Atualizar gols
         novos_jogos = []
         for j in rodada["jogos"]:
             if j["mandante"] == id_m and j["visitante"] == id_v:
@@ -119,18 +98,10 @@ for idx, jogo in enumerate(rodada["jogos"]):
 
         supabase.table(tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_atual).execute()
 
-        # Processa premiação e salários
-        if gols_m > gols_v:
-            processar_pagamentos(id_m, gols_m, gols_v, "vitoria")
-            processar_pagamentos(id_v, gols_v, gols_m, "derrota")
-        elif gols_m < gols_v:
-            processar_pagamentos(id_m, gols_m, gols_v, "derrota")
-            processar_pagamentos(id_v, gols_v, gols_m, "vitoria")
-        else:
-            processar_pagamentos(id_m, gols_m, gols_v, "empate")
-            processar_pagamentos(id_v, gols_v, gols_m, "empate")
+        # Premiação e salário
+        pagar_salario_e_premiacao_resultado(id_m, id_v, gols_m, gols_v, int(numero_divisao))
 
-        st.success(f"✅ Resultado atualizado: {nome_m} {gols_m} x {gols_v} {nome_v}")
+        st.success(f"✅ Resultado salvo e movimentações feitas: {nome_m} {gols_m} x {gols_v} {nome_v}")
         st.rerun()
 
 # 🔎 Histórico geral
