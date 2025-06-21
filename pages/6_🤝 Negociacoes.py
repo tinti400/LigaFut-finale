@@ -46,7 +46,6 @@ meu_elenco = res_elenco.data or []
 # 🔁 Exibir todos os outros times
 for id_time_adv, nome_adv in times.items():
     with st.expander(f"⚽ {nome_adv}"):
-
         elenco_adv = supabase.table("elenco").select("*").eq("id_time", id_time_adv).execute().data or []
 
         if not elenco_adv:
@@ -54,12 +53,20 @@ for id_time_adv, nome_adv in times.items():
         else:
             for jogador in elenco_adv:
                 st.markdown("---")
-                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")                
-                st.markdown(f"**🎯 Overall:** {jogador.get('overall', '-')}")                
-                st.markdown(f"**🌍 Nacionalidade:** {jogador.get('nacionalidade', '-')}")                
-                st.markdown(f"**🏷️ Origem:** {jogador.get('time_origem', '-')}")                
-                valor_jogador = jogador.get("valor", 0)
-                st.markdown(f"**💰 Valor:** R$ {valor_jogador:,.0f}")
+                col1, col2 = st.columns([1, 5])
+                with col1:
+                    img = jogador.get("imagem_url") or "https://cdn-icons-png.flaticon.com/512/147/147144.png"
+                    st.image(img, width=60)
+
+                with col2:
+                    st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
+                    st.markdown(f"📌 **Posição:** {jogador.get('posicao', '-')}")
+                    st.markdown(f"⭐ **Overall:** {jogador.get('overall', '-')}")
+                    st.markdown(f"🌍 **Nacionalidade:** {jogador.get('nacionalidade', '-')}")
+                    st.markdown(f"🏟️ **Origem:** {jogador.get('origem', '-')}")
+                    st.markdown(f"🧩 **Classificação:** {jogador.get('classificacao', 'Não definida')}")
+                    valor_jogador = jogador.get("valor", 0)
+                    st.markdown(f"💰 **Valor:** R$ {valor_jogador:,.0f}".replace(",", "."))
 
                 tipo = st.radio(
                     f"Tipo de negociação para {jogador['nome']}",
@@ -81,12 +88,13 @@ for id_time_adv, nome_adv in times.items():
 
                 elif tipo == "Troca Simples":
                     opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
-                    selecao = st.selectbox(
-                        "🔁 Escolha um jogador do seu elenco",
-                        opcoes,
-                        key=f"troca_simples_{jogador['id']}"
-                    )
-                    jogadores_oferecidos = [meu_elenco[opcoes.index(selecao)]]
+                    if opcoes:
+                        selecao = st.selectbox(
+                            "🔁 Escolha um jogador do seu elenco",
+                            opcoes,
+                            key=f"troca_simples_{jogador['id']}"
+                        )
+                        jogadores_oferecidos = [meu_elenco[opcoes.index(selecao)]]
 
                 elif tipo == "Troca Composta":
                     opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
@@ -117,6 +125,10 @@ for id_time_adv, nome_adv in times.items():
                             "jogador_posicao": jogador["posicao"],
                             "jogador_overall": jogador["overall"],
                             "jogador_valor": jogador["valor"],
+                            "imagem_url": jogador.get("imagem_url", ""),
+                            "nacionalidade": jogador.get("nacionalidade", "-"),
+                            "origem": jogador.get("origem", "-"),
+                            "classificacao": jogador.get("classificacao", ""),
                             "valor_oferecido": int(valor_proposta),
                             "jogadores_oferecidos": jogadores_oferecidos,
                             "status": "pendente",
