@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-import random
 import pandas as pd
 from utils import pagar_salario_e_premiacao_resultado, verificar_login
 
@@ -98,10 +97,10 @@ for idx, jogo in enumerate(rodada["jogos"]):
 
         supabase.table(tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_atual).execute()
 
-        # Premiação e salário
+        # Premiação e salários
         pagar_salario_e_premiacao_resultado(id_m, id_v, gols_m, gols_v, int(numero_divisao))
 
-        st.success(f"✅ Resultado salvo e movimentações feitas: {nome_m} {gols_m} x {gols_v} {nome_v}")
+        st.success(f"✅ Resultado salvo: {nome_m} {gols_m} x {gols_v} {nome_v}")
         st.experimental_rerun()
 
 # 🔎 Histórico geral
