@@ -1,101 +1,91 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+from datetime import datetime
 import random
 from itertools import combinations
-from datetime import datetime
 
-st.set_page_config(page_title="♻️ Gerar Rodadas", layout="wide")
-st.title("♻️ Gerar Rodadas - LigaFut")
+st.set_page_config(page_title="♻️ Gerar Rodadas T2", layout="wide")
+st.title("♻️ Gerar Rodadas - Temporada 2")
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🧠 Nome da tabela de rodadas por divisão
-def nome_tabela_rodadas(divisao_numero):
-    return f"rodadas_divisao_{divisao_numero}"
+# 🧠 Nome da tabela
+def nome_tabela_rodadas(divisao):
+    return f"rodadas_temporada_2_divisao_{divisao}"
 
 # 🧼 Apagar rodadas antigas
 def apagar_rodadas_antigas(tabela):
     try:
-        res = supabase.table(tabela).select("id").execute()
-        if res.data:
-            for item in res.data:
-                supabase.table(tabela).delete().eq("id", item["id"]).execute()
-            st.success(f"🧹 {len(res.data)} rodadas apagadas da tabela `{tabela}`.")
-        else:
-            st.info(f"ℹ️ Nenhuma rodada antiga encontrada em `{tabela}`.")
+        supabase.table(tabela).delete().neq("id", "").execute()
+        st.success(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
     except Exception as e:
         if "does not exist" in str(e).lower():
-            st.info(f"ℹ️ Tabela `{tabela}` ainda não existe.")
+            st.info(f"ℹ️ Tabela `{tabela}` ainda não existe (nada a apagar).")
         else:
             st.error(f"❌ Erro ao apagar rodadas da tabela `{tabela}`: {e}")
 
-# ⚽ Geração das rodadas com turno e returno
-def gerar_rodadas(times_ids):
-    random.shuffle(times_ids)
-    jogos = list(combinations(times_ids, 2))
-    random.shuffle(jogos)
+# ⚽ Gerar rodadas com turno e returno
+def gerar_rodadas(times):
+    random.shuffle(times)
+    jogos_turno = list(combinations(times, 2))
+    random.shuffle(jogos_turno)
 
-    qtd_rodadas = len(times_ids) - 1
-    rodadas_turno = [[] for _ in range(qtd_rodadas)]
+    total_rodadas = len(times) - 1
+    rodadas_turno = [[] for _ in range(total_rodadas)]
 
-    for jogo in jogos:
+    for mandante, visitante in jogos_turno:
         for rodada in rodadas_turno:
-            escalados = [j['mandante'] for j in rodada] + [j['visitante'] for j in rodada]
-            if jogo[0] not in escalados and jogo[1] not in escalados:
-                rodada.append({"mandante": jogo[0], "visitante": jogo[1]})
+            usados = [j['mandante'] for j in rodada] + [j['visitante'] for j in rodada]
+            if mandante["id"] not in usados and visitante["id"] not in usados:
+                rodada.append({
+                    "mandante": mandante["id"],
+                    "visitante": visitante["id"]
+                })
                 break
 
     rodadas_returno = [
-        [{"mandante": j["visitante"], "visitante": j["mandante"]} for j in rodada]
+        [{"mandante": jogo["visitante"], "visitante": jogo["mandante"]} for jogo in rodada]
         for rodada in rodadas_turno
     ]
 
     return rodadas_turno + rodadas_returno
 
-# 🔄 Buscar times vinculados a usuários
-try:
-    usuarios_res = supabase.table("usuarios").select("time_id", "Divisão").execute()
-    usuarios = usuarios_res.data or []
+# 🔁 Loop por divisão
+for divisao in [1, 2, 3]:
+    st.markdown(f"## 📅 Temporada 2 | Divisão {divisao}")
+    try:
+        # 🎯 Buscar usuários com times na divisão
+        res = supabase.table("usuarios").select("id_time, nome_time, divisao").eq("divisao", divisao).execute()
+        usuarios = res.data
 
-    # Agrupar times por número da divisão (1, 2 ou 3)
-    divisao_times = {}
-    for u in usuarios:
-        id_time = u.get("time_id")
-        divisao_str = u.get("Divisão", "").strip()
-
-        # Extração do número: "Divisão 3" → 3
-        if id_time and divisao_str.lower().startswith("divisão"):
-            try:
-                divisao_num = int(divisao_str.split(" ")[-1])
-                divisao_times.setdefault(divisao_num, []).append(id_time)
-            except:
-                continue
-
-    # Loop por divisões
-    for divisao_numero, lista_times in divisao_times.items():
-        st.markdown(f"## 📅 Divisão {divisao_numero}")
-
-        if len(lista_times) < 2:
-            st.warning(f"⚠️ Divisão {divisao_numero} precisa de pelo menos 2 times.")
+        if not usuarios:
+            st.warning(f"⚠️ Nenhum time encontrado para a Divisão {divisao}.")
             continue
 
-        tabela_rodadas = nome_tabela_rodadas(divisao_numero)
-        apagar_rodadas_antigas(tabela_rodadas)
+        times = [{"id": u["id_time"], "nome": u["nome_time"]} for u in usuarios if u.get("id_time") and u.get("nome_time")]
 
-        rodadas = gerar_rodadas(lista_times)
+        if len(times) < 2:
+            st.warning(f"⚠️ Poucos times na Divisão {divisao} para gerar rodadas.")
+            continue
+
+        tabela = nome_tabela_rodadas(divisao)
+        apagar_rodadas_antigas(tabela)
+
+        rodadas = gerar_rodadas(times)
 
         for i, rodada in enumerate(rodadas, start=1):
-            supabase.table(tabela_rodadas).insert({
+            dados = {
                 "numero": i,
                 "jogos": rodada,
                 "data_criacao": datetime.now().isoformat()
-            }).execute()
+            }
+            supabase.table(tabela).insert(dados).execute()
 
-        st.success(f"✅ {len(rodadas)} rodadas geradas para a divisão {divisao_numero}.")
+        st.success(f"✅ {len(rodadas)} rodadas geradas para a Divisão {divisao}.")
 
-except Exception as e:
-    st.error(f"❌ Erro ao buscar usuários ou gerar rodadas: {e}")
+    except Exception as e:
+        st.error(f"❌ Erro ao buscar usuários ou gerar rodadas: {e}")
