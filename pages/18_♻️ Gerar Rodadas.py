@@ -8,14 +8,14 @@ from datetime import datetime
 st.set_page_config(page_title="♻️ Gerar Rodadas", layout="wide")
 st.title("♻️ Gerar Rodadas - LigaFut")
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🧠 Montar nome da tabela de rodadas
-def nome_tabela_rodadas(divisao):
-    return f"rodadas_divisao_{divisao}"
+# 🧠 Nome da tabela de rodadas por divisão
+def nome_tabela_rodadas(divisao_numero):
+    return f"rodadas_divisao_{divisao_numero}"
 
 # 🧼 Apagar rodadas antigas
 def apagar_rodadas_antigas(tabela):
@@ -56,28 +56,34 @@ def gerar_rodadas(times_ids):
 
     return rodadas_turno + rodadas_returno
 
-# 🔄 Buscar todos usuários com id_time e divisão
+# 🔄 Buscar times vinculados a usuários
 try:
-    usuarios_res = supabase.table("usuarios").select("id_time", "divisao").execute()
+    usuarios_res = supabase.table("usuarios").select("time_id", "Divisão").execute()
     usuarios = usuarios_res.data or []
 
-    # Agrupar por divisão
+    # Agrupar times por número da divisão (1, 2 ou 3)
     divisao_times = {}
     for u in usuarios:
-        id_time = u.get("id_time")
-        divisao = u.get("divisao")
-        if id_time and divisao:
-            divisao_times.setdefault(divisao, []).append(id_time)
+        id_time = u.get("time_id")
+        divisao_str = u.get("Divisão", "").strip()
 
-    # Loop por divisão
-    for divisao, lista_times in divisao_times.items():
-        st.markdown(f"## 📅 Divisão {divisao}")
+        # Extração do número: "Divisão 3" → 3
+        if id_time and divisao_str.lower().startswith("divisão"):
+            try:
+                divisao_num = int(divisao_str.split(" ")[-1])
+                divisao_times.setdefault(divisao_num, []).append(id_time)
+            except:
+                continue
+
+    # Loop por divisões
+    for divisao_numero, lista_times in divisao_times.items():
+        st.markdown(f"## 📅 Divisão {divisao_numero}")
 
         if len(lista_times) < 2:
-            st.warning(f"⚠️ Divisão {divisao} precisa de pelo menos 2 times.")
+            st.warning(f"⚠️ Divisão {divisao_numero} precisa de pelo menos 2 times.")
             continue
 
-        tabela_rodadas = nome_tabela_rodadas(divisao)
+        tabela_rodadas = nome_tabela_rodadas(divisao_numero)
         apagar_rodadas_antigas(tabela_rodadas)
 
         rodadas = gerar_rodadas(lista_times)
@@ -89,7 +95,7 @@ try:
                 "data_criacao": datetime.now().isoformat()
             }).execute()
 
-        st.success(f"✅ {len(rodadas)} rodadas geradas para a divisão {divisao}.")
+        st.success(f"✅ {len(rodadas)} rodadas geradas para a divisão {divisao_numero}.")
 
 except Exception as e:
     st.error(f"❌ Erro ao buscar usuários ou gerar rodadas: {e}")
