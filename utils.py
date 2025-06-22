@@ -5,19 +5,22 @@ from datetime import datetime
 import uuid
 from utils import verificar_sessao
 
+# 📌 Configuração da página
 st.set_page_config(page_title="📤 Propostas Enviadas - LigaFut", layout="wide")
 verificar_sessao()
 
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🔎 Identificação do time logado
 id_time_origem = st.session_state["id_time"]
 nome_time_origem = st.session_state["nome_time"]
 
-# 🔴 Contador de propostas enviadas pendentes
-count_enviadas = supabase.table("propostas").select("*").eq("id_time_origem", id_time_origem).eq("status", "pendente").execute()
-notificacoes_enviadas = len(count_enviadas.data) if count_enviadas.data else 0
+# 🔴 Contador de propostas pendentes enviadas
+res_count = supabase.table("propostas").select("*").eq("id_time_origem", id_time_origem).eq("status", "pendente").execute()
+notificacoes_enviadas = len(res_count.data) if res_count.data else 0
 
 st.markdown(f"""
 <h3>📤 Propostas Enviadas
@@ -25,23 +28,31 @@ st.markdown(f"""
 </h3>
 """, unsafe_allow_html=True)
 
-# 🔎 Selecionar time alvo
-times_ref = supabase.table("times").select("id", "nome").neq("id", id_time_origem).execute()
-times_disponiveis = times_ref.data or []
+# 🔽 Selecionar time alvo
+res_times = supabase.table("times").select("id", "nome").neq("id", id_time_origem).execute()
+times_disponiveis = res_times.data or []
+if not times_disponiveis:
+    st.warning("Nenhum time disponível para enviar proposta.")
+    st.stop()
+
 nomes_times = {t["nome"]: t["id"] for t in times_disponiveis}
 nome_time_alvo = st.selectbox("Escolha o time para enviar proposta:", list(nomes_times.keys()))
 id_time_alvo = nomes_times[nome_time_alvo]
 
-# 🔎 Selecionar jogador alvo
-elenco_ref = supabase.table("elenco").select("*").eq("id_time", id_time_alvo).execute()
-elenco_disponivel = elenco_ref.data or []
+# 🧍 Selecionar jogador alvo
+res_elenco = supabase.table("elenco").select("*").eq("id_time", id_time_alvo).execute()
+elenco_disponivel = res_elenco.data or []
+if not elenco_disponivel:
+    st.warning("O time selecionado não possui jogadores.")
+    st.stop()
+
 jogadores_alvo = [f'{j["nome"]} ({j["posicao"]})' for j in elenco_disponivel]
 jogador_escolhido = st.selectbox("Escolha o jogador desejado:", jogadores_alvo)
 jogador_data = next((j for j in elenco_disponivel if f'{j["nome"]} ({j["posicao"]})' == jogador_escolhido), None)
 
-valor_oferecido = st.number_input("Valor oferecido (R$):", min_value=0, step=100000)
+valor_oferecido = st.number_input("Valor oferecido (R$):", min_value=0, step=100_000)
 
-# 📨 Enviar nova proposta
+# 📩 Enviar nova proposta
 if st.button("📩 Enviar proposta"):
     if jogador_data:
         try:
@@ -50,7 +61,7 @@ if st.button("📩 Enviar proposta"):
                 "id_time_origem": id_time_origem,
                 "nome_time_origem": nome_time_origem,
                 "id_time_alvo": id_time_alvo,
-                "destino_id": id_time_alvo,  # ✅ necessário para aparecer no outro lado
+                "destino_id": id_time_alvo,
                 "nome_time_alvo": nome_time_alvo,
                 "jogador_nome": jogador_data["nome"],
                 "jogador_posicao": jogador_data["posicao"],
@@ -59,26 +70,27 @@ if st.button("📩 Enviar proposta"):
                 "valor_oferecido": valor_oferecido,
                 "status": "pendente",
                 "created_at": datetime.now().isoformat(),
-                "jogadores_oferecidos": []  # vazio por padrão
+                "jogadores_oferecidos": []
             }
             supabase.table("propostas").insert(nova_proposta).execute()
             st.success("✅ Proposta enviada com sucesso!")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"Erro ao enviar proposta: {e}")
     else:
         st.warning("Jogador não encontrado!")
 
-# 📜 Exibir propostas enviadas
+# 📜 Propostas enviadas
 st.subheader("📜 Suas propostas enviadas")
+
 try:
-    propostas_ref = supabase.table("propostas") \
+    res_propostas = supabase.table("propostas") \
         .select("*") \
         .eq("id_time_origem", id_time_origem) \
         .order("created_at", desc=True) \
         .execute()
 
-    propostas = propostas_ref.data or []
+    propostas = res_propostas.data or []
     if not propostas:
         st.info("Você ainda não enviou nenhuma proposta.")
     else:
@@ -97,9 +109,9 @@ try:
                     with col1:
                         novo_valor = st.number_input(
                             f"Editar valor (R$) - {p['jogador_nome']}", 
-                            min_value=0, 
-                            step=100000, 
-                            value=p["valor_oferecido"], 
+                            min_value=0,
+                            step=100_000,
+                            value=p["valor_oferecido"],
                             key=f"editar_valor_{p['id']}"
                         )
                         if st.button("✏️ Salvar Alteração", key=f"salvar_{p['id']}"):
@@ -108,19 +120,22 @@ try:
                                     "valor_oferecido": novo_valor
                                 }).eq("id", p["id"]).execute()
                                 st.success("✏️ Valor da proposta atualizado!")
-                                st.experimental_rerun()
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"Erro ao editar proposta: {e}")
 
                     with col2:
                         if st.button("❌ Cancelar proposta", key=f"cancelar_{p['id']}"):
                             try:
-                                supabase.table("propostas").update({"status": "cancelada"}).eq("id", p["id"]).execute()
+                                supabase.table("propostas").update({
+                                    "status": "cancelada"
+                                }).eq("id", p["id"]).execute()
                                 st.warning("❌ Proposta cancelada.")
-                                st.experimental_rerun()
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"Erro ao cancelar proposta: {e}")
 
 except Exception as e:
     st.error(f"Erro ao buscar propostas enviadas: {e}")
+
 
