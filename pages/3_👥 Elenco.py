@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
 from utils import registrar_movimentacao
 
-st.set_page_config(page_title="Elenco - LigaFut", layout="wide")
+st.set_page_config(page_title="👥 Elenco - LigaFut", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -25,12 +24,13 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 is_admin = len(res_admin.data) > 0
 
+# 🧾 Título e separador
 st.markdown(f"""
     <h1 style='text-align:center;'>👥 Elenco do {nome_time}</h1>
     <hr style='border:1px solid #444;'>
 """, unsafe_allow_html=True)
 
-# 💰 Buscar saldo
+# 💰 Saldo do time
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
 saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 
@@ -38,7 +38,7 @@ saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
 
-# Estatísticas
+# 📊 Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 salario_total = sum(
@@ -57,11 +57,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 🕽️ Filtro de classificação
+# 🎯 Filtro de classificação
 classificacoes = ["Todos", "Titular", "Reserva", "Negociavel", "Sem classificação"]
 classificacao_selecionada = st.selectbox("📌 Filtrar por classificação:", classificacoes)
 
-# Filtrar jogadores
 if classificacao_selecionada == "Sem classificação":
     jogadores_filtrados = [j for j in jogadores if not j.get("classificacao")]
 elif classificacao_selecionada == "Todos":
@@ -69,7 +68,7 @@ elif classificacao_selecionada == "Todos":
 else:
     jogadores_filtrados = [j for j in jogadores if j.get("classificacao") == classificacao_selecionada.lower()]
 
-# 🔃 Atualizar classificação
+# 📋 Listagem
 for jogador in jogadores_filtrados:
     col1, col2, col3, col4, col5, col6, col7 = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 2.5, 2])
 
@@ -92,12 +91,17 @@ for jogador in jogadores_filtrados:
 
     with col5:
         classificacao_atual = jogador.get("classificacao", "Sem classificação")
-        nova_classificacao = st.selectbox("", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
-                                          index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao_atual.capitalize()) if classificacao_atual else 3,
-                                          key=f"class_{jogador['id']}")
+        nova_classificacao = st.selectbox(
+            "",
+            ["Titular", "Reserva", "Negociavel", "Sem classificação"],
+            index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(
+                classificacao_atual.capitalize() if classificacao_atual else "Sem classificação"
+            ),
+            key=f"class_{jogador['id']}"
+        )
         if nova_classificacao.lower() != classificacao_atual:
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
-            st.experimental_rerun()
+            st.rerun()
 
     with col6:
         valor = jogador.get("valor", 0)
@@ -117,7 +121,10 @@ for jogador in jogadores_filtrados:
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
+                # Remove do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+
+                # Insere no mercado de transferências
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -131,15 +138,16 @@ for jogador in jogadores_filtrados:
                     "classificacao": jogador.get("classificacao", ""),
                     "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
                 }).execute()
+
+                # Registra movimentação
                 registrar_movimentacao(
                     id_time=id_time,
-                    jogador=jogador["nome"],
+                    tipo="entrada",
                     valor=round(jogador["valor"] * 0.7),
-                    tipo="mercado",
-                    categoria="venda",
-                    destino="Mercado"
+                    descricao=f"Venda de {jogador['nome']} para o mercado"
                 )
+
                 st.success(f"{jogador['nome']} foi vendido com sucesso!")
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
