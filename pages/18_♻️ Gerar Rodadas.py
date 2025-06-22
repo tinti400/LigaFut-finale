@@ -1,122 +1,89 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from itertools import combinations
-import random
 from datetime import datetime
+import random
+from itertools import combinations
 
-st.set_page_config(page_title="♻️ Gerar Rodadas - Temporada 2", layout="wide")
-st.markdown("<h1 style='text-align:center;'>♻️ Gerar Rodadas - Temporada 2</h1><hr>", unsafe_allow_html=True)
+st.set_page_config(page_title="♻️ Gerar Rodadas Todas Temporadas", layout="wide")
+st.title("♻️ Gerar Rodadas - Todas Temporadas")
 
-# 🔐 Conexão Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# Função para apagar rodadas anteriores
+# 🧠 Nome da tabela de rodadas por temporada e divisão
+def nome_tabela(temporada, divisao):
+    return f"rodadas_temporada_{temporada}_divisao_{divisao}"
+
+# 🧹 Apagar rodadas antigas
 def apagar_rodadas(tabela):
     try:
-        supabase.table(tabela).delete().neq("id", 0).execute()
-        return True, None
+        supabase.table(tabela).delete().execute()
+        st.info(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
     except Exception as e:
-        return False, str(e)
+        st.error(f"❌ Erro ao apagar rodadas da tabela {tabela}: {e}")
 
-# Função para gerar confrontos (turno e returno)
-def gerar_confrontos(times):
+# ⚽ Geração de rodadas com turno e returno
+def gerar_rodadas(times):
     random.shuffle(times)
-    confrontos = list(combinations(times, 2))
-    jogos = []
-    for i, (mandante, visitante) in enumerate(confrontos):
-        jogos.append({
-            "mandante_id": mandante["id"],
-            "visitante_id": visitante["id"],
-            "mandante": mandante["nome"],
-            "visitante": visitante["nome"]
-        })
-    for i, (mandante, visitante) in enumerate(confrontos):
-        jogos.append({
-            "mandante_id": visitante["id"],
-            "visitante_id": mandante["id"],
-            "mandante": visitante["nome"],
-            "visitante": mandante["nome"]
-        })
-    return jogos
+    jogos_turno = list(combinations(times, 2))
+    random.shuffle(jogos_turno)
 
-# Função para distribuir jogos em rodadas
-def distribuir_em_rodadas(jogos, times_por_divisao):
-    rodadas = []
-    rodada_atual = []
-    times_rodada = set()
+    rodadas_turno = [[] for _ in range(len(times) - 1)]
 
-    for jogo in jogos:
-        if jogo["mandante_id"] not in times_rodada and jogo["visitante_id"] not in times_rodada:
-            rodada_atual.append(jogo)
-            times_rodada.add(jogo["mandante_id"])
-            times_rodada.add(jogo["visitante_id"])
+    for jogo in jogos_turno:
+        for rodada in rodadas_turno:
+            times_na_rodada = [j["mandante"] for j in rodada] + [j["visitante"] for j in rodada]
+            if jogo[0] not in times_na_rodada and jogo[1] not in times_na_rodada:
+                rodada.append({"mandante": jogo[0], "visitante": jogo[1]})
+                break
 
-        if len(rodada_atual) == len(times_por_divisao) // 2:
-            rodadas.append(rodada_atual)
-            rodada_atual = []
-            times_rodada = set()
+    rodadas_returno = [
+        [{"mandante": j["visitante"], "visitante": j["mandante"]} for j in rodada]
+        for rodada in rodadas_turno
+    ]
 
-    if rodada_atual:
-        rodadas.append(rodada_atual)
+    return rodadas_turno + rodadas_returno
 
-    return rodadas
+# 🔍 Buscar times da tabela usuarios
+try:
+    res_usuarios = supabase.table("usuarios").select("id_time, nome_time, divisao, temporada").execute()
+    if not res_usuarios.data:
+        st.warning("⚠️ Nenhum time encontrado na tabela 'usuarios'.")
+        st.stop()
 
-# Função principal para gerar rodadas
-def gerar_rodadas(temporada, divisao):
-    nome_tabela = f"rodadas_temporada_{temporada}_divisao_{divisao}"
-    try:
-        # Buscar todos os usuários com time_id e divisão
-        usuarios = supabase.table("usuarios").select("time_id, Divisão").execute().data
-        if not usuarios:
-            st.error("Nenhum usuário encontrado.")
-            return
+    # Agrupar times por (temporada, divisão)
+    grupos = {}
+    for user in res_usuarios.data:
+        temporada = user.get("temporada")
+        divisao = user.get("divisao")
+        id_time = user.get("id_time")
+        if temporada and divisao and id_time:
+            chave = (temporada, divisao)
+            grupos.setdefault(chave, []).append(id_time)
 
-        # Filtrar times da divisão específica
-        usuarios_divisao = [u for u in usuarios if u.get("Divisão") == f"Divisão {divisao}" and u.get("time_id")]
-        if not usuarios_divisao:
-            st.warning(f"Nenhum time encontrado para a Divisão {divisao}.")
-            return
+    # 🔄 Gerar rodadas por grupo
+    for (temporada, divisao), lista_times in sorted(grupos.items()):
+        st.markdown(f"### 📅 Temporada {temporada} | Divisão {divisao}")
+        if len(lista_times) < 2:
+            st.warning(f"⚠️ Poucos times na divisão {divisao}, temporada {temporada}.")
+            continue
 
-        # Buscar nomes dos times a partir dos IDs
-        time_ids = [u["time_id"] for u in usuarios_divisao]
-        times_data = supabase.table("times").select("id, nome").in_("id", time_ids).execute().data
+        tabela = nome_tabela(temporada, divisao)
+        apagar_rodadas(tabela)
+        rodadas = gerar_rodadas(lista_times)
 
-        if not times_data:
-            st.warning(f"Times não encontrados na tabela 'times'.")
-            return
-
-        # Mapear IDs e nomes
-        times = [{"id": t["id"], "nome": t["nome"]} for t in times_data]
-
-        # Gerar confrontos e rodadas
-        jogos = gerar_confrontos(times)
-        rodadas = distribuir_em_rodadas(jogos, times)
-
-        # Apagar rodadas antigas
-        apagado, erro = apagar_rodadas(nome_tabela)
-        if not apagado:
-            st.error(f"Erro ao apagar rodadas da tabela {nome_tabela}: {erro}")
-            return
-
-        # Inserir novas rodadas
-        for i, rodada in enumerate(rodadas, 1):
-            nova_rodada = {
+        for i, rodada in enumerate(rodadas, start=1):
+            dados = {
                 "numero": i,
                 "jogos": rodada,
                 "data_criacao": datetime.now().isoformat()
             }
-            supabase.table(nome_tabela).insert(nova_rodada).execute()
+            supabase.table(tabela).insert(dados).execute()
 
-        st.success(f"✅ Rodadas da Divisão {divisao} - Temporada {temporada} geradas com sucesso!")
+        st.success(f"✅ {len(rodadas)} rodadas geradas na tabela `{tabela}`.")
 
-    except Exception as e:
-        st.error(f"❌ Erro ao buscar usuários ou gerar rodadas: {e}")
-
-# Interface Streamlit
-for divisao in [1, 2, 3]:
-    with st.expander(f"📅 Temporada 2 | Divisão {divisao}"):
-        if st.button(f"🛠️ Gerar Rodadas Divisão {divisao}", key=f"btn_div_{divisao}"):
-            gerar_rodadas(temporada=2, divisao=divisao)
+except Exception as e:
+    st.error(f"❌ Erro ao buscar usuários ou gerar rodadas: {e}")
