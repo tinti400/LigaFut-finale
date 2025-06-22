@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import requests
 import random
 from itertools import combinations
 from datetime import datetime
@@ -58,24 +57,34 @@ for temporada in [1, 2, 3]:
         st.markdown(f"## 📅 Temporada {temporada} | Divisão {divisao}")
 
         tabela_rodadas = nome_tabela_rodadas(temporada, divisao)
-        apagar_rodadas_antigas(tabela_rodadas)
 
-        # 🔄 Buscar times da divisão e temporada
-        res = supabase.table("times").select("id").eq("divisao", divisao).eq("temporada", temporada).execute()
-        lista_times = [item["id"] for item in res.data]
-
-        if len(lista_times) < 2:
-            st.warning(f"⚠️ Poucos times para gerar rodadas na Divisão {divisao}, Temporada {temporada}.")
+        # ⚠️ Validação antes de buscar times
+        if not temporada or not divisao:
+            st.error("❌ Temporada ou divisão inválida.")
             continue
 
-        rodadas = gerar_rodadas(lista_times)
+        # 🧹 Apagar rodadas anteriores
+        apagar_rodadas_antigas(tabela_rodadas)
 
-        for i, rodada in enumerate(rodadas, start=1):
-            dados = {
-                "numero": i,
-                "jogos": rodada,
-                "data_criacao": datetime.now().isoformat()
-            }
-            supabase.table(tabela_rodadas).insert(dados).execute()
+        try:
+            # 🔄 Buscar times da divisão e temporada
+            res = supabase.table("times").select("id").eq("divisao", divisao).eq("temporada", temporada).execute()
+            lista_times = [item["id"] for item in res.data if "id" in item]
 
-        st.success(f"✅ {len(rodadas)} rodadas geradas para `{tabela_rodadas}`.")
+            if len(lista_times) < 2:
+                st.warning(f"⚠️ Poucos times para gerar rodadas na Divisão {divisao}, Temporada {temporada}.")
+                continue
+
+            rodadas = gerar_rodadas(lista_times)
+
+            for i, rodada in enumerate(rodadas, start=1):
+                dados = {
+                    "numero": i,
+                    "jogos": rodada,
+                    "data_criacao": datetime.now().isoformat()
+                }
+                supabase.table(tabela_rodadas).insert(dados).execute()
+
+            st.success(f"✅ {len(rodadas)} rodadas geradas para `{tabela_rodadas}`.")
+        except Exception as e:
+            st.error(f"❌ Erro ao gerar rodadas da `{tabela_rodadas}`: {e}")
