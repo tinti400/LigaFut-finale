@@ -8,83 +8,82 @@ from datetime import datetime
 st.set_page_config(page_title="♻️ Gerar Rodadas", layout="wide")
 st.title("♻️ Gerar Rodadas - LigaFut")
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🧠 Função para montar nome da tabela
-def nome_tabela_rodadas(temporada, divisao):
-    return f"rodadas_temporada_{temporada}_divisao_{divisao}"
+# 🧠 Função para nome da tabela
+def nome_tabela_rodadas(divisao):
+    return f"rodadas_divisao_{divisao}"
 
-# 🧼 Apaga rodadas antigas com tratamento seguro (evita erro DELETE requires WHERE)
+# 🧼 Função para apagar rodadas anteriores
 def apagar_rodadas_antigas(tabela):
     try:
-        supabase.table(tabela).delete().neq("id", "").execute()
-        st.success(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
+        res = supabase.table(tabela).select("id").execute()
+        if res.data:
+            for item in res.data:
+                supabase.table(tabela).delete().eq("id", item["id"]).execute()
+            st.success(f"🧹 Rodadas antigas apagadas da tabela `{tabela}`.")
+        else:
+            st.info(f"ℹ️ Tabela `{tabela}` ainda não possui rodadas (nada a apagar).")
     except Exception as e:
         if "does not exist" in str(e).lower():
-            st.info(f"ℹ️ Tabela `{tabela}` ainda não existe (nada a apagar).")
+            st.info(f"ℹ️ Tabela `{tabela}` ainda não existe.")
         else:
             st.error(f"❌ Erro ao apagar rodadas da tabela `{tabela}`: {e}")
 
-# ⚽ Gera rodadas com turno e returno
-def gerar_rodadas(times):
-    random.shuffle(times)
-    jogos_turno = list(combinations(times, 2))
-    random.shuffle(jogos_turno)
+# ⚽ Geração das rodadas com turno e returno
+def gerar_rodadas(times_ids):
+    random.shuffle(times_ids)
+    jogos = list(combinations(times_ids, 2))  # todos contra todos
+    random.shuffle(jogos)
 
-    total_rodadas = len(times) - 1
-    rodadas_turno = [[] for _ in range(total_rodadas)]
+    qtd_rodadas = len(times_ids) - 1
+    rodadas_turno = [[] for _ in range(qtd_rodadas)]
 
-    for jogo in jogos_turno:
+    for jogo in jogos:
         for rodada in rodadas_turno:
-            times_na_rodada = [j['mandante'] for j in rodada] + [j['visitante'] for j in rodada]
-            if jogo[0] not in times_na_rodada and jogo[1] not in times_na_rodada:
+            ja_na_rodada = [j["mandante"] for j in rodada] + [j["visitante"] for j in rodada]
+            if jogo[0] not in ja_na_rodada and jogo[1] not in ja_na_rodada:
                 rodada.append({"mandante": jogo[0], "visitante": jogo[1]})
                 break
 
     rodadas_returno = [
-        [{"mandante": jogo["visitante"], "visitante": jogo["mandante"]} for jogo in rodada]
+        [{"mandante": j["visitante"], "visitante": j["mandante"]} for j in rodada]
         for rodada in rodadas_turno
     ]
 
     return rodadas_turno + rodadas_returno
 
-# 🔁 Loop por temporada e divisão
-for temporada in [1, 2, 3]:
-    for divisao in [1, 2, 3]:
-        st.markdown(f"## 📅 Temporada {temporada} | Divisão {divisao}")
+# 🔁 Loop pelas divisões (1 a 3)
+for divisao in [1, 2, 3]:
+    st.markdown(f"## 📅 Divisão {divisao}")
 
-        tabela_rodadas = nome_tabela_rodadas(temporada, divisao)
+    tabela_rodadas = nome_tabela_rodadas(divisao)
 
-        # ⚠️ Validação antes de buscar times
-        if not temporada or not divisao:
-            st.error("❌ Temporada ou divisão inválida.")
+    # 🔄 Buscar times da divisão
+    try:
+        res_times = supabase.table("times").select("id").eq("divisao", divisao).execute()
+        lista_times = [t["id"] for t in res_times.data if "id" in t]
+
+        if len(lista_times) < 2:
+            st.warning(f"⚠️ Divisão {divisao} precisa de pelo menos 2 times.")
             continue
 
-        # 🧹 Apagar rodadas anteriores
+        # 🧹 Limpar rodadas antigas
         apagar_rodadas_antigas(tabela_rodadas)
 
-        try:
-            # 🔄 Buscar times da divisão e temporada
-            res = supabase.table("times").select("id").eq("divisao", divisao).eq("temporada", temporada).execute()
-            lista_times = [item["id"] for item in res.data if "id" in item]
+        # ⚽ Gerar novas rodadas
+        rodadas = gerar_rodadas(lista_times)
 
-            if len(lista_times) < 2:
-                st.warning(f"⚠️ Poucos times para gerar rodadas na Divisão {divisao}, Temporada {temporada}.")
-                continue
+        for i, rodada in enumerate(rodadas, start=1):
+            supabase.table(tabela_rodadas).insert({
+                "numero": i,
+                "jogos": rodada,
+                "data_criacao": datetime.now().isoformat()
+            }).execute()
 
-            rodadas = gerar_rodadas(lista_times)
-
-            for i, rodada in enumerate(rodadas, start=1):
-                dados = {
-                    "numero": i,
-                    "jogos": rodada,
-                    "data_criacao": datetime.now().isoformat()
-                }
-                supabase.table(tabela_rodadas).insert(dados).execute()
-
-            st.success(f"✅ {len(rodadas)} rodadas geradas para `{tabela_rodadas}`.")
-        except Exception as e:
-            st.error(f"❌ Erro ao gerar rodadas da `{tabela_rodadas}`: {e}")
+        st.success(f"✅ {len(rodadas)} rodadas geradas para a divisão {divisao}.")
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar rodadas da divisão {divisao}: {e}")
