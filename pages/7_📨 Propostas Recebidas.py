@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 from utils import registrar_movimentacao
+import uuid
 
 st.set_page_config(page_title="📨 Propostas Recebidas", layout="wide")
 
@@ -89,6 +90,21 @@ else:
                             # 💾 Registrar movimentações
                             registrar_movimentacao(proposta["id_time_origem"], "saida", proposta["valor_oferecido"], f"Compra de {proposta['jogador_nome']}")
                             registrar_movimentacao(proposta["id_time_alvo"], "entrada", proposta["valor_oferecido"], f"Venda de {proposta['jogador_nome']}")
+
+                            # 📝 Registro no BID (informativo, sem alterar saldo)
+                            supabase.table("bid").insert({
+                                "id": str(uuid.uuid4()),
+                                "data": datetime.now().isoformat(),
+                                "jogador_nome": proposta["jogador_nome"],
+                                "jogador_posicao": proposta["jogador_posicao"],
+                                "id_time_origem": proposta["id_time_alvo"],
+                                "id_time_destino": proposta["id_time_origem"],
+                                "nome_time_origem": nome_time,
+                                "nome_time_destino": proposta["nome_time_origem"],
+                                "valor": proposta["valor_oferecido"],
+                                "tipo": "Venda",
+                                "categoria": "Proposta"
+                            }).execute()
 
                             st.success("✅ Proposta aceita com sucesso!")
                             st.rerun()
