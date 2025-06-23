@@ -45,6 +45,12 @@ res_rodadas = (
 
 rodadas = res_rodadas.data if res_rodadas.data else []
 
+# 🧮 Função para buscar salário total
+def salario_total(id_time):
+    res_elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute()
+    elenco = res_elenco.data if isinstance(res_elenco.data, list) else []
+    return sum(j.get("salario", 0) for j in elenco if isinstance(j, dict))
+
 # ⚙️ Função para pagar salários e premiações
 def pagar_por_jogo(id_mandante, id_visitante, gols_m, gols_v, divisao):
     if divisao == 1:
@@ -121,11 +127,6 @@ for rodada in rodadas:
         nome_v = times.get(id_v, {}).get("nome", "❓")
         logo_m = times.get(id_m, {}).get("logo", "")
         logo_v = times.get(id_v, {}).get("logo", "")
-
-        # 🔢 Buscar salário total dos times
-        def salario_total(id_time):
-            elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute().data
-            return sum(j.get("salario", 0) for j in elenco if isinstance(j, dict))
 
         sal_m = salario_total(id_m)
         sal_v = salario_total(id_v)
