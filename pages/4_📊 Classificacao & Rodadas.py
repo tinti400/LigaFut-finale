@@ -28,20 +28,21 @@ eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
-numero_divisao = int(divisao.split()[-1])
-numero_temporada = int(temporada.split()[-1])
+numero_divisao = divisao.split()[-1]
+numero_temporada = temporada.split()[-1]
+nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
 
 # 🔄 Buscar rodadas
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def buscar_resultados():
     try:
-        res = supabase.table("rodadas").select("*").eq("divisao", numero_divisao).eq("temporada", numero_temporada).order("numero").execute()
+        res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
         return res.data if res.data else []
     except:
         return []
 
 # 👥 Buscar nomes e logos dos times
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -71,6 +72,7 @@ def calcular_classificacao(rodadas, times_map):
             try: gm, gv = int(gm), int(gv)
             except: continue
 
+            # 💸 Descontar salários dos dois times (1x por jogo confirmado)
             for time_id in [m, v]:
                 elenco = supabase.table("elenco").select("salario", "valor").eq("time_id", time_id).execute().data
                 total_salario = sum(j.get("salario", int(j.get("valor", 0)*0.01)) for j in elenco)
@@ -171,8 +173,8 @@ for rodada in rodadas:
         gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-        m_logo = m.get("logo", "")
-        v_logo = v.get("logo", "")
+        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
         m_nome = m.get("nome", "Desconhecido")
         v_nome = v.get("nome", "Desconhecido")
 
@@ -193,9 +195,9 @@ if eh_admin:
     st.markdown("---")
     if st.button("🧹 Resetar Rodadas"):
         try:
-            docs = supabase.table("rodadas").select("id").eq("divisao", numero_divisao).eq("temporada", numero_temporada).execute().data
+            docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
             for d in docs:
-                supabase.table("rodadas").delete().eq("id", d["id"]).execute()
+                supabase.table(nome_tabela_rodadas).delete().eq("id", d["id"]).execute()
             st.success("Rodadas apagadas com sucesso.")
             st.rerun()
         except Exception as e:
