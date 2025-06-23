@@ -68,7 +68,8 @@ def pagar_por_jogo(id_mandante, id_visitante, gols_m, gols_v, divisao):
 
     # 💸 Salários
     for id_time in [id_mandante, id_visitante]:
-        elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute().data
+        res_elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute()
+        elenco = res_elenco.data if res_elenco.data else []
         total_salario = sum(j.get("salario", 0) for j in elenco)
         saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
         novo_saldo = saldo - total_salario
