@@ -16,7 +16,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🌟 Dados do usuário e time
+# 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -90,11 +90,11 @@ inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
 jogadores_pagina = jogadores_filtrados[inicio:fim]
 
-# 📦 Verifica quantidade atual do elenco
+# 🛆 Verifica quantidade atual do elenco
 res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
 qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
 
-# 📋 Exibição principal
+# 🗋️ Exibição principal
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
@@ -151,10 +151,9 @@ for jogador in jogadores_pagina:
                             descricao=f"Compra de {jogador['nome']} no mercado"
                         )
 
-                        # Atualiza saldo do time
                         supabase.table("times").update({"saldo": saldo_time - valor}).eq("id", id_time).execute()
 
-                        # Insere no BID
+                        # 📋 Registrar no BID
                         supabase.table("bid").insert({
                             "nome": jogador["nome"],
                             "id_time": id_time,
@@ -176,7 +175,7 @@ for jogador in jogadores_pagina:
 # 🛠️ Ações administrativas (excluir múltiplos)
 if is_admin:
     st.markdown("---")
-    st.markdown("### 🤍 Ações em massa (admin)")
+    st.markdown("### 📥 Ações em massa (admin)")
     if selecionados:
         st.warning(f"{len(selecionados)} jogadores selecionados.")
         if st.button("🗑️ Excluir selecionados do mercado"):
