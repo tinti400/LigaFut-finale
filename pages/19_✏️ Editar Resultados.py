@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from datetime import datetime
-import random
 import pandas as pd
 
 # 🔐 Conexão com Supabase
@@ -28,31 +26,44 @@ if not res_admin.data:
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
-numero_divisao = divisao.split()[-1]
-numero_temporada = temporada.split()[-1]
-tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+numero_divisao = int(divisao.split()[-1])
+numero_temporada = int(temporada.split()[-1])
 
 # 🔄 Times e nomes
 def buscar_times_nomes_logos():
-    times_data = supabase.table("times").select("id", "nome", "logo").execute().data
+    res = supabase.table("times").select("id", "nome", "logo").execute()
+    times_data = res.data if res.data else []
     return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in times_data}
 
 times_info = buscar_times_nomes_logos()
 
-# 🔄 Rodadas
-rodadas_data = supabase.table(tabela_rodadas).select("*").order("numero").execute().data
+# 🔄 Rodadas (ajuste correto para tabela única)
+try:
+    res_rodadas = (
+        supabase.table("rodadas")
+        .select("*")
+        .eq("temporada", numero_temporada)
+        .eq("divisao", numero_divisao)
+        .order("numero")
+        .execute()
+    )
+    rodadas_data = res_rodadas.data if res_rodadas.data else []
+except Exception as e:
+    st.error(f"Erro ao carregar rodadas: {e}")
+    st.stop()
+
 if not rodadas_data:
     st.warning("Nenhuma rodada encontrada.")
     st.stop()
 
 rodada_nums = [r["numero"] for r in rodadas_data]
 rodada_atual = st.selectbox("Escolha a rodada para editar:", rodada_nums)
-rodada = next(r for r in rodadas_data if r["numero"] == rodada_atual)
+rodada = next((r for r in rodadas_data if r["numero"] == rodada_atual), None)
 
 # 🔍 Filtro por time
 todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in rodada["jogos"]]
-nomes_filtrados = {id_: times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids}
-nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada", ["Todos"] + list(set(nomes_filtrados.values())))
+nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
+nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
 # 🎯 Edição dos jogos
 for idx, jogo in enumerate(rodada["jogos"]):
@@ -73,20 +84,20 @@ for idx, jogo in enumerate(rodada["jogos"]):
 
     with col1:
         st.image(logo_m or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
-        st.markdown(f"**{nome_m}**", unsafe_allow_html=True)
+        st.markdown(f"**{nome_m}**")
 
     with col2:
-        gols_m = st.number_input(f"Gols {nome_m}", value=jogo.get("gols_mandante") or 0, min_value=0, key=f"gm_{idx}")
+        gols_m = st.number_input(f"Gols {nome_m}", value=jogo.get("gols_mandante", 0), min_value=0, key=f"gm_{idx}")
 
     with col3:
-        st.markdown("<h4 style='text-align:center;'>X</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align:center;'>⚔️</h4>", unsafe_allow_html=True)
 
     with col4:
-        gols_v = st.number_input(f"Gols {nome_v}", value=jogo.get("gols_visitante") or 0, min_value=0, key=f"gv_{idx}")
+        gols_v = st.number_input(f"Gols {nome_v}", value=jogo.get("gols_visitante", 0), min_value=0, key=f"gv_{idx}")
 
     with col5:
         st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
-        st.markdown(f"**{nome_v}**", unsafe_allow_html=True)
+        st.markdown(f"**{nome_v}**")
 
     if st.button("💾 Salvar", key=f"btn_{idx}"):
         novos_jogos = []
@@ -96,15 +107,15 @@ for idx, jogo in enumerate(rodada["jogos"]):
                 j["gols_visitante"] = gols_v
             novos_jogos.append(j)
 
-        supabase.table(tabela_rodadas).update({"jogos": novos_jogos}).eq("numero", rodada_atual).execute()
+        supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
         st.success(f"✅ Resultado atualizado: {nome_m} {gols_m} x {gols_v} {nome_v}")
         st.rerun()
 
 # 🔎 Histórico geral
 st.markdown("---")
-st.subheader("📜 Histórico do Time em Todas Rodadas")
+st.subheader("📜 Histórico do Time em Todas as Rodadas")
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
-time_nome = st.selectbox("Selecione um time:", sorted(nomes_times.keys()))
+time_nome = st.selectbox("Selecione um time para ver histórico:", sorted(nomes_times.keys()))
 id_escolhido = nomes_times[time_nome]
 
 historico = []
@@ -115,7 +126,7 @@ for r in rodadas_data:
             nome_v = times_info.get(j["visitante"], {}).get("nome", "?")
             gm = j.get("gols_mandante")
             gv = j.get("gols_visitante")
-            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "Não definido"
+            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "❌ Não definido"
 
             historico.append({
                 "Rodada": r["numero"],
@@ -129,6 +140,3 @@ if historico:
     st.dataframe(df, use_container_width=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
-
-
-
