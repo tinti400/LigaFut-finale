@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao
+from utils import registrar_movimentacao, registrar_bid
 
 st.set_page_config(page_title="💼 Mercado de Transferências - LigaFut", layout="wide")
 
@@ -17,7 +17,7 @@ supabase = create_client(url, key)
 
 # 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
-id_time = st.session_state["id_time"]
+id_time = str(st.session_state["id_time"])  # ✅ Garante que é string
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
@@ -43,8 +43,8 @@ if not mercado_aberto:
     st.stop()
 
 # 💰 Saldo do time
-res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
-saldo_time = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+saldo_time = float(res_saldo.data[0]["saldo"]) if res_saldo.data else 0
 st.markdown(f"### 💰 Saldo atual: **R$ {saldo_time:,.0f}**".replace(",", "."))
 
 # 🔍 Filtros
@@ -122,32 +122,54 @@ for jogador in jogadores_pagina:
                 if not check.data:
                     st.error("❌ Este jogador já foi comprado.")
                     st.experimental_rerun()
-                elif saldo_time < jogador["valor"]:
+                elif saldo_time < float(jogador["valor"]):
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
+                        valor_compra = float(jogador["valor"])
+
+                        # Adiciona ao elenco
                         supabase.table("elenco").insert({
                             "nome": jogador["nome"],
                             "posicao": jogador["posicao"],
                             "overall": jogador["overall"],
-                            "valor": jogador["valor"],
+                            "valor": valor_compra,
                             "id_time": id_time,
                             "nacionalidade": jogador.get("nacionalidade"),
                             "foto": jogador.get("foto"),
-                            "origem": jogador.get("origem", jogador.get("time_origem", ""))
+                            "origem": jogador.get("origem", jogador.get("time_origem", "")),
+                            "salario": jogador.get("salario") if jogador.get("salario") is not None else int(valor_compra * 0.01)
                         }).execute()
 
+                        # Remove do mercado
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
+                        # Atualiza saldo do time
+                        novo_saldo = saldo_time - valor_compra
+                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                        # Registra movimentação financeira
                         registrar_movimentacao(
                             id_time=id_time,
                             tipo="saida",
-                            valor=jogador["valor"],
+                            valor=valor_compra,
                             descricao=f"Compra de {jogador['nome']} no mercado"
+                        )
+
+                        # Registra no BID
+                        registrar_bid(
+                            id_time=id_time,
+                            tipo="compra",
+                            categoria="mercado",
+                            jogador=jogador["nome"],
+                            valor=-valor_compra,
+                            origem=jogador.get("time_origem", "Desconhecido"),
+                            destino=nome_time
                         )
 
                         st.success(f"{jogador['nome']} comprado com sucesso!")
                         st.experimental_rerun()
+
                     except Exception as e:
                         st.error(f"Erro ao comprar jogador: {e}")
 
