@@ -25,12 +25,12 @@ except Exception as e:
     st.error(f"Erro ao buscar times: {e}")
     times_map = {}
 
-# 🔄 Carrega todas movimentações
+# 🔄 Carrega BID
 try:
-    mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).execute()
-    todas_movs = mov_ref.data
+    bid_res = supabase.table("bid").select("*").order("data", desc=True).execute()
+    todas_movs = bid_res.data
 except Exception as e:
-    st.error(f"Erro ao buscar movimentações: {e}")
+    st.error(f"Erro ao buscar BID: {e}")
     todas_movs = []
 
 # 🎛️ Filtros
@@ -41,16 +41,18 @@ filtro_categoria = st.selectbox("Filtrar por categoria", ["Todos", "mercado", "l
 # Aplica filtros
 movimentacoes = []
 for mov in todas_movs:
-    nome_time = times_map.get(mov.get("id_time", ""), "Desconhecido")
+    nome_time_origem = times_map.get(mov.get("id_time_origem", ""), "Desconhecido")
+    nome_time_destino = times_map.get(mov.get("id_time_destino", ""), "Desconhecido")
 
-    if filtro_time != "Todos" and nome_time != filtro_time:
+    if filtro_time != "Todos" and filtro_time not in [nome_time_origem, nome_time_destino]:
         continue
     if filtro_tipo != "Todos" and mov.get("tipo") != filtro_tipo:
         continue
     if filtro_categoria != "Todos" and mov.get("categoria") != filtro_categoria:
         continue
 
-    mov["nome_time"] = nome_time
+    mov["nome_time_origem"] = nome_time_origem
+    mov["nome_time_destino"] = nome_time_destino
     movimentacoes.append(mov)
 
 # 📄 Paginação
@@ -67,33 +69,33 @@ if not movs_paginados:
     st.info("Nenhuma movimentação encontrada.")
 else:
     for mov in movs_paginados:
-        jogador = mov.get("jogador", "Desconhecido")
+        jogador = mov.get("jogador_nome", "Desconhecido")
+        posicao = mov.get("jogador_posicao", "-")
         tipo = mov.get("tipo", "N/A").capitalize()
         categoria = mov.get("categoria", "N/A").capitalize()
         valor = mov.get("valor", 0)
         data = mov.get("data", "")
-        nome_time = mov.get("nome_time", "Desconhecido")
-        destino = mov.get("destino", "")
-        origem = mov.get("origem", "")
+        origem = mov.get("nome_time_origem", "Desconhecido")
+        destino = mov.get("nome_time_destino", "Desconhecido")
 
         try:
             data_formatada = datetime.fromisoformat(data).strftime('%d/%m/%Y %H:%M')
         except:
             data_formatada = "Data inválida"
 
-        valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
+        valor_str = f"R$ {valor:,.0f}".replace(",", ".")
 
-        # Ícones
+        # Ícones por tipo/categoria
         if categoria.lower() == "leilao":
             icone = "📢"
         elif categoria.lower() == "proposta":
             icone = "📤"
-        elif valor >= 0:
-            icone = "🟢"
+        elif categoria.lower() == "mercado":
+            icone = "🏪"
         else:
-            icone = "🔴"
+            icone = "🔁"
 
-        cor_valor = "green" if valor >= 0 else "red"
+        cor_valor = "green" if tipo.lower() == "compra" else "red"
 
         with st.container():
             st.markdown("---")
@@ -101,14 +103,9 @@ else:
             with col1:
                 st.markdown(f"<span style='font-size:28px'>{icone}</span>", unsafe_allow_html=True)
             with col2:
-                st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
-                st.markdown(f"**👤 Jogador:** {jogador}")
+                st.markdown(f"**🕒 {data_formatada}** — **{destino}**")
+                st.markdown(f"**👤 Jogador:** {jogador} ({posicao})")
                 st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
                 st.markdown(f"**💰 Valor:** <span style='color:{cor_valor}'>{valor_str}</span>", unsafe_allow_html=True)
-                if origem:
-                    st.markdown(f"**↩️ Origem:** {origem}")
-                if destino:
-                    st.markdown(f"**➡️ Destino:** {destino}")
-
-                if jogador == "Desconhecido":
-                    st.warning("⚠️ Jogador com nome ausente no BID. Verifique a origem da transação.")
+                st.markdown(f"**↩️ Origem:** {origem}")
+                st.markdown(f"**➡️ Destino:** {destino}")
