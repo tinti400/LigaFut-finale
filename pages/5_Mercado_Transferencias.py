@@ -17,7 +17,7 @@ supabase = create_client(url, key)
 
 # 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
-id_time = str(st.session_state["id_time"])  # ✅ Garante que é string
+id_time = str(st.session_state["id_time"])
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
@@ -127,6 +127,7 @@ for jogador in jogadores_pagina:
                 else:
                     try:
                         valor_compra = float(jogador["valor"])
+                        salario_final = int(jogador.get("salario", int(valor_compra * 0.01)))
 
                         # Adiciona ao elenco
                         supabase.table("elenco").insert({
@@ -138,17 +139,17 @@ for jogador in jogadores_pagina:
                             "nacionalidade": jogador.get("nacionalidade"),
                             "foto": jogador.get("foto"),
                             "origem": jogador.get("origem", jogador.get("time_origem", "")),
-                            "salario": jogador.get("salario") if jogador.get("salario") is not None else int(valor_compra * 0.01)
+                            "salario": salario_final
                         }).execute()
 
                         # Remove do mercado
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                        # Atualiza saldo do time
+                        # Atualiza saldo
                         novo_saldo = saldo_time - valor_compra
                         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                        # Registra movimentação financeira
+                        # Registra movimentação
                         registrar_movimentacao(
                             id_time=id_time,
                             tipo="saida",
