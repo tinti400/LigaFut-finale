@@ -69,6 +69,7 @@ else:
                     id_time_origem = proposta["id_time_origem"]
                     id_time_destino = proposta["id_time_alvo"]
                     jogador_nome = proposta["jogador_nome"]
+                    nome_time_origem = proposta["nome_time_origem"]
 
                     # Remover jogador do time atual
                     supabase.table("elenco").delete().eq("id_time", id_time_destino).eq("nome", jogador_nome).execute()
@@ -103,8 +104,8 @@ else:
 
                     # Registrar movimentações financeiras
                     if valor > 0:
-                        registrar_movimentacao(id_time_origem, jogador_nome, "Transferência", "Compra", valor)
-                        registrar_movimentacao(id_time_destino, jogador_nome, "Transferência", "Venda", valor)
+                        registrar_movimentacao(id_time_origem, "saida", valor, f"Compra de {jogador_nome}")
+                        registrar_movimentacao(id_time_destino, "entrada", valor, f"Venda de {jogador_nome}")
 
                     # ❌ Apagar TODAS as propostas pendentes desse jogador (inclusive a aceita)
                     supabase.table("propostas").delete() \
@@ -112,7 +113,7 @@ else:
                         .eq("destino_id", id_time) \
                         .eq("status", "pendente").execute()
 
-                    st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {proposta['nome_time_origem']}.")
+                    st.success(f"✅ Proposta aceita! {jogador_nome} foi transferido para {nome_time_origem}.")
                     st.experimental_rerun()
 
                 except Exception as e:
@@ -120,10 +121,8 @@ else:
 
             if col2.button("❌ Recusar", key=f"recusar_{proposta['id']}"):
                 try:
-                    # ❌ Apagar a proposta recusada
                     supabase.table("propostas").delete().eq("id", proposta["id"]).execute()
                     st.warning("❌ Proposta recusada e removida do histórico.")
                     st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao recusar a proposta: {e}")
-
