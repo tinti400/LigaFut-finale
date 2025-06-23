@@ -28,25 +28,28 @@ eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
-numero_divisao = divisao.split()[-1]
-numero_temporada = temporada.split()[-1]
-nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+numero_divisao = int(divisao.split()[-1])
+numero_temporada = int(temporada.split()[-1])
 
 # 🔄 Buscar rodadas
 @st.cache(ttl=60)
-def buscar_resultados():
+def buscar_resultados(temporada, divisao):
     try:
-        res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
-        return res.data if res.data else []
+        res = supabase.table("rodadas") \
+            .select("*") \
+            .eq("temporada", temporada) \
+            .eq("divisao", divisao) \
+            .order("numero") \
+            .execute()
+        return res.data
     except Exception as e:
-        st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
 # 👥 Buscar nomes e logos dos times
 @st.cache(ttl=60)
-def obter_nomes_times():
+def obter_nomes_times(divisao):
     try:
-        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
+        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {divisao}").execute().data
         time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
         if not time_ids:
             return {}
@@ -72,17 +75,6 @@ def calcular_classificacao(rodadas, times_map):
             if None in [m, v, gm, gv]: continue
             try: gm, gv = int(gm), int(gv)
             except: continue
-
-            # 💸 Descontar salários dos dois times (1x por jogo confirmado)
-            for time_id in [m, v]:
-                elenco = supabase.table("elenco").select("salario", "valor").eq("time_id", time_id).execute().data
-                total_salario = sum(j.get("salario", int(j.get("valor", 0)*0.01)) for j in elenco)
-
-                res_saldo = supabase.table("times").select("saldo").eq("id", time_id).execute()
-                saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-                novo_saldo = saldo_atual - total_salario
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", time_id).execute()
-                registrar_movimentacao(supabase, time_id, -total_salario, "Pagamento de salários")
 
             for t in (m, v):
                 if t not in tabela:
@@ -125,8 +117,8 @@ def calcular_classificacao(rodadas, times_map):
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
 # 🔄 Dados
-rodadas = buscar_resultados()
-times_map = obter_nomes_times()
+rodadas = buscar_resultados(numero_temporada, numero_divisao)
+times_map = obter_nomes_times(numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
 # 📊 Tabela de classificação
@@ -190,20 +182,3 @@ for rodada in rodadas:
             st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
             st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
-
-# 🧹 Admin: resetar rodadas
-if eh_admin:
-    st.markdown("---")
-    if st.button("🧹 Resetar Rodadas"):
-        try:
-            docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
-            for d in docs:
-                supabase.table(nome_tabela_rodadas).delete().eq("id", d["id"]).execute()
-            st.success("Rodadas apagadas com sucesso.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro: {e}")
-
-
-
-
