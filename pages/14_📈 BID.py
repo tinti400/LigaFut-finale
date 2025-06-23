@@ -83,6 +83,7 @@ else:
 
         valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
+        # Ícones
         if categoria.lower() == "leilao":
             icone = "📢"
         elif categoria.lower() == "proposta":
@@ -91,6 +92,8 @@ else:
             icone = "🟢"
         else:
             icone = "🔴"
+
+        cor_valor = "green" if valor >= 0 else "red"
 
         with st.container():
             st.markdown("---")
@@ -101,13 +104,11 @@ else:
                 st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
                 st.markdown(f"**👤 Jogador:** {jogador}")
                 st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
-                st.markdown(f"**💰 Valor:** {valor_str}")
+                st.markdown(f"**💰 Valor:** <span style='color:{cor_valor}'>{valor_str}</span>", unsafe_allow_html=True)
                 if origem:
                     st.markdown(f"**↩️ Origem:** {origem}")
                 if destino:
                     st.markdown(f"**➡️ Destino:** {destino}")
 
-
-
-
-
+                if jogador == "Desconhecido":
+                    st.warning("⚠️ Jogador com nome ausente no BID. Verifique a origem da transação.")
