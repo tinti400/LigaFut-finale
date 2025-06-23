@@ -30,16 +30,14 @@ def registrar_movimentacao(id_time, tipo, valor, descricao):
         nova = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
-            "tipo": tipo or "saida",
-            "valor": valor or 0,
-            "descricao": descricao or "Sem descrição",
+            "tipo": tipo,
+            "valor": valor,
+            "descricao": descricao,
             "data": datetime.now().isoformat()
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
-        return True
     except Exception as e:
         st.error(f"Erro ao registrar movimentação financeira: {e}")
-        return False
 
 # 📈 Registrar movimentação pública no BID
 def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino=""):
@@ -55,20 +53,31 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     :param destino: nome do time de destino (opcional)
     """
     try:
+        if not all([id_time, tipo, categoria, jogador]) or valor is None:
+            st.error("❌ Dados obrigatórios ausentes para registrar no BID.")
+            return False
+
         registro = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
-            "tipo": tipo or "compra",
-            "categoria": categoria or "mercado",
-            "jogador": jogador or "Desconhecido",
-            "valor": valor or 0,
+            "tipo": str(tipo),
+            "categoria": str(categoria),
+            "jogador": str(jogador),
+            "valor": int(valor),  # garante formato correto
             "data": datetime.now().isoformat(),
             "origem": origem or "",
             "destino": destino or ""
         }
+
+        # 🐞 DEBUG VISUAL
+        st.markdown("### 🐞 DEBUG BID - Conteúdo enviado:")
+        st.json(registro)
+
         supabase.table("movimentacoes").insert(registro).execute()
         return True
+
     except Exception as e:
-        st.error(f"Erro ao registrar no BID: {e}")
+        st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
+
 
