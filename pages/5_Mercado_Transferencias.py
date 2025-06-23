@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao, registrar_no_bid
+from utils import registrar_movimentacao
 from datetime import datetime
 
 st.set_page_config(page_title="💼 Mercado de Transferências - LigaFut", layout="wide")
@@ -16,7 +16,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 🌟 Dados do usuário e time
+# 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
@@ -90,11 +90,16 @@ inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
 jogadores_pagina = jogadores_filtrados[inicio:fim]
 
-# 🗏️ Exibição
+# 🛆 Verifica quantidade atual do elenco
+res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
+qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
+
+# 🗋️ Exibição principal
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
-# 👆 Itera jogadores
+selecionados = set()
+
 for jogador in jogadores_pagina:
     col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
     with col1:
@@ -110,39 +115,81 @@ for jogador in jogadores_pagina:
         st.markdown(f"🏠 Origem: {jogador.get('time_origem', 'Desconhecido')}")
 
     with col4:
-        if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
-            if saldo_time < jogador["valor"]:
-                st.error("❌ Saldo insuficiente.")
-            else:
-                try:
-                    valor = int(jogador["valor"])
-                    salario = int(jogador.get("salario") or valor * 0.01)
-
-                    supabase.table("elenco").insert({
-                        "nome": jogador["nome"],
-                        "posicao": jogador["posicao"],
-                        "overall": jogador["overall"],
-                        "valor": valor,
-                        "salario": salario,
-                        "id_time": id_time,
-                        "nacionalidade": jogador.get("nacionalidade"),
-                        "foto": jogador.get("foto"),
-                        "origem": jogador.get("origem", jogador.get("time_origem", ""))
-                    }).execute()
-
-                    supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
-                    registrar_movimentacao(id_time, "saida", valor, f"Compra de {jogador['nome']} no mercado")
-
-                    supabase.table("times").update({"saldo": saldo_time - valor}).eq("id", id_time).execute()
-                    registrar_no_bid(jogador["nome"], id_time, "compra_mercado", valor)
-
-                    st.success(f"{jogador['nome']} comprado com sucesso!")
+        if qtde_elenco >= 35:
+            st.warning("⚠️ Elenco cheio (35 jogadores)")
+        else:
+            if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
+                check = supabase.table("mercado_transferencias").select("id").eq("id", jogador["id"]).execute()
+                if not check.data:
+                    st.error("❌ Este jogador já foi comprado.")
                     st.experimental_rerun()
+                elif saldo_time < jogador["valor"]:
+                    st.error("❌ Saldo insuficiente.")
+                else:
+                    try:
+                        valor = int(jogador["valor"])
+                        salario = int(jogador.get("salario", valor * 0.01))
 
-                except Exception as e:
-                    st.error(f"Erro ao comprar jogador: {e}")
+                        supabase.table("elenco").insert({
+                            "nome": jogador["nome"],
+                            "posicao": jogador["posicao"],
+                            "overall": jogador["overall"],
+                            "valor": valor,
+                            "salario": salario,
+                            "id_time": id_time,
+                            "nacionalidade": jogador.get("nacionalidade"),
+                            "foto": jogador.get("foto"),
+                            "origem": jogador.get("origem", jogador.get("time_origem", ""))
+                        }).execute()
 
-# 🗝 Navegação
+                        supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+
+                        registrar_movimentacao(
+                            id_time=id_time,
+                            tipo="saida",
+                            valor=valor,
+                            descricao=f"Compra de {jogador['nome']} no mercado"
+                        )
+
+                        supabase.table("times").update({"saldo": saldo_time - valor}).eq("id", id_time).execute()
+
+                        # 📋 Registrar no BID
+                        supabase.table("bid").insert({
+                            "nome": jogador["nome"],
+                            "id_time": id_time,
+                            "tipo": "compra_mercado",
+                            "valor": valor,
+                            "data": datetime.now().isoformat()
+                        }).execute()
+
+                        st.success(f"{jogador['nome']} comprado com sucesso!")
+                        st.experimental_rerun()
+
+                    except Exception as e:
+                        st.error(f"Erro ao comprar jogador: {e}")
+
+    if is_admin:
+        if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
+            selecionados.add(jogador["id"])
+
+# 🛠️ Ações administrativas (excluir múltiplos)
+if is_admin:
+    st.markdown("---")
+    st.markdown("### 📥 Ações em massa (admin)")
+    if selecionados:
+        st.warning(f"{len(selecionados)} jogadores selecionados.")
+        if st.button("🗑️ Excluir selecionados do mercado"):
+            try:
+                for id_jogador in selecionados:
+                    supabase.table("mercado_transferencias").delete().eq("id", id_jogador).execute()
+                st.success("✅ Jogadores excluídos com sucesso!")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao excluir múltiplos jogadores: {e}")
+    else:
+        st.info("Selecione jogadores acima para habilitar a exclusão.")
+
+# 🔁 Navegação
 col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("⬅ Página anterior") and pagina_atual > 1:
@@ -152,6 +199,5 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
-
 
 
