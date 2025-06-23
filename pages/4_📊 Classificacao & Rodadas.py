@@ -31,13 +31,13 @@ temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-# 🔄 Buscar rodadas da tabela unificada "rodadas"
+# 🔄 Buscar rodadas
+@st.cache_data(ttl=60)
 def buscar_resultados():
     try:
         res = supabase.table("rodadas").select("*").eq("divisao", numero_divisao).eq("temporada", numero_temporada).order("numero").execute()
         return res.data if res.data else []
-    except Exception as e:
-        st.error(f"Erro ao buscar rodadas: {e}")
+    except:
         return []
 
 # 👥 Buscar nomes e logos dos times
@@ -56,8 +56,7 @@ def obter_nomes_times():
                 "tecnico": t.get("tecnico", "")
             } for t in res.data
         }
-    except Exception as e:
-        st.error(f"Erro ao buscar nomes dos times: {e}")
+    except:
         return {}
 
 # 🧠 Calcular classificação
@@ -72,7 +71,6 @@ def calcular_classificacao(rodadas, times_map):
             try: gm, gv = int(gm), int(gv)
             except: continue
 
-            # 💸 Descontar salários dos dois times (1x por jogo confirmado)
             for time_id in [m, v]:
                 elenco = supabase.table("elenco").select("salario", "valor").eq("time_id", time_id).execute().data
                 total_salario = sum(j.get("salario", int(j.get("valor", 0)*0.01)) for j in elenco)
@@ -118,8 +116,8 @@ def calcular_classificacao(rodadas, times_map):
         for tid in tabela:
             if tid in puni_map:
                 tabela[tid]["pontos"] -= puni_map[tid]
-    except Exception as e:
-        st.error(f"Erro ao aplicar punições: {e}")
+    except:
+        pass
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
@@ -128,7 +126,7 @@ rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Exibe classificação
+# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -173,8 +171,8 @@ for rodada in rodadas:
         gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        m_logo = m.get("logo", "")
+        v_logo = v.get("logo", "")
         m_nome = m.get("nome", "Desconhecido")
         v_nome = v.get("nome", "Desconhecido")
 
@@ -202,4 +200,5 @@ if eh_admin:
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
+
 
