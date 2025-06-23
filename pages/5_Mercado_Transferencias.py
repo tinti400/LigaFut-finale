@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao, registrar_bid
+from utils import registrar_movimentacao
 
 st.set_page_config(page_title="💼 Mercado de Transferências - LigaFut", layout="wide")
 
@@ -17,7 +17,7 @@ supabase = create_client(url, key)
 
 # 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
-id_time = str(st.session_state["id_time"])
+id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
@@ -43,8 +43,8 @@ if not mercado_aberto:
     st.stop()
 
 # 💰 Saldo do time
-res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-saldo_time = float(res_saldo.data[0]["saldo"]) if res_saldo.data else 0
+res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
+saldo_time = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 st.markdown(f"### 💰 Saldo atual: **R$ {saldo_time:,.0f}**".replace(",", "."))
 
 # 🔍 Filtros
@@ -122,50 +122,32 @@ for jogador in jogadores_pagina:
                 if not check.data:
                     st.error("❌ Este jogador já foi comprado.")
                     st.experimental_rerun()
-                elif saldo_time < float(jogador["valor"]):
+                elif saldo_time < jogador["valor"]:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
-                        valor_compra = float(jogador["valor"])
-                        salario_final = int(float(jogador.get("salario") or valor_compra * 0.01))
+                        valor = int(jogador["valor"])
+                        salario = int(jogador.get("salario", valor * 0.01))
 
-                        # Adiciona ao elenco
                         supabase.table("elenco").insert({
                             "nome": jogador["nome"],
                             "posicao": jogador["posicao"],
                             "overall": jogador["overall"],
-                            "valor": valor_compra,
+                            "valor": valor,
+                            "salario": salario,
                             "id_time": id_time,
                             "nacionalidade": jogador.get("nacionalidade"),
                             "foto": jogador.get("foto"),
-                            "origem": jogador.get("origem", jogador.get("time_origem", "")),
-                            "salario": salario_final
+                            "origem": jogador.get("origem", jogador.get("time_origem", ""))
                         }).execute()
 
-                        # Remove do mercado
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
 
-                        # Atualiza saldo
-                        novo_saldo = saldo_time - valor_compra
-                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                        # Registra movimentação
                         registrar_movimentacao(
                             id_time=id_time,
                             tipo="saida",
-                            valor=valor_compra,
+                            valor=valor,
                             descricao=f"Compra de {jogador['nome']} no mercado"
-                        )
-
-                        # Registra no BID
-                        registrar_bid(
-                            id_time=id_time,
-                            tipo="compra",
-                            categoria="mercado",
-                            jogador=jogador["nome"],
-                            valor=-valor_compra,
-                            origem=jogador.get("time_origem", "Desconhecido"),
-                            destino=nome_time
                         )
 
                         st.success(f"{jogador['nome']} comprado com sucesso!")
@@ -178,7 +160,7 @@ for jogador in jogadores_pagina:
         if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
             selecionados.add(jogador["id"])
 
-# 🛠️ Ações administrativas
+# 🛠️ Ações administrativas (excluir múltiplos)
 if is_admin:
     st.markdown("---")
     st.markdown("### 🩵 Ações em massa (admin)")
