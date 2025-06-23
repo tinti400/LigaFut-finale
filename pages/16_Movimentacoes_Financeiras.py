@@ -88,8 +88,11 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 colunas_exibir = [
     "📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"
 ]
-
 df_exibir = df[colunas_exibir].copy()
+
+# 🔧 Força todas as colunas como string para evitar erro
+for col in df_exibir.columns:
+    df_exibir[col] = df_exibir[col].astype(str)
 
 # 🔍 Debug
 st.subheader("🔍 Debug do DataFrame")
@@ -98,11 +101,12 @@ st.write("Tipos de dados:", df_exibir.dtypes)
 st.write("Amostra dos dados:")
 st.write(df_exibir.head())
 
-# 📋 Exibir tabela formatada
+# 📋 Exibir
 try:
     st.subheader(f"💼 Extrato do time **{nome_time}**")
     st.dataframe(df_exibir, use_container_width=True)
 except Exception as e:
     st.error(f"Erro ao exibir DataFrame formatado: {e}")
+
 
 
