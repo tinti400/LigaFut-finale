@@ -127,8 +127,8 @@ for jogador in jogadores_pagina:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
-                        valor = int(jogador["valor"])
-                        salario = int(jogador.get("salario", valor * 0.01))
+                        valor = int(float(jogador["valor"]))
+                        salario = int(float(jogador.get("salario", valor * 0.01)))
 
                         supabase.table("elenco").insert({
                             "nome": jogador["nome"],
@@ -159,7 +159,8 @@ for jogador in jogadores_pagina:
                             "id_time": id_time,
                             "tipo": "compra_mercado",
                             "valor": valor,
-                            "data": datetime.now().isoformat()
+                            "data": datetime.now().isoformat(),
+                            "origem": jogador.get("origem", jogador.get("time_origem", "Desconhecido"))
                         }).execute()
 
                         st.success(f"{jogador['nome']} comprado com sucesso!")
@@ -199,5 +200,6 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
+
 
 
