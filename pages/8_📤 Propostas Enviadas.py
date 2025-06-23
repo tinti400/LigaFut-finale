@@ -46,13 +46,18 @@ else:
                 st.write(f"💰 **Valor do Jogador:** R$ {proposta.get('jogador_valor', 0):,.0f}".replace(",", ".")}")
                 st.write(f"🏟️ **Clube Alvo:** {proposta.get('nome_time_destino', 'Desconhecido')}")
                 st.write(f"📦 **Valor Oferecido:** R$ {proposta.get('valor_oferecido', 0):,.0f}".replace(",", "."))                
-                st.write(f"📅 **Data da Proposta:** {proposta.get('data', '')[:10]}")
+                data_proposta = proposta.get("data")
+                if data_proposta:
+                    data_formatada = datetime.strptime(data_proposta[:19], "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y %H:%M")
+                    st.write(f"📅 **Data da Proposta:** {data_formatada}")
                 st.write(f"📌 **Status:** `{proposta.get('status', 'pendente').capitalize()}`")
 
             jogadores_oferecidos = proposta.get("jogadores_oferecidos", [])
             if jogadores_oferecidos:
                 st.markdown("**🔁 Jogadores Oferecidos em Troca:**")
                 for j in jogadores_oferecidos:
-                    st.write(f"- {j['nome']} (OVR {j['overall']}) - {j['posicao']}")
-
+                    nome = j.get("nome", "Desconhecido")
+                    overall = j.get("overall", "-")
+                    posicao = j.get("posicao", "Posição")
+                    st.write(f"- {nome} (OVR {overall}) - {posicao}")
 
