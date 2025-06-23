@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao, registrar_bid  # ✅ IMPORTA AS DUAS FUNÇÕES
+from utils import registrar_movimentacao, registrar_bid
 
 st.set_page_config(page_title="👥 Elenco - LigaFut", layout="wide")
 
@@ -42,7 +42,7 @@ jogadores = res.data if res.data else []
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 salario_total = sum(
-    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * 0.01)
+    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * 0.007)
     for j in jogadores
 )
 
@@ -105,7 +105,7 @@ for jogador in jogadores_filtrados:
 
     with col6:
         valor = jogador.get("valor", 0)
-        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * 0.01)
+        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * 0.007)
         origem = jogador.get("origem", "Desconhecida")
         st.markdown(
             f"""
@@ -121,19 +121,14 @@ for jogador in jogadores_filtrados:
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # 🔢 Cálculo do valor da venda
                 valor_venda = round(jogador["valor"] * 0.7)
-
-                # 💰 Atualiza saldo do time
                 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
                 saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
                 novo_saldo = saldo_atual + valor_venda
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                # ❌ Remove do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # 📥 Insere no mercado de transferências
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -145,10 +140,9 @@ for jogador in jogadores_filtrados:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": jogador.get("origem", "Desconhecida"),
                     "classificacao": jogador.get("classificacao", ""),
-                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
+                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.007)
                 }).execute()
 
-                # 🧾 Registra movimentação financeira
                 registrar_movimentacao(
                     id_time=id_time,
                     tipo="entrada",
@@ -156,7 +150,6 @@ for jogador in jogadores_filtrados:
                     descricao=f"Venda de {jogador['nome']} para o mercado"
                 )
 
-                # 📈 Registra no BID
                 registrar_bid(
                     id_time=id_time,
                     tipo="venda",
