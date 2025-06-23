@@ -24,9 +24,6 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 is_admin = len(res_admin.data) > 0
 
-# 💰 Percentual de salário
-PERCENTUAL_SALARIO = 0.007
-
 # 🧾 Título e separador
 st.markdown(f"""
     <h1 style='text-align:center;'>👥 Elenco do {nome_time}</h1>
@@ -45,7 +42,7 @@ jogadores = res.data if res.data else []
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 salario_total = sum(
-    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * PERCENTUAL_SALARIO)
+    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * 0.007)
     for j in jogadores
 )
 
@@ -108,7 +105,7 @@ for jogador in jogadores_filtrados:
 
     with col6:
         valor = jogador.get("valor", 0)
-        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * PERCENTUAL_SALARIO)
+        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * 0.007)
         origem = jogador.get("origem", "Desconhecida")
         st.markdown(
             f"""
@@ -143,7 +140,7 @@ for jogador in jogadores_filtrados:
                     "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
                     "origem": jogador.get("origem", "Desconhecida"),
                     "classificacao": jogador.get("classificacao", ""),
-                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * PERCENTUAL_SALARIO)
+                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.007)
                 }).execute()
 
                 registrar_movimentacao(
