@@ -1,25 +1,34 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime, timedelta
-from utils import registrar_bid, verificar_sessao
+from utils import registrar_movimentacao
 
-st.set_page_config(page_title="📢 Leilão do Sistema", layout="wide")
-st.title("📢 Leilão do Sistema")
+st.set_page_config(page_title="Leilões Ativos - LigaFut", layout="wide")
 
-# 🔐 Conexão Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão
-verificar_sessao()
-id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+id_time_usuario = st.session_state["id_time"]
+nome_time_usuario = st.session_state.get("nome_time", "")
 
 # 🔒 Verifica restrições
-res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
-restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+restricoes = {}
+try:
+    res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time_usuario).execute()
+    if res_restricoes.data and isinstance(res_restricoes.data[0].get("restricoes"), dict):
+        restricoes = res_restricoes.data[0]["restricoes"]
+except Exception as e:
+    st.warning("Não foi possível verificar restrições do seu time.")
+    restricoes = {}
+
 if restricoes.get("leilao", False):
     st.error("🚫 Seu time está proibido de participar de leilões.")
     st.stop()
@@ -71,7 +80,7 @@ for leilao in leiloes:
             if time_res.data:
                 st.info(f"🏷️ Último Lance: {time_res.data[0]['nome']}")
 
-    # ⏹️ Finalizar leilão se tempo acabar
+    # ⏹️ Finalizar leilão se tempo acabar (vai para validação manual)
     if tempo_restante == 0:
         leilao_ref = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
         dados = leilao_ref.data[0] if leilao_ref.data else {}
@@ -80,39 +89,6 @@ for leilao in leiloes:
                 "ativo": False,
                 "aguardando_validacao": True
             }).eq("id", leilao["id"]).execute()
-
-            # Enviar para admin validar
-            jogador_info = {
-                "nome": leilao["nome_jogador"],
-                "posicao": leilao["posicao_jogador"],
-                "overall": leilao.get("overall_jogador"),
-                "valor": leilao["valor_atual"],
-                "id_time": leilao["id_time_atual"],
-                "imagem_url": leilao.get("imagem_url"),
-                "nacionalidade": leilao.get("nacionalidade"),
-                "origem": "Leilão Sistema"
-            }
-
-            supabase.table("pendente_leiloes").insert({
-                "id_time": leilao["id_time_atual"],
-                "nome_time": leilao["time_vencedor"],
-                "jogador": leilao["nome_jogador"],
-                "valor": leilao["valor_atual"],
-                "dados_jogador": jogador_info,
-                "status": "pendente",
-                "data": datetime.now().isoformat()
-            }).execute()
-
-            registrar_bid(
-                id_time=leilao["id_time_atual"],
-                tipo="compra",
-                categoria="leilao",
-                jogador=leilao["nome_jogador"],
-                valor=leilao["valor_atual"],
-                origem="Leilão Sistema",
-                destino=leilao["time_vencedor"]
-            )
-
             st.success("✅ Leilão finalizado! Aguardando validação do administrador.")
         continue
 
@@ -125,7 +101,7 @@ for leilao in leiloes:
         novo_lance = valor_atual + aumento
         with colunas[i % 5]:
             if st.button(f"➕ R$ {novo_lance:,.0f}".replace(",", "."), key=f"lance_{leilao['id']}_{i}"):
-                saldo_res = supabase.table("times").select("saldo").eq("id", id_time).execute()
+                saldo_res = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
                 saldo = saldo_res.data[0]["saldo"]
                 if novo_lance > saldo:
                     st.error("❌ Saldo insuficiente.")
@@ -138,15 +114,16 @@ for leilao in leiloes:
                     # Atualizar leilão
                     supabase.table("leiloes").update({
                         "valor_atual": novo_lance,
-                        "id_time_atual": id_time,
-                        "time_vencedor": nome_time,
+                        "id_time_atual": id_time_usuario,
+                        "time_vencedor": nome_time_usuario,
                         "fim": fim_dt.isoformat()
                     }).eq("id", leilao["id"]).execute()
 
                     st.success("✅ Lance enviado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
 
 # 🔁 Atualizar manualmente
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
-    st.experimental_rerun()
+    st.rerun()
+
