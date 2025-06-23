@@ -103,17 +103,14 @@ else:
 
                             # 💰 Atualiza saldos
                             if proposta["valor_oferecido"] > 0:
-                                # Comprador perde dinheiro
                                 saldo_comp = supabase.table("times").select("saldo").eq("id", proposta["id_time_origem"]).execute().data[0]["saldo"]
                                 novo_saldo_comp = saldo_comp - proposta["valor_oferecido"]
                                 supabase.table("times").update({"saldo": novo_saldo_comp}).eq("id", proposta["id_time_origem"]).execute()
 
-                                # Vendedor ganha dinheiro
                                 saldo_vend = supabase.table("times").select("saldo").eq("id", proposta["id_time_alvo"]).execute().data[0]["saldo"]
                                 novo_saldo_vend = saldo_vend + proposta["valor_oferecido"]
                                 supabase.table("times").update({"saldo": novo_saldo_vend}).eq("id", proposta["id_time_alvo"]).execute()
 
-                                # 💾 Registrar movimentações financeiras
                                 registrar_movimentacao(proposta["id_time_origem"], "saida", proposta["valor_oferecido"], f"Compra de {proposta['jogador_nome']}")
                                 registrar_movimentacao(proposta["id_time_alvo"], "entrada", proposta["valor_oferecido"], f"Venda de {proposta['jogador_nome']}")
 
@@ -158,11 +155,10 @@ else:
                                     destino=nome_time
                                 )
 
-                            # Atualiza status da proposta
                             supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
 
                             st.success("✅ Proposta aceita com sucesso!")
-                            st.rerun()
+                            st.experimental_rerun()
 
                         except Exception as e:
                             st.error(f"Erro ao aceitar proposta: {e}")
@@ -172,7 +168,7 @@ else:
                         try:
                             supabase.table("propostas").update({"status": "recusada"}).eq("id", proposta["id"]).execute()
                             st.info("Proposta recusada.")
-                            st.rerun()
+                            st.experimental_rerun()
                         except Exception as e:
                             st.error(f"Erro ao recusar proposta: {e}")
 
@@ -180,3 +176,4 @@ else:
                 st.success("✅ Proposta aceita.")
             elif status == "recusada":
                 st.error("❌ Proposta recusada.")
+
