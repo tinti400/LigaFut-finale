@@ -101,7 +101,7 @@ for jogador in jogadores_filtrados:
         )
         if nova_classificacao.lower() != classificacao_atual:
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
-            st.rerun()
+            st.experimental_rerun()
 
     with col6:
         valor = jogador.get("valor", 0)
@@ -121,10 +121,19 @@ for jogador in jogadores_filtrados:
     with col7:
         if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
             try:
-                # Remove do elenco
+                # 🔢 Cálculo do valor da venda
+                valor_venda = round(jogador["valor"] * 0.7)
+
+                # 💰 Atualiza saldo do time
+                res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+                saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+                novo_saldo = saldo_atual + valor_venda
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                # ❌ Remove do elenco
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                # Insere no mercado de transferências
+                # 📥 Insere no mercado de transferências
                 supabase.table("mercado_transferencias").insert({
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
@@ -139,15 +148,16 @@ for jogador in jogadores_filtrados:
                     "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.01)
                 }).execute()
 
-                # Registra movimentação
+                # 🧾 Registra movimentação financeira
                 registrar_movimentacao(
                     id_time=id_time,
                     tipo="entrada",
-                    valor=round(jogador["valor"] * 0.7),
+                    valor=valor_venda,
                     descricao=f"Venda de {jogador['nome']} para o mercado"
                 )
 
                 st.success(f"{jogador['nome']} foi vendido com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
+
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
