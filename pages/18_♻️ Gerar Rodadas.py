@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+import itertools
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -21,22 +22,21 @@ try:
     admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).execute()
     eh_admin = len(admin_ref.data) > 0
     if not eh_admin:
-        st.warning("🔐 Acesso permitido apenas para administradores.")
+        st.warning("🔒 Acesso permitido apenas para administradores.")
         st.stop()
 except Exception as e:
     st.error(f"Erro ao verificar administrador: {e}")
     st.stop()
 
-# 🔽️ Seleção da divisão e temporada
+# 🔽 Seleção da divisão e temporada
 col1, col2 = st.columns(2)
 opcao_divisao = col1.selectbox("Selecione a Divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 opcao_temporada = col2.selectbox("Selecione a Temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
 
-numero_divisao = opcao_divisao.split()[-1]
-numero_temporada = opcao_temporada.split()[-1]
-nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+numero_divisao = int(opcao_divisao.split()[-1])
+numero_temporada = int(opcao_temporada.split()[-1])
 
-# 🗓️ Buscar times pela divisão
+# 📅 Buscar times pela divisão
 try:
     usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", opcao_divisao).execute().data
     time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
@@ -50,12 +50,13 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
         st.warning("🚨 É necessário no mínimo 2 times para gerar rodadas.")
         st.stop()
 
-    # 🔄 Apagar rodadas anteriores (usando nome correto da tabela)
+    # 🔄 Apagar rodadas anteriores da temporada e divisão
     try:
-        dados_antigos = supabase.table(nome_tabela_rodadas).select("id").execute().data
-        for doc in dados_antigos:
-            supabase.table(nome_tabela_rodadas).delete().eq("id", doc["id"]).execute()
-        st.success("Rodadas antigas removidas com sucesso.")
+        supabase.table("rodadas")\
+            .delete()\
+            .eq("temporada", numero_temporada)\
+            .eq("divisao", numero_divisao)\
+            .execute()
     except Exception as e:
         st.error(f"Erro ao apagar rodadas antigas: {e}")
         st.stop()
@@ -63,7 +64,7 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
     # ✅ Algoritmo Round-Robin (Turno e Returno)
     def gerar_rodadas_round_robin(time_ids):
         if len(time_ids) % 2 != 0:
-            time_ids.append("folga")  # para número ímpar
+            time_ids.append("folga")
 
         n = len(time_ids)
         metade = n // 2
@@ -85,7 +86,6 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
             rodadas_turno.append(jogos)
             lista = [lista[0]] + [lista[-1]] + lista[1:-1]
 
-        # Returno: inverte mandos
         rodadas_returno = []
         for jogos in rodadas_turno:
             jogos_volta = []
@@ -100,14 +100,32 @@ if st.button(f"⚙️ Gerar Rodadas da {opcao_divisao} - {opcao_temporada}"):
 
         return rodadas_turno + rodadas_returno
 
-    # ⚽ Gera as rodadas
+    # ⚽ Gera as rodadas completas
     rodadas = gerar_rodadas_round_robin(time_ids)
 
-    # 📆 Salvar rodadas
+    # 💾 Salvar rodadas no Supabase
     try:
         for i, jogos in enumerate(rodadas, 1):
-            supabase.table(nome_tabela_rodadas).insert({"numero": i, "jogos": jogos}).execute()
+            supabase.table("rodadas").insert({
+                "temporada": numero_temporada,
+                "divisao": numero_divisao,
+                "numero": i,
+                "jogos": jogos
+            }).execute()
         st.success(f"✅ {len(rodadas)} rodadas geradas com sucesso para {opcao_divisao} - {opcao_temporada}!")
     except Exception as e:
         st.error(f"Erro ao salvar rodadas: {e}")
+
+    # 🧹 Limpa punições (exceto temporada 1)
+    if numero_temporada != 1:
+        try:
+            for time_id in time_ids:
+                supabase.table("times").update({
+                    "restricoes": [],
+                    "pontuacao_negativa": 0
+                }).eq("id", time_id).execute()
+            st.info("🧹 Restrições e punições zeradas para a nova temporada!")
+        except Exception as e:
+            st.error(f"Erro ao limpar punições: {e}")
+
 
