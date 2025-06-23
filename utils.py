@@ -16,22 +16,22 @@ def verificar_sessao():
         st.warning("Você precisa estar logado para acessar esta página.")
         st.stop()
 
-# 💰 Registrar movimentação financeira (controle de saldo)
-def registrar_movimentacao(id_time, tipo, valor, descricao):
+# 💰 Registrar movimentação financeira (controle interno)
+def registrar_movimentacao_financeira(id_time, tipo, valor, descricao):
     """
-    Registra uma movimentação financeira na tabela 'movimentacoes_financeiras'.
+    Registra uma movimentação na tabela 'movimentacoes_financeiras'.
 
-    :param id_time: ID do time responsável
+    :param id_time: ID do time
     :param tipo: 'entrada' ou 'saida'
-    :param valor: valor numérico da movimentação
-    :param descricao: descrição da movimentação
+    :param valor: valor numérico (float ou int)
+    :param descricao: descrição da transação
     """
     try:
         nova = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
             "tipo": tipo,
-            "valor": valor,
+            "valor": float(valor),
             "descricao": descricao,
             "data": datetime.now().isoformat()
         }
@@ -39,31 +39,36 @@ def registrar_movimentacao(id_time, tipo, valor, descricao):
     except Exception as e:
         st.error(f"Erro ao registrar movimentação financeira: {e}")
 
-# 📈 Registrar movimentação pública no BID
-def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino=""):
+# 📋 Registrar no BID (log completo de transferências e negociações)
+def registrar_movimentacao(id_time, tipo, valor, descricao, categoria="mercado", jogador=None, origem=None, destino=None):
     """
-    Registra uma movimentação para exibição pública no BID (tabela 'movimentacoes').
+    Registra uma movimentação visível no BID (tabela 'movimentacoes').
 
-    :param id_time: ID do time responsável
-    :param tipo: 'compra' ou 'venda'
-    :param categoria: 'mercado', 'leilao', 'proposta', etc.
-    :param jogador: nome do jogador
-    :param valor: valor da movimentação (positivo para entrada, negativo para saída)
-    :param origem: nome do time de origem (opcional)
-    :param destino: nome do time de destino (opcional)
+    :param id_time: ID do time que realizou a ação
+    :param tipo: 'compra', 'venda', 'leilão', etc.
+    :param valor: valor numérico da transação
+    :param descricao: descrição da movimentação
+    :param categoria: tipo de evento (ex: 'mercado', 'leilao', 'proposta')
+    :param jogador: nome do jogador envolvido
+    :param origem: nome do time de origem
+    :param destino: nome do time de destino
     """
     try:
-        registro = {
+        mov = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
             "tipo": tipo,
+            "valor": float(valor),
+            "descricao": descricao,
             "categoria": categoria,
             "jogador": jogador,
-            "valor": valor,
-            "data": datetime.now().isoformat(),
             "origem": origem,
-            "destino": destino
+            "destino": destino,
+            "data": datetime.now().isoformat()
         }
-        supabase.table("movimentacoes").insert(registro).execute()
+        supabase.table("movimentacoes").insert(mov).execute()
     except Exception as e:
         st.error(f"Erro ao registrar no BID: {e}")
+
+
+
