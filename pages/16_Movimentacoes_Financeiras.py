@@ -97,7 +97,8 @@ for col in df_exibir.columns:
 # 🔍 Debug
 st.subheader("🔍 Debug do DataFrame")
 st.write("Colunas:", df_exibir.columns.tolist())
-st.write("Tipos de dados:", df_exibir.dtypes)
+st.text("Tipos de dados:")
+st.text(df_exibir.dtypes.to_string())
 st.write("Amostra dos dados:")
 st.write(df_exibir.head())
 
@@ -107,6 +108,7 @@ try:
     st.dataframe(df_exibir, use_container_width=True)
 except Exception as e:
     st.error(f"Erro ao exibir DataFrame formatado: {e}")
+
 
 
 
