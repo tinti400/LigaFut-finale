@@ -20,9 +20,9 @@ nome_time = st.session_state.get("nome_time", "Seu Time")
 
 # 📥 Buscar saldo atual
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
-saldo_atual = res_saldo.data["saldo"]
+saldo_atual = res_saldo.data.get("saldo", 0)
 
-# 📥 Buscar movimentações financeiras (ordem decrescente)
+# 📥 Buscar movimentações
 res_mov = supabase.table("movimentacoes_financeiras")\
     .select("*")\
     .eq("id_time", id_time)\
@@ -36,34 +36,44 @@ if not movs:
 
 # 📊 Criar DataFrame e converter datas
 df = pd.DataFrame(movs)
-df["data"] = pd.to_datetime(df["data"])
+df["data"] = pd.to_datetime(df["data"], errors="coerce")
+df = df.dropna(subset=["data"])
 df = df.sort_values("data", ascending=False)
 
-# 🔄 Calcular saldo anterior e saldo atual linha a linha
+# 🛡️ Garante colunas básicas
+if "valor" not in df.columns:
+    df["valor"] = 0
+if "tipo" not in df.columns:
+    df["tipo"] = "saida"
+if "descricao" not in df.columns:
+    df["descricao"] = "Sem descrição"
+
+# 🔁 Calcular caixa anterior e atual linha a linha
 saldos_atuais = []
 saldos_anteriores = []
 saldo = saldo_atual
 
 for _, row in df.iterrows():
-    valor = row["valor"]
-    if row["tipo"] == "entrada":
+    valor = float(row.get("valor", 0))
+    tipo = row.get("tipo", "saida")
+
+    if tipo == "entrada":
         saldo_anterior = saldo - valor
-    else:  # saída
+    else:
         saldo_anterior = saldo + valor
 
     saldos_anteriores.append(saldo_anterior)
     saldos_atuais.append(saldo)
+    saldo = saldo_anterior  # atualiza para a próxima linha
 
-    saldo = saldo_anterior  # para a próxima linha
-
-# 🧮 Adicionar colunas de saldo
+# 🧮 Adicionar colunas ao DataFrame
 df["caixa_atual"] = saldos_atuais
 df["caixa_anterior"] = saldos_anteriores
 
 # 🎨 Formatar valores
 def formatar_valor(v):
     try:
-        return f"R${v:,.0f}".replace(",", ".")
+        return f"R${float(v):,.0f}".replace(",", ".")
     except:
         return "-"
 
@@ -74,11 +84,14 @@ df["📅 Data"] = df["data"].dt.strftime("%d/%m/%Y %H:%M")
 df["📌 Tipo"] = df["tipo"].str.capitalize()
 df["📝 Descrição"] = df["descricao"]
 
-# 🔽 Selecionar colunas finais
-df_exibir = df[[
+# 🧾 Selecionar colunas finais com segurança
+colunas_exibir = [
     "📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"
-]]
+]
+
+df_exibir = df[colunas_exibir].copy()
 
 # 📋 Exibir
 st.markdown(f"### 💼 Extrato do time **{nome_time}**")
 st.dataframe(df_exibir, use_container_width=True)
+
