@@ -28,14 +28,14 @@ def buscar_data_mais_recente():
         return res.data[0]["data_criacao"]
     return None
 
-# 🔄 Buscar fase
+# 🔄 Buscar jogos por fase
 def buscar_fase(fase, data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("data_criacao", data).execute()
     return res.data if res.data else []
 
-# 🔄 Buscar fase de grupos
-def buscar_grupos(data):
-    res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data).execute()
+# 🔄 Buscar fase de grupos (sem filtrar por data)
+def buscar_grupos_todos():
+    res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").execute()
     return res.data if res.data else []
 
 # 🎨 Card visual dos jogos
@@ -114,7 +114,7 @@ def exibir_fase_mata(nome, dados, col):
 # 🔁 Coleta de dados
 times = buscar_times()
 data_atual = buscar_data_mais_recente()
-grupos = buscar_grupos(data_atual)
+grupos = buscar_grupos_todos()
 oitavas = buscar_fase("oitavas", data_atual)
 quartas = buscar_fase("quartas", data_atual)
 semis = buscar_fase("semifinal", data_atual)
@@ -170,21 +170,12 @@ if st.button("🔄 Avançar para o Mata-Mata (Sorteio)"):
     for i in range(0, 16, 2):
         time_a = classificados[i]
         time_b = classificados[i + 1]
-
-        jogo_ida = {
-            "mandante": time_a,
-            "visitante": time_b,
-            "gols_mandante": None,
-            "gols_visitante": None
-        }
-        jogo_volta = {
-            "mandante": time_b,
-            "visitante": time_a,
-            "gols_mandante": None,
-            "gols_visitante": None
-        }
-
-        confrontos.extend([jogo_ida, jogo_volta])
+        if time_a == time_b:
+            continue
+        confrontos.extend([
+            {"mandante": time_a, "visitante": time_b, "gols_mandante": None, "gols_visitante": None},
+            {"mandante": time_b, "visitante": time_a, "gols_mandante": None, "gols_visitante": None}
+        ])
 
     supabase.table("copa_ligafut").insert({
         "fase": "oitavas",
@@ -227,9 +218,11 @@ def avancar_fase(fase_atual, proxima_fase):
     random.shuffle(classificados)
     for i in range(0, len(classificados), 2):
         a, b = classificados[i], classificados[i+1]
+        if a == b:
+            continue
         jogos_novos.extend([
             {"mandante": a, "visitante": b, "gols_mandante": None, "gols_visitante": None},
-            {"mandante": b, "visitante": a, "gols_mandante": None, "gols_visitante": None},
+            {"mandante": b, "visitante": a, "gols_mandante": None, "gols_visitante": None}
         ])
 
     supabase.table("copa_ligafut").insert({
