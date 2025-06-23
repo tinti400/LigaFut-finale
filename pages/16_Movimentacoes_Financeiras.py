@@ -114,15 +114,9 @@ df_exibir = df[colunas].copy()
 if limite:
     df_exibir = df_exibir.head(limite)
 
-# Força todas como string
-for col in df_exibir.columns:
-    df_exibir[col] = df_exibir[col].astype(str)
+# ✅ Força o DataFrame inteiro como string para evitar qualquer erro
+df_exibir = df_exibir.astype(str)
 
 # 📋 Exibe
 st.subheader(f"💼 Extrato do time **{nome_time}**")
 st.dataframe(df_exibir, use_container_width=True)
-
-
-
-
-
