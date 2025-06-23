@@ -24,33 +24,29 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção de divisão e temporada
+# 🔹 Seleção da divisão e temporada
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
-numero_divisao = int(divisao.split()[-1])
-numero_temporada = int(temporada.split()[-1])
+numero_divisao = divisao.split()[-1]
+numero_temporada = temporada.split()[-1]
+nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
 
-# 🔄 Buscar rodadas da nova tabela unificada
-@st.cache_data(ttl=60)
-def buscar_rodadas():
+# 🔄 Buscar rodadas
+@st.cache(ttl=60)
+def buscar_resultados():
     try:
-        res = supabase.table("rodadas")\
-            .select("*")\
-            .eq("divisao", numero_divisao)\
-            .eq("temporada", numero_temporada)\
-            .order("numero")\
-            .execute()
-        return res.data or []
+        res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
+        return res.data if res.data else []
     except Exception as e:
         st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
 # 👥 Buscar nomes e logos dos times
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def obter_nomes_times():
     try:
-        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {numero_divisao}").execute().data
+        usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
         time_ids = list({u["time_id"] for u in usuarios if u.get("time_id")})
         if not time_ids:
             return {}
@@ -77,6 +73,17 @@ def calcular_classificacao(rodadas, times_map):
             if None in [m, v, gm, gv]: continue
             try: gm, gv = int(gm), int(gv)
             except: continue
+
+            # 💸 Descontar salários dos dois times (1x por jogo confirmado)
+            for time_id in [m, v]:
+                elenco = supabase.table("elenco").select("salario", "valor").eq("time_id", time_id).execute().data
+                total_salario = sum(j.get("salario", int(j.get("valor", 0)*0.01)) for j in elenco)
+
+                res_saldo = supabase.table("times").select("saldo").eq("id", time_id).execute()
+                saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+                novo_saldo = saldo_atual - total_salario
+                supabase.table("times").update({"saldo": novo_saldo}).eq("id", time_id).execute()
+                registrar_movimentacao(supabase, time_id, -total_salario, "Pagamento de salários")
 
             for t in (m, v):
                 if t not in tabela:
@@ -107,14 +114,23 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
 
+    try:
+        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
+        puni_map = {p["id_time"]: p["pontos_retirados"] for p in res_punicoes.data}
+        for tid in tabela:
+            if tid in puni_map:
+                tabela[tid]["pontos"] -= puni_map[tid]
+    except Exception as e:
+        st.error(f"Erro ao aplicar punições: {e}")
+
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🔄 Carregar dados
-rodadas = buscar_rodadas()
+# 🔄 Dados
+rodadas = buscar_resultados()
 times_map = obter_nomes_times()
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Exibir classificação
+# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -140,14 +156,14 @@ if classificacao:
 
     st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
 else:
-    st.info("Nenhuma classificação disponível.")
+    st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Visualização da rodada
+# 📅 Filtro de rodada
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
-rodada_selecionada = st.selectbox("Rodada", rodadas_disponiveis)
+rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
 
 for rodada in rodadas:
     if rodada["numero"] != rodada_selecionada:
@@ -159,8 +175,8 @@ for rodada in rodadas:
         gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-        m_logo = m.get("logo", "")
-        v_logo = v.get("logo", "")
+        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
+        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
         m_nome = m.get("nome", "Desconhecido")
         v_nome = v.get("nome", "Desconhecido")
 
@@ -175,3 +191,16 @@ for rodada in rodadas:
             st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
             st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+
+# 🧹 Admin: resetar rodadas
+if eh_admin:
+    st.markdown("---")
+    if st.button("🧹 Resetar Rodadas"):
+        try:
+            docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
+            for d in docs:
+                supabase.table(nome_tabela_rodadas).delete().eq("id", d["id"]).execute()
+            st.success("Rodadas apagadas com sucesso.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro: {e}")
