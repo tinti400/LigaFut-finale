@@ -1,4 +1,4 @@
-## -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -65,33 +65,34 @@ else:
 
                             supabase.table("elenco").insert({"id_time": proposta["id_time_origem"], **jogador}).execute()
 
-                            # 💰 Atualiza saldo do time vendedor
-                            res_saldo = supabase.table("times").select("saldo").eq("id", proposta["id_time_alvo"]).execute()
-                            saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-                            novo_saldo = saldo_atual + proposta["valor_oferecido"]
-                            supabase.table("times").update({"saldo": novo_saldo}).eq("id", proposta["id_time_alvo"]).execute()
-
-                            # 💰 Atualiza saldo do time comprador
-                            res_saldo2 = supabase.table("times").select("saldo").eq("id", proposta["id_time_origem"]).execute()
-                            saldo_atual2 = res_saldo2.data[0]["saldo"] if res_saldo2.data else 0
-                            novo_saldo2 = saldo_atual2 - proposta["valor_oferecido"]
-                            supabase.table("times").update({"saldo": novo_saldo2}).eq("id", proposta["id_time_origem"]).execute()
-
                             # 🧹 Remover jogador do elenco original
                             supabase.table("elenco").delete().match({
                                 "id_time": proposta["id_time_alvo"],
                                 "nome": proposta["jogador_nome"]
                             }).execute()
 
+                            # 💰 Atualiza saldo do time COMPRADOR (desconta)
+                            res_saldo_comp = supabase.table("times").select("saldo").eq("id", proposta["id_time_origem"]).execute()
+                            saldo_comp = res_saldo_comp.data[0]["saldo"] if res_saldo_comp.data else 0
+                            novo_saldo_comp = saldo_comp - proposta["valor_oferecido"]
+                            supabase.table("times").update({"saldo": novo_saldo_comp}).eq("id", proposta["id_time_origem"]).execute()
+
+                            # 💰 Atualiza saldo do time VENDEDOR (recebe)
+                            res_saldo_vend = supabase.table("times").select("saldo").eq("id", proposta["id_time_alvo"]).execute()
+                            saldo_vend = res_saldo_vend.data[0]["saldo"] if res_saldo_vend.data else 0
+                            novo_saldo_vend = saldo_vend + proposta["valor_oferecido"]
+                            supabase.table("times").update({"saldo": novo_saldo_vend}).eq("id", proposta["id_time_alvo"]).execute()
+
                             # 🔁 Atualiza status da proposta
                             supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
 
-                            # 💾 Registrar movimentação
+                            # 💾 Registrar movimentações
                             registrar_movimentacao(proposta["id_time_origem"], "saida", proposta["valor_oferecido"], f"Compra de {proposta['jogador_nome']}")
                             registrar_movimentacao(proposta["id_time_alvo"], "entrada", proposta["valor_oferecido"], f"Venda de {proposta['jogador_nome']}")
 
-                            st.success("Proposta aceita com sucesso!")
-                            st.experimental_rerun()
+                            st.success("✅ Proposta aceita com sucesso!")
+                            st.rerun()
+
                         except Exception as e:
                             st.error(f"Erro ao aceitar proposta: {e}")
 
@@ -100,9 +101,10 @@ else:
                         try:
                             supabase.table("propostas").update({"status": "recusada"}).eq("id", proposta["id"]).execute()
                             st.info("Proposta recusada.")
-                            st.experimental_rerun()
+                            st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao recusar proposta: {e}")
+
             elif status == "aceita":
                 st.success("✅ Proposta aceita.")
             elif status == "recusada":
