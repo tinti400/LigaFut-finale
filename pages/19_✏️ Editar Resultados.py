@@ -37,7 +37,7 @@ def buscar_times_nomes_logos():
 
 times_info = buscar_times_nomes_logos()
 
-# 🔄 Rodadas (ajuste correto para tabela única)
+# 🔄 Rodadas
 try:
     res_rodadas = (
         supabase.table("rodadas")
@@ -87,13 +87,25 @@ for idx, jogo in enumerate(rodada["jogos"]):
         st.markdown(f"**{nome_m}**")
 
     with col2:
-        gols_m = st.number_input(f"Gols {nome_m}", value=jogo.get("gols_mandante", 0), min_value=0, key=f"gm_{idx}")
+        gols_m_valor = jogo.get("gols_mandante")
+        gols_m = st.number_input(
+            f"Gols {nome_m}",
+            value=int(gols_m_valor) if isinstance(gols_m_valor, (int, float)) else 0,
+            min_value=0,
+            key=f"gm_{idx}"
+        )
 
     with col3:
         st.markdown("<h4 style='text-align:center;'>⚔️</h4>", unsafe_allow_html=True)
 
     with col4:
-        gols_v = st.number_input(f"Gols {nome_v}", value=jogo.get("gols_visitante", 0), min_value=0, key=f"gv_{idx}")
+        gols_v_valor = jogo.get("gols_visitante")
+        gols_v = st.number_input(
+            f"Gols {nome_v}",
+            value=int(gols_v_valor) if isinstance(gols_v_valor, (int, float)) else 0,
+            min_value=0,
+            key=f"gv_{idx}"
+        )
 
     with col5:
         st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
@@ -140,3 +152,4 @@ if historico:
     st.dataframe(df, use_container_width=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
+
