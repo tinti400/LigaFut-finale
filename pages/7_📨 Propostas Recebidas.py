@@ -2,8 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-from utils import registrar_movimentacao
-import uuid
+from utils import registrar_movimentacao, registrar_bid
 
 st.set_page_config(page_title="📨 Propostas Recebidas", layout="wide")
 
@@ -91,20 +90,25 @@ else:
                             registrar_movimentacao(proposta["id_time_origem"], "saida", proposta["valor_oferecido"], f"Compra de {proposta['jogador_nome']}")
                             registrar_movimentacao(proposta["id_time_alvo"], "entrada", proposta["valor_oferecido"], f"Venda de {proposta['jogador_nome']}")
 
-                            # 📝 Registro no BID (informativo, sem alterar saldo)
-                            supabase.table("bid").insert({
-                                "id": str(uuid.uuid4()),
-                                "data": datetime.now().isoformat(),
-                                "jogador_nome": proposta["jogador_nome"],
-                                "jogador_posicao": proposta["jogador_posicao"],
-                                "id_time_origem": proposta["id_time_alvo"],
-                                "id_time_destino": proposta["id_time_origem"],
-                                "nome_time_origem": nome_time,
-                                "nome_time_destino": proposta["nome_time_origem"],
-                                "valor": proposta["valor_oferecido"],
-                                "tipo": "Venda",
-                                "categoria": "Proposta"
-                            }).execute()
+                            # 📝 Registro no BID (sem alterar caixa)
+                            registrar_bid(
+                                id_time=proposta["id_time_origem"],
+                                tipo="compra",
+                                categoria="proposta",
+                                jogador=proposta["jogador_nome"],
+                                valor=-proposta["valor_oferecido"],
+                                origem=nome_time,
+                                destino=proposta["nome_time_origem"]
+                            )
+                            registrar_bid(
+                                id_time=proposta["id_time_alvo"],
+                                tipo="venda",
+                                categoria="proposta",
+                                jogador=proposta["jogador_nome"],
+                                valor=proposta["valor_oferecido"],
+                                origem=nome_time,
+                                destino=proposta["nome_time_origem"]
+                            )
 
                             st.success("✅ Proposta aceita com sucesso!")
                             st.rerun()
