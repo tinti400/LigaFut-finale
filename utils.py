@@ -16,26 +16,21 @@ def verificar_sessao():
         st.warning("Você precisa estar logado para acessar esta página.")
         st.stop()
 
-# 💰 Registrar movimentação financeira (atualiza saldo + histórico)
-def registrar_movimentacao(id_time, tipo, valor, descricao):
+# 💰 Registrar movimentação financeira e opcionalmente no BID
+def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, categoria=None, origem=None, destino=None):
     """
-    Registra uma movimentação financeira e atualiza o saldo do time na tabela 'times'.
+    Registra uma movimentação financeira e, se aplicável, também registra no BID.
 
-    :param id_time: ID do time
+    :param id_time: ID do time responsável
     :param tipo: 'entrada' ou 'saida'
-    :param valor: valor numérico
+    :param valor: valor numérico da movimentação
     :param descricao: descrição da movimentação
+    :param jogador: nome do jogador (opcional)
+    :param categoria: tipo da negociação: mercado, leilao, proposta (opcional)
+    :param origem: nome do time de origem (opcional)
+    :param destino: nome do time de destino (opcional)
     """
     try:
-        # Buscar saldo atual
-        res = supabase.table("times").select("saldo").eq("id", id_time).execute()
-        saldo_atual = res.data[0]["saldo"] if res.data else 0
-
-        # Atualizar saldo
-        novo_saldo = saldo_atual + valor if tipo == "entrada" else saldo_atual - valor
-        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-        # Registrar histórico
         nova = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
@@ -45,9 +40,20 @@ def registrar_movimentacao(id_time, tipo, valor, descricao):
             "data": datetime.now().isoformat()
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
-
     except Exception as e:
         st.error(f"Erro ao registrar movimentação financeira: {e}")
+
+    # Se for venda ou compra, registra no BID
+    if tipo in ["entrada", "saida"] and jogador and categoria:
+        registrar_bid(
+            id_time=id_time,
+            tipo="compra" if tipo == "saida" else "venda",
+            categoria=categoria,
+            jogador=jogador,
+            valor=valor,
+            origem=origem or "",
+            destino=destino or ""
+        )
 
 # 📈 Registrar movimentação pública no BID
 def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino=""):
@@ -58,9 +64,9 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     :param tipo: 'compra' ou 'venda'
     :param categoria: 'mercado', 'leilao', 'proposta', etc.
     :param jogador: nome do jogador
-    :param valor: valor da movimentação
-    :param origem: nome do time de origem
-    :param destino: nome do time de destino
+    :param valor: valor da movimentação (positivo para entrada, negativo para saída)
+    :param origem: nome do time de origem (opcional)
+    :param destino: nome do time de destino (opcional)
     """
     try:
         if not all([id_time, tipo, categoria, jogador]) or valor is None:
@@ -79,9 +85,9 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
             "destino": destino or ""
         }
 
-        # 🐞 DEBUG VISUAL
-        st.markdown("### 🐞 DEBUG BID - Conteúdo enviado:")
-        st.json(registro)
+        # 🐞 DEBUG OPCIONAL
+        # st.markdown("### 🐞 DEBUG BID:")
+        # st.json(registro)
 
         supabase.table("movimentacoes").insert(registro).execute()
         return True
