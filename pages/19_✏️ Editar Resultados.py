@@ -111,17 +111,33 @@ for idx, jogo in enumerate(rodada["jogos"]):
         st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
         st.markdown(f"**{nome_v}**")
 
-    if st.button("💾 Salvar", key=f"btn_{idx}"):
-        novos_jogos = []
-        for j in rodada["jogos"]:
-            if j["mandante"] == id_m and j["visitante"] == id_v:
-                j["gols_mandante"] = gols_m
-                j["gols_visitante"] = gols_v
-            novos_jogos.append(j)
+    col_salvar, col_apagar = st.columns([1, 1])
 
-        supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
-        st.success(f"✅ Resultado atualizado: {nome_m} {gols_m} x {gols_v} {nome_v}")
-        st.rerun()
+    with col_salvar:
+        if st.button("💾 Salvar", key=f"btn_salvar_{idx}"):
+            novos_jogos = []
+            for j in rodada["jogos"]:
+                if j["mandante"] == id_m and j["visitante"] == id_v:
+                    j["gols_mandante"] = gols_m
+                    j["gols_visitante"] = gols_v
+                novos_jogos.append(j)
+
+            supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
+            st.success(f"✅ Resultado atualizado: {nome_m} {gols_m} x {gols_v} {nome_v}")
+            st.rerun()
+
+    with col_apagar:
+        if st.button("🗑️ Apagar Resultado", key=f"btn_apagar_{idx}"):
+            novos_jogos = []
+            for j in rodada["jogos"]:
+                if j["mandante"] == id_m and j["visitante"] == id_v:
+                    j["gols_mandante"] = None
+                    j["gols_visitante"] = None
+                novos_jogos.append(j)
+
+            supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
+            st.warning(f"❌ Resultado apagado: {nome_m} x {nome_v}")
+            st.rerun()
 
 # 🔎 Histórico geral
 st.markdown("---")
@@ -152,4 +168,5 @@ if historico:
     st.dataframe(df, use_container_width=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
+
 
