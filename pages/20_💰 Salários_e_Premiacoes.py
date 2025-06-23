@@ -69,8 +69,9 @@ def pagar_por_jogo(id_mandante, id_visitante, gols_m, gols_v, divisao):
     # 💸 Salários
     for id_time in [id_mandante, id_visitante]:
         res_elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute()
-        elenco = res_elenco.data if res_elenco.data else []
-        total_salario = sum(j.get("salario", 0) for j in elenco)
+        elenco = res_elenco.data if isinstance(res_elenco.data, list) else []
+        total_salario = sum(j.get("salario", 0) for j in elenco if isinstance(j, dict))
+
         saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
         novo_saldo = saldo - total_salario
         supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
@@ -121,18 +122,26 @@ for rodada in rodadas:
         logo_m = times.get(id_m, {}).get("logo", "")
         logo_v = times.get(id_v, {}).get("logo", "")
 
+        # 🔢 Buscar salário total dos times
+        def salario_total(id_time):
+            elenco = supabase.table("elenco").select("salario").eq("id_time", id_time).execute().data
+            return sum(j.get("salario", 0) for j in elenco if isinstance(j, dict))
+
+        sal_m = salario_total(id_m)
+        sal_v = salario_total(id_v)
+
         st.markdown(f"### 🏟️ Rodada {numero} — {nome_m} {gm} x {gv} {nome_v}")
         cols = st.columns([1, 1, 1])
         with cols[0]:
             if logo_m:
                 st.image(logo_m, width=50)
-            st.caption(nome_m)
+            st.caption(f"{nome_m} — 💸 Salário: R$ {sal_m:,.0f}".replace(",", "."))
         with cols[1]:
             st.markdown("<h4 style='text-align:center;'>⚔️</h4>", unsafe_allow_html=True)
         with cols[2]:
             if logo_v:
                 st.image(logo_v, width=50)
-            st.caption(nome_v)
+            st.caption(f"{nome_v} — 💸 Salário: R$ {sal_v:,.0f}".replace(",", "."))
 
         if st.button("💰 Pagar Premiação + Salários", key=f"pagar_{numero}_{idx}"):
             pagar_por_jogo(id_m, id_v, gm, gv, numero_divisao)
@@ -144,3 +153,4 @@ for rodada in rodadas:
 
 if pagamentos_exibidos == 0:
     st.info("Nenhum jogo com placar definido encontrado.")
+
