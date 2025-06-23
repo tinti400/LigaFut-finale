@@ -49,11 +49,27 @@ id_time_selecionado = next((tid for tid, nome in times.items() if nome == time_s
 
 if id_time_selecionado:
     elenco_adv = supabase.table("elenco").select("*").eq("id_time", id_time_selecionado).execute().data or []
-    
+
     st.subheader(f"🎯 Elenco de {time_selecionado}")
 
+    with st.expander("🔎 Filtros para busca no elenco adversário"):
+        filtro_nome = st.text_input("🔤 Buscar por nome")
+        posicoes = sorted(set(j.get("posicao", "") for j in elenco_adv if j.get("posicao")))
+        filtro_posicao = st.selectbox("📌 Filtrar por posição", ["Todas"] + posicoes)
+        filtro_overall = st.slider("⭐ Overall mínimo", min_value=0, max_value=99, value=0)
+
+    elenco_filtrado = []
+    for jogador in elenco_adv:
+        nome_ok = filtro_nome.lower() in jogador.get("nome", "").lower()
+        posicao_ok = (filtro_posicao == "Todas" or jogador.get("posicao") == filtro_posicao)
+        overall_ok = jogador.get("overall", 0) >= filtro_overall
+        if nome_ok and posicao_ok and overall_ok:
+            elenco_filtrado.append(jogador)
+
+    elenco_adv = elenco_filtrado
+
     if not elenco_adv:
-        st.info("Nenhum jogador disponível neste time.")
+        st.info("Nenhum jogador disponível neste time com os filtros aplicados.")
     else:
         overalls = [j["overall"] for j in elenco_adv if isinstance(j.get("overall"), int)]
         media_overall = sum(overalls) / len(overalls) if overalls else 0
@@ -71,7 +87,7 @@ if id_time_selecionado:
                 st.markdown(f"⭐ **Overall:** {jogador.get('overall', '-')}")
                 st.markdown(f"🌍 **Nacionalidade:** {jogador.get('nacionalidade', '-')}")
                 st.markdown(f"🏟️ **Origem:** {jogador.get('origem', '-')}")
-                st.markdown(f"🧩 **Classificação:** {jogador.get('classificacao', 'Não definida')}")
+                st.markdown(f"🧹 **Classificação:** {jogador.get('classificacao', 'Não definida')}")
                 valor_jogador = jogador.get("valor", 0)
                 st.markdown(f"💰 **Valor:** R$ {valor_jogador:,.0f}".replace(",", "."))
 
@@ -85,6 +101,13 @@ if id_time_selecionado:
             jogadores_oferecidos = []
             valor_proposta = 0
 
+            # Filtro por posição no elenco próprio
+            posicoes_meu_elenco = sorted(set(j.get("posicao", "") for j in meu_elenco if j.get("posicao")))
+            filtro_posicao_meu = st.selectbox("\ud83d\udccc Filtrar seu elenco por posição", ["Todas"] + posicoes_meu_elenco, key=f"filtro_pos_meu_{jogador['id']}")
+            elenco_filtrado_meu = [j for j in meu_elenco if filtro_posicao_meu == "Todas" or j.get("posicao") == filtro_posicao_meu]
+
+            opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in elenco_filtrado_meu]
+
             if tipo == "Somente Dinheiro":
                 valor_proposta = st.number_input(
                     "💵 Valor da Proposta (R$)",
@@ -94,23 +117,21 @@ if id_time_selecionado:
                 )
 
             elif tipo == "Troca Simples":
-                opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
                 if opcoes:
                     selecao = st.selectbox(
                         "🔁 Escolha um jogador do seu elenco",
                         opcoes,
                         key=f"troca_simples_{jogador['id']}"
                     )
-                    jogadores_oferecidos = [meu_elenco[opcoes.index(selecao)]]
+                    jogadores_oferecidos = [elenco_filtrado_meu[opcoes.index(selecao)]]
 
             elif tipo == "Troca Composta":
-                opcoes = [f"{j['nome']} (OVR {j['overall']})" for j in meu_elenco]
                 selecao = st.multiselect(
                     "🔁 Escolha um ou mais jogadores do seu elenco",
                     opcoes,
                     key=f"troca_composta_{jogador['id']}"
                 )
-                jogadores_oferecidos = [meu_elenco[opcoes.index(s)] for s in selecao]
+                jogadores_oferecidos = [elenco_filtrado_meu[opcoes.index(s)] for s in selecao]
                 valor_proposta = st.number_input(
                     "💰 Valor adicional em dinheiro (R$)",
                     step=500_000,
