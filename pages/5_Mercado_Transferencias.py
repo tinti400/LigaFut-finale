@@ -6,59 +6,63 @@ from datetime import datetime
 
 st.set_page_config(page_title="💼 Mercado de Transferências - LigaFut", layout="wide")
 
-# Verifica sessão
+# ✅ Verifica sessão
 if "usuario_id" not in st.session_state or "id_time" not in st.session_state or "nome_time" not in st.session_state:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# Conexão Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🎯 Dados do usuário e time
 usuario_id = st.session_state["usuario_id"]
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
-# Verifica se é admin
+# ⚙️ Verifica se é admin
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 is_admin = len(res_admin.data) > 0
 
-# Verifica restrição ao mercado
+# 🚫 Verifica restrição ao mercado
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
-    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+    restricoes = {}
+    if res_restricoes.data and isinstance(res_restricoes.data[0], dict):
+        restricoes = res_restricoes.data[0].get("restricoes", {})
+
     if restricoes.get("mercado", False):
         st.error("🚫 Seu time está proibido de acessar o Mercado de Transferências.")
         st.stop()
 except Exception as e:
     st.warning(f"⚠️ Erro ao verificar restrições: {e}")
 
-# Verifica se o mercado está aberto
+# ✅ Verifica se o mercado está aberto
 res_status = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
 mercado_aberto = res_status.data[0]["mercado_aberto"] if res_status.data else False
 if not mercado_aberto:
     st.warning("🚫 O mercado está fechado no momento.")
     st.stop()
 
-# Saldo do time
+# 💰 Saldo do time
 res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
 saldo_time = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 st.markdown(f"### 💰 Saldo atual: **R$ {saldo_time:,.0f}**".replace(",", "."))
 
-# Filtros
+# 🔍 Filtros
 st.markdown("### 🔍 Filtros de Pesquisa")
 filtro_nome = st.text_input("Nome do jogador").strip().lower()
 filtro_posicao = st.text_input("Posição").strip().lower()
 filtro_nacionalidade = st.text_input("Nacionalidade").strip().lower()
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
 
-# Carregar jogadores disponíveis
+# 🔃 Carregar jogadores disponíveis
 res = supabase.table("mercado_transferencias").select("*").execute()
 mercado = res.data if res.data else []
 
-# Aplicar filtros
+# 🔍 Aplicar filtros
 jogadores_filtrados = [
     j for j in mercado
     if filtro_nome in j.get("nome", "").lower()
@@ -66,7 +70,7 @@ jogadores_filtrados = [
     and filtro_nacionalidade in str(j.get("nacionalidade", "")).lower()
 ]
 
-# Ordenação
+# 🔢 Ordenação
 if filtro_ordenacao == "Maior Overall":
     jogadores_filtrados.sort(key=lambda x: x.get("overall", 0), reverse=True)
 elif filtro_ordenacao == "Menor Overall":
@@ -76,7 +80,7 @@ elif filtro_ordenacao == "Nome A-Z":
 elif filtro_ordenacao == "Nome Z-A":
     jogadores_filtrados.sort(key=lambda x: x.get("nome", "").lower(), reverse=True)
 
-# Paginação
+# 📃 Paginação
 jogadores_por_pagina = 15
 total_jogadores = len(jogadores_filtrados)
 total_paginas = (total_jogadores - 1) // jogadores_por_pagina + 1
@@ -89,10 +93,11 @@ inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
 jogadores_pagina = jogadores_filtrados[inicio:fim]
 
-# Verifica quantidade atual do elenco
+# 🛆 Verifica quantidade atual do elenco
 res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
 qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
 
+# 🗋️ Exibição principal
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
@@ -141,7 +146,7 @@ for jogador in jogadores_pagina:
                             "id_time": id_time,
                             "nacionalidade": jogador.get("nacionalidade"),
                             "foto": jogador.get("foto"),
-                            "origem": jogador.get("origem", jogador.get("time_origem", ""))
+                            "origem": jogador.get("origem", jogador.get("time_origem", "Desconhecido"))
                         }).execute()
 
                         supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
@@ -175,13 +180,13 @@ for jogador in jogadores_pagina:
         if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
             selecionados.add(jogador["id"])
 
-# Ações administrativas
+# 🛠️ Ações administrativas (excluir múltiplos)
 if is_admin:
     st.markdown("---")
-    st.markdown("### 📅 Ações em massa (admin)")
+    st.markdown("### 📥 Ações em massa (admin)")
     if selecionados:
         st.warning(f"{len(selecionados)} jogadores selecionados.")
-        if st.button("🖑 Excluir selecionados do mercado"):
+        if st.button("🗑️ Excluir selecionados do mercado"):
             try:
                 for id_jogador in selecionados:
                     supabase.table("mercado_transferencias").delete().eq("id", id_jogador).execute()
@@ -192,7 +197,7 @@ if is_admin:
     else:
         st.info("Selecione jogadores acima para habilitar a exclusão.")
 
-# Navegação
+# 🔁 Navegação
 col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("⬅ Página anterior") and pagina_atual > 1:
@@ -202,6 +207,7 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
+
 
 
 
