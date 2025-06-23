@@ -123,7 +123,11 @@ for jogador in jogadores_pagina:
                 if not check.data:
                     st.error("❌ Este jogador já foi comprado.")
                     st.experimental_rerun()
-                elif saldo_time < jogador["valor"]:
+
+                res_atual = supabase.table("times").select("saldo").eq("id", id_time).execute()
+                saldo_atual = res_atual.data[0]["saldo"] if res_atual.data else 0
+
+                if saldo_atual < jogador["valor"]:
                     st.error("❌ Saldo insuficiente.")
                 else:
                     try:
@@ -151,9 +155,9 @@ for jogador in jogadores_pagina:
                             descricao=f"Compra de {jogador['nome']} no mercado"
                         )
 
-                        supabase.table("times").update({"saldo": saldo_time - valor}).eq("id", id_time).execute()
+                        novo_saldo = saldo_atual - valor
+                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                        # 📋 Registrar no BID
                         supabase.table("bid").insert({
                             "nome": jogador["nome"],
                             "id_time": id_time,
