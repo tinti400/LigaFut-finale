@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import registrar_movimentacao
+from utils import registrar_movimentacao, registrar_bid  # ✅ IMPORTA AS DUAS FUNÇÕES
 
 st.set_page_config(page_title="👥 Elenco - LigaFut", layout="wide")
 
@@ -154,6 +154,16 @@ for jogador in jogadores_filtrados:
                     tipo="entrada",
                     valor=valor_venda,
                     descricao=f"Venda de {jogador['nome']} para o mercado"
+                )
+
+                # 📈 Registra no BID
+                registrar_bid(
+                    id_time=id_time,
+                    tipo="venda",
+                    categoria="mercado",
+                    jogador=jogador["nome"],
+                    valor=valor_venda,
+                    origem=nome_time
                 )
 
                 st.success(f"{jogador['nome']} foi vendido com sucesso!")
