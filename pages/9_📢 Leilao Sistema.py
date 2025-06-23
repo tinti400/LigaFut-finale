@@ -1,4 +1,4 @@
-## -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime, timedelta
@@ -25,8 +25,7 @@ try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time_usuario).execute()
     if res_restricoes.data and isinstance(res_restricoes.data[0].get("restricoes"), dict):
         restricoes = res_restricoes.data[0]["restricoes"]
-except Exception as e:
-    st.warning("Não foi possível verificar restrições do seu time.")
+except Exception:
     restricoes = {}
 
 if restricoes.get("leilao", False):
@@ -47,7 +46,7 @@ for leilao in leiloes:
     fim_dt = datetime.fromisoformat(fim)
     tempo_restante = max(0, int((fim_dt - datetime.utcnow()).total_seconds()))
 
-    # ⛔ Garante que leilões finalizados aguardando validação não sejam exibidos
+    # ⛔ Esconde leilões aguardando validação
     if datetime.utcnow() >= fim_dt and not leilao.get("aguardando_validacao", False):
         continue
 
@@ -63,7 +62,7 @@ for leilao in leiloes:
     imagem_url = leilao.get("imagem_url", "")
     id_time_vencedor = leilao.get("id_time_atual", "")
 
-    # 🖼️ Exibir informações
+    # 🖼️ Exibir
     col1, col2 = st.columns([1, 3])
     with col1:
         if imagem_url:
@@ -80,7 +79,7 @@ for leilao in leiloes:
             if time_res.data:
                 st.info(f"🏷️ Último Lance: {time_res.data[0]['nome']}")
 
-    # ⏹️ Finalizar leilão se tempo acabar (vai para validação manual)
+    # ⏹️ Finalização automática DESATIVADA — vai para validação manual
     if tempo_restante == 0:
         leilao_ref = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
         dados = leilao_ref.data[0] if leilao_ref.data else {}
@@ -106,12 +105,10 @@ for leilao in leiloes:
                 if novo_lance > saldo:
                     st.error("❌ Saldo insuficiente.")
                 else:
-                    # ⏳ Estender tempo se necessário
                     agora = datetime.utcnow()
                     if (fim_dt - agora).total_seconds() <= 15:
                         fim_dt = agora + timedelta(seconds=15)
 
-                    # Atualizar leilão
                     supabase.table("leiloes").update({
                         "valor_atual": novo_lance,
                         "id_time_atual": id_time_usuario,
@@ -120,10 +117,11 @@ for leilao in leiloes:
                     }).eq("id", leilao["id"]).execute()
 
                     st.success("✅ Lance enviado com sucesso!")
-                    st.rerun()
+                    st.experimental_rerun()
 
-# 🔁 Atualizar manualmente
+# 🔁 Botão manual
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
-    st.rerun()
+    st.experimental_rerun()
+
 
