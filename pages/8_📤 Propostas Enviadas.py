@@ -1,4 +1,3 @@
-# 8_📤 Propostas Enviadas.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -8,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="📤 Propostas Enviadas", layout="wide")
 verificar_sessao()
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -16,15 +15,18 @@ supabase = create_client(url, key)
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-st.markdown(f"<h3>📤 Propostas Enviadas - {nome_time}</h3><hr>", unsafe_allow_html=True)
-
 # 🔄 Buscar propostas enviadas
 try:
     res = supabase.table("propostas").select("*").eq("id_time_origem", id_time).order("data", desc=True).execute()
     propostas = res.data if res.data else []
 except Exception as e:
     st.error(f"Erro ao buscar propostas enviadas: {e}")
-    st.stop()
+    propostas = []
+
+# 🔰 Título
+st.markdown(f"""
+<h3>📤 Propostas Enviadas - {nome_time}</h3>
+""", unsafe_allow_html=True)
 
 if not propostas:
     st.info("📭 Nenhuma proposta enviada até o momento.")
@@ -39,25 +41,22 @@ else:
                 st.image(imagem, width=80)
 
             with col2:
-                st.markdown(f"### {proposta.get('jogador_nome', 'Desconhecido')} ({proposta.get('jogador_posicao', '')})")
+                st.markdown(f"### {proposta['jogador_nome']} ({proposta['jogador_posicao']})")
                 st.write(f"🌍 **Nacionalidade:** {proposta.get('nacionalidade', 'Desconhecida')}")
-                st.write(f"📌 **Posição:** {proposta.get('jogador_posicao', '---')}")
-                st.write(f"⭐ **Overall:** {proposta.get('jogador_overall', '-')}")
-                st.write(f"💰 **Valor do Jogador:** R$ {proposta.get('jogador_valor', 0):,.0f}".replace(",", ".")}")
+                st.write(f"📌 **Posição:** {proposta['jogador_posicao']}")
+                st.write(f"⭐ **Overall:** {proposta['jogador_overall']}")
+                st.write(f"💰 **Valor do Jogador:** R$ {proposta.get('jogador_valor', 0):,.0f}".replace(",", "."))
                 st.write(f"🏟️ **Clube Alvo:** {proposta.get('nome_time_destino', 'Desconhecido')}")
-                st.write(f"📦 **Valor Oferecido:** R$ {proposta.get('valor_oferecido', 0):,.0f}".replace(",", "."))                
-                data_proposta = proposta.get("data")
-                if data_proposta:
-                    data_formatada = datetime.strptime(data_proposta[:19], "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y %H:%M")
-                    st.write(f"📅 **Data da Proposta:** {data_formatada}")
-                st.write(f"📌 **Status:** `{proposta.get('status', 'pendente').capitalize()}`")
+                st.write(f"📦 **Valor Oferecido:** R$ {proposta['valor_oferecido']:,.0f}".replace(",", "."))
+                st.write(f"📅 **Data da Proposta:** {datetime.fromisoformat(proposta['data']).strftime('%d/%m/%Y %H:%M')}")
 
-            jogadores_oferecidos = proposta.get("jogadores_oferecidos", [])
-            if jogadores_oferecidos:
-                st.markdown("**🔁 Jogadores Oferecidos em Troca:**")
-                for j in jogadores_oferecidos:
-                    nome = j.get("nome", "Desconhecido")
-                    overall = j.get("overall", "-")
-                    posicao = j.get("posicao", "Posição")
-                    st.write(f"- {nome} (OVR {overall}) - {posicao}")
+                status = proposta.get("status", "pendente")
+                if status == "pendente":
+                    st.warning("⏳ Proposta ainda não respondida.")
+                elif status == "aceita":
+                    st.success("✅ Proposta aceita.")
+                elif status == "recusada":
+                    st.error("❌ Proposta recusada.")
+                elif status == "contraproposta":
+                    st.info("🔁 Contra proposta enviada.")
 
