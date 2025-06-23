@@ -97,50 +97,69 @@ jogadores_pagina = jogadores_filtrados[inicio:fim]
 res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
 qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
 
-# 🗳️ Exibição dos jogadores
+# 📦 Lista de jogadores selecionados (somente admins)
+selecionados = set()
+
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
 for jogador in jogadores_pagina:
-    col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
-    with col1:
-        st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
+    col1, col2, col3, col4, col5 = st.columns([0.3, 1.8, 2, 2, 2])
+    
+    # ✅ Checkbox admin
+    if is_admin:
+        selecionado = col1.checkbox("", key=f"check_{jogador['id']}")
+        if selecionado:
+            selecionados.add(jogador["id"])
+    else:
+        col1.markdown("")
 
     with col2:
+        st.image(jogador.get("foto") or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=60)
+
+    with col3:
         st.markdown(f"**{jogador.get('nome')}**")
         st.markdown(f"📌 {jogador.get('posicao')} | ⭐ {jogador.get('overall')}")
         st.markdown(f"🌍 {jogador.get('nacionalidade', 'Não informada')}")
 
-    with col3:
+    with col4:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
         st.markdown(f"🏠 Origem: {jogador.get('time_origem', 'Desconhecido')}")
 
-    with col4:
+        # ✏️ Editar valor (apenas admin)
+        if is_admin:
+            novo_valor = st.number_input(f"Editar valor de {jogador['nome']}", min_value=1, step=1,
+                                         value=int(jogador["valor"]), key=f"val_{jogador['id']}")
+            if st.button(f"💾 Salvar valor", key=f"edit_{jogador['id']}"):
+                try:
+                    supabase.table("mercado_transferencias").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
+                    st.success(f"Valor de {jogador['nome']} atualizado com sucesso!")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"Erro ao atualizar valor: {e}")
+
+    with col5:
         if qtde_elenco >= 35:
             st.warning("⚠️ Elenco cheio (35 jogadores)")
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
                 try:
-                    # Verifica saldo novamente
                     res_atual = supabase.table("times").select("saldo").eq("id", id_time).execute()
                     saldo_atual = res_atual.data[0]["saldo"] if res_atual.data else 0
                     if saldo_atual < jogador["valor"]:
                         st.error("❌ Saldo insuficiente.")
                         st.stop()
 
-                    # Verifica duplicação no elenco
                     verifica_duplicado = supabase.table("elenco").select("id").eq("id_time", id_time).eq("nome", jogador["nome"]).eq("posicao", jogador["posicao"]).execute()
                     if verifica_duplicado.data:
                         st.error(f"❌ {jogador['nome']} já está no seu elenco.")
                         st.stop()
 
-                    # Deleta do mercado (proteção de concorrência)
                     res_delete = supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                     if not res_delete.data:
                         st.error("❌ Este jogador já foi comprado por outro time.")
                         st.experimental_rerun()
 
-                    # Inserir no elenco
                     valor = int(jogador["valor"])
                     salario = int(jogador.get("salario", valor * 0.01))
                     supabase.table("elenco").insert({
@@ -181,6 +200,19 @@ for jogador in jogadores_pagina:
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
 
+# 🧹 Excluir múltiplos jogadores (admin)
+if is_admin and selecionados:
+    st.markdown("---")
+    st.warning(f"{len(selecionados)} jogador(es) selecionado(s).")
+    if st.button("🚮 Excluir todos os selecionados do mercado"):
+        try:
+            for jogador_id in selecionados:
+                supabase.table("mercado_transferencias").delete().eq("id", jogador_id).execute()
+            st.success("✅ Jogadores excluídos com sucesso!")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao excluir jogadores: {e}")
+
 # 🔀 Navegação
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -191,3 +223,4 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
+
