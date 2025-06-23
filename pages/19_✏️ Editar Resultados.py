@@ -65,6 +65,68 @@ todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in 
 nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
+# 🧮 Função para atualizar classificação
+def atualizar_classificacao():
+    classificacao = {}
+
+    # Somar todos os jogos válidos
+    for r in rodadas_data:
+        for j in r["jogos"]:
+            m, v = j["mandante"], j["visitante"]
+            gm, gv = j.get("gols_mandante"), j.get("gols_visitante")
+
+            if not all(isinstance(x, (int, float)) for x in [gm, gv]):
+                continue
+
+            for time_id in [m, v]:
+                if time_id not in classificacao:
+                    classificacao[time_id] = {
+                        "id_time": time_id,
+                        "pontos": 0,
+                        "jogos": 0,
+                        "vitorias": 0,
+                        "empates": 0,
+                        "derrotas": 0,
+                        "gols_pro": 0,
+                        "gols_contra": 0,
+                        "saldo": 0,
+                        "temporada": numero_temporada,
+                        "divisao": numero_divisao
+                    }
+
+            classificacao[m]["jogos"] += 1
+            classificacao[v]["jogos"] += 1
+            classificacao[m]["gols_pro"] += gm
+            classificacao[m]["gols_contra"] += gv
+            classificacao[v]["gols_pro"] += gv
+            classificacao[v]["gols_contra"] += gm
+
+            if gm > gv:
+                classificacao[m]["vitorias"] += 1
+                classificacao[m]["pontos"] += 3
+                classificacao[v]["derrotas"] += 1
+            elif gv > gm:
+                classificacao[v]["vitorias"] += 1
+                classificacao[v]["pontos"] += 3
+                classificacao[m]["derrotas"] += 1
+            else:
+                classificacao[m]["empates"] += 1
+                classificacao[v]["empates"] += 1
+                classificacao[m]["pontos"] += 1
+                classificacao[v]["pontos"] += 1
+
+    for time_id in classificacao:
+        c = classificacao[time_id]
+        c["saldo"] = c["gols_pro"] - c["gols_contra"]
+
+    # Limpar classificação anterior
+    supabase.table("classificacao").delete().eq("temporada", numero_temporada).eq("divisao", numero_divisao).execute()
+
+    # Inserir nova
+    if classificacao:
+        dados = list(classificacao.values())
+        supabase.table("classificacao").insert(dados).execute()
+
 # 🎯 Edição dos jogos
 for idx, jogo in enumerate(rodada["jogos"]):
     id_m, id_v = jogo["mandante"], jogo["visitante"]
@@ -111,7 +173,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
         st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
         st.markdown(f"**{nome_v}**")
 
-    col_salvar, col_apagar = st.columns([1, 1])
+    col_salvar, col_apagar = st.columns(2)
 
     with col_salvar:
         if st.button("💾 Salvar", key=f"btn_salvar_{idx}"):
@@ -123,7 +185,8 @@ for idx, jogo in enumerate(rodada["jogos"]):
                 novos_jogos.append(j)
 
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
-            st.success(f"✅ Resultado atualizado: {nome_m} {gols_m} x {gols_v} {nome_v}")
+            atualizar_classificacao()
+            st.success(f"✅ Resultado atualizado e classificação recalculada.")
             st.rerun()
 
     with col_apagar:
@@ -136,7 +199,8 @@ for idx, jogo in enumerate(rodada["jogos"]):
                 novos_jogos.append(j)
 
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
-            st.warning(f"❌ Resultado apagado: {nome_m} x {nome_v}")
+            atualizar_classificacao()
+            st.warning(f"❌ Resultado apagado e classificação atualizada.")
             st.rerun()
 
 # 🔎 Histórico geral
