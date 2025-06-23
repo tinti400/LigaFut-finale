@@ -1,11 +1,12 @@
-# -*- coding: utf-8 -*-
+# # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import verificar_sessao, registrar_movimentacao
+from utils import verificar_sessao, registrar_movimentacao, registrar_bid
 
 st.set_page_config(page_title="📨 Propostas Recebidas", layout="wide")
 verificar_sessao()
 
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -13,7 +14,7 @@ supabase = create_client(url, key)
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🔴 Buscar propostas pendentes
+# 🔄 Buscar propostas pendentes
 res = supabase.table("propostas").select("*").eq("destino_id", id_time).eq("status", "pendente").execute()
 propostas = res.data if res.data else []
 notificacoes_recebidas = len(propostas)
@@ -71,10 +72,10 @@ else:
                     jogador_nome = proposta["jogador_nome"]
                     nome_time_origem = proposta["nome_time_origem"]
 
-                    # Remover jogador do time atual
+                    # 🔁 Remover jogador do time atual
                     supabase.table("elenco").delete().eq("id_time", id_time_destino).eq("nome", jogador_nome).execute()
 
-                    # Adicionar jogador ao time comprador
+                    # ➕ Adicionar jogador ao time comprador
                     novo_jogador = {
                         "nome": jogador_nome,
                         "posicao": proposta["jogador_posicao"],
@@ -83,11 +84,11 @@ else:
                         "id_time": id_time_origem,
                         "nacionalidade": proposta.get("nacionalidade"),
                         "imagem_url": proposta.get("imagem_url"),
-                        "origem": proposta.get("origem", nome_time)
+                        "origem": nome_time
                     }
                     supabase.table("elenco").insert(novo_jogador).execute()
 
-                    # Inserir jogadores oferecidos no time atual (se houver)
+                    # 🔁 Inserir jogadores oferecidos no time atual (se houver)
                     for jogador in jogadores_oferecidos:
                         supabase.table("elenco").delete().eq("id_time", id_time_origem).eq("nome", jogador["nome"]).execute()
                         jogador_trocado = {
@@ -102,12 +103,34 @@ else:
                         }
                         supabase.table("elenco").insert(jogador_trocado).execute()
 
-                    # Registrar movimentações financeiras
+                    # 💰 Atualizar saldos
                     if valor > 0:
+                        # Saída do comprador
                         registrar_movimentacao(id_time_origem, "saida", valor, f"Compra de {jogador_nome}")
+                        # Entrada no vendedor
                         registrar_movimentacao(id_time_destino, "entrada", valor, f"Venda de {jogador_nome}")
 
-                    # ❌ Apagar TODAS as propostas pendentes desse jogador (inclusive a aceita)
+                        # 📈 Registrar no BID
+                        registrar_bid(
+                            id_time=id_time_origem,
+                            tipo="compra",
+                            categoria="proposta",
+                            jogador=jogador_nome,
+                            valor=valor,
+                            origem=nome_time,
+                            destino=nome_time_origem
+                        )
+                        registrar_bid(
+                            id_time=id_time_destino,
+                            tipo="venda",
+                            categoria="proposta",
+                            jogador=jogador_nome,
+                            valor=valor,
+                            origem=nome_time,
+                            destino=nome_time_origem
+                        )
+
+                    # ❌ Apagar TODAS as propostas pendentes desse jogador
                     supabase.table("propostas").delete() \
                         .eq("jogador_nome", jogador_nome) \
                         .eq("destino_id", id_time) \
