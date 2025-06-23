@@ -127,7 +127,7 @@ for jogador in jogadores_pagina:
                 else:
                     try:
                         valor_compra = float(jogador["valor"])
-                        salario_final = int(jogador.get("salario", int(valor_compra * 0.01)))
+                        salario_final = int(float(jogador.get("salario") or valor_compra * 0.01))
 
                         # Adiciona ao elenco
                         supabase.table("elenco").insert({
@@ -178,7 +178,7 @@ for jogador in jogadores_pagina:
         if st.checkbox(f"Selecionar {jogador['nome']}", key=f"check_{jogador['id']}"):
             selecionados.add(jogador["id"])
 
-# 🛠️ Ações administrativas (excluir múltiplos)
+# 🛠️ Ações administrativas
 if is_admin:
     st.markdown("---")
     st.markdown("### 🩵 Ações em massa (admin)")
@@ -205,3 +205,4 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
+
