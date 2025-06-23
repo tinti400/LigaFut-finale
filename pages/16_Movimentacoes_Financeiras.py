@@ -22,7 +22,7 @@ usuario_id = st.session_state["usuario_id"]
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 is_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔽 Se admin, seleciona time
+# 🔽 Se admin, permite escolher o time
 if is_admin:
     res_times = supabase.table("times").select("id, nome").order("nome", desc=False).execute()
     times = res_times.data or []
@@ -37,6 +37,10 @@ if is_admin:
 else:
     id_time = st.session_state["id_time"]
     nome_time = st.session_state.get("nome_time", "Seu Time")
+
+# 🔢 Quantidade de movimentações a exibir
+limite = st.selectbox("Quantas movimentações deseja exibir?", ["5", "10", "20", "Todas"], index=1)
+limite = None if limite == "Todas" else int(limite)
 
 # 📥 Buscar saldo atual
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
@@ -60,7 +64,7 @@ df["data"] = pd.to_datetime(df["data"], errors="coerce")
 df = df.dropna(subset=["data"])
 df = df.sort_values("data", ascending=False)
 
-# 🛡️ Garante colunas básicas
+# Garante campos básicos
 if "valor" not in df.columns:
     df["valor"] = 0
 if "tipo" not in df.columns:
@@ -106,19 +110,15 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
 df_exibir = df[colunas].copy()
 
-# Força todas as colunas como string
+# Limita a quantidade exibida
+if limite:
+    df_exibir = df_exibir.head(limite)
+
+# Força todas como string
 for col in df_exibir.columns:
     df_exibir[col] = df_exibir[col].astype(str)
 
-# 🔍 Debug (opcional - pode remover depois)
-st.subheader("🔍 Debug do DataFrame")
-st.write("Colunas:", df_exibir.columns.tolist())
-st.text("Tipos de dados:")
-st.text(df_exibir.dtypes.to_string())
-st.write("Amostra dos dados:")
-st.write(df_exibir.head())
-
-# 📋 Exibir
+# 📋 Exibe
 st.subheader(f"💼 Extrato do time **{nome_time}**")
 st.dataframe(df_exibir, use_container_width=True)
 
