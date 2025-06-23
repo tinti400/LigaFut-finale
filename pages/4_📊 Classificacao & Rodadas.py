@@ -28,21 +28,26 @@ eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
-numero_divisao = divisao.split()[-1]
-numero_temporada = temporada.split()[-1]
-nome_tabela_rodadas = f"rodadas_divisao_{numero_divisao}_temp{numero_temporada}"
+numero_divisao = int(divisao.split()[-1])
+numero_temporada = int(temporada.split()[-1])
 
 # 🔄 Buscar rodadas
-@st.cache(ttl=60)
+@st.cache_data(ttl=60)
 def buscar_resultados():
     try:
-        res = supabase.table(nome_tabela_rodadas).select("*").order("numero").execute()
+        res = supabase.table("rodadas") \
+            .select("*") \
+            .eq("temporada", numero_temporada) \
+            .eq("divisao", numero_divisao) \
+            .order("numero") \
+            .execute()
         return res.data if res.data else []
-    except:
+    except Exception as e:
+        st.error(f"Erro ao buscar rodadas: {e}")
         return []
 
 # 👥 Buscar nomes e logos dos times
-@st.cache(ttl=60)
+@st.cache_data(ttl=60)
 def obter_nomes_times():
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", divisao).execute().data
@@ -195,12 +200,13 @@ if eh_admin:
     st.markdown("---")
     if st.button("🧹 Resetar Rodadas"):
         try:
-            docs = supabase.table(nome_tabela_rodadas).select("id").execute().data
+            docs = supabase.table("rodadas").select("id").eq("temporada", numero_temporada).eq("divisao", numero_divisao).execute().data
             for d in docs:
-                supabase.table(nome_tabela_rodadas).delete().eq("id", d["id"]).execute()
+                supabase.table("rodadas").delete().eq("id", d["id"]).execute()
             st.success("Rodadas apagadas com sucesso.")
             st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
+
 
 
