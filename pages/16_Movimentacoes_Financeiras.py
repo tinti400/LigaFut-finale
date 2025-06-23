@@ -48,7 +48,7 @@ if "tipo" not in df.columns:
 if "descricao" not in df.columns:
     df["descricao"] = "Sem descrição"
 
-# 🔁 Calcular caixa anterior e atual linha a linha
+# 🔁 Calcular caixa anterior e atual
 saldos_atuais = []
 saldos_anteriores = []
 saldo = saldo_atual
@@ -64,9 +64,9 @@ for _, row in df.iterrows():
 
     saldos_anteriores.append(saldo_anterior)
     saldos_atuais.append(saldo)
-    saldo = saldo_anterior  # atualiza para a próxima linha
+    saldo = saldo_anterior
 
-# 🧮 Adicionar colunas ao DataFrame
+# 🧮 Adicionar colunas
 df["caixa_atual"] = saldos_atuais
 df["caixa_anterior"] = saldos_anteriores
 
@@ -81,17 +81,28 @@ df["💰 Caixa Atual"] = df["caixa_atual"].apply(formatar_valor)
 df["📦 Caixa Anterior"] = df["caixa_anterior"].apply(formatar_valor)
 df["💸 Valor"] = df["valor"].apply(formatar_valor)
 df["📅 Data"] = df["data"].dt.strftime("%d/%m/%Y %H:%M")
-df["📌 Tipo"] = df["tipo"].str.capitalize()
-df["📝 Descrição"] = df["descricao"]
+df["📌 Tipo"] = df["tipo"].astype(str).str.capitalize()
+df["📝 Descrição"] = df["descricao"].astype(str)
 
-# 🧾 Selecionar colunas finais com segurança
+# 🧾 Selecionar colunas finais
 colunas_exibir = [
     "📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"
 ]
 
 df_exibir = df[colunas_exibir].copy()
 
-# 📋 Exibir
-st.markdown(f"### 💼 Extrato do time **{nome_time}**")
-st.dataframe(df_exibir, use_container_width=True)
+# 🔍 Debug
+st.subheader("🔍 Debug do DataFrame")
+st.write("Colunas:", df_exibir.columns.tolist())
+st.write("Tipos de dados:", df_exibir.dtypes)
+st.write("Amostra dos dados:")
+st.write(df_exibir.head())
+
+# 📋 Exibir tabela formatada
+try:
+    st.subheader(f"💼 Extrato do time **{nome_time}**")
+    st.dataframe(df_exibir, use_container_width=True)
+except Exception as e:
+    st.error(f"Erro ao exibir DataFrame formatado: {e}")
+
 
