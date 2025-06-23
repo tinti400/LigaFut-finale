@@ -2,7 +2,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
 from supabase import create_client
-from utils import registrar_movimentacao
+from utils import registrar_movimentacao  # versão simples: (id_time, tipo, valor, descricao)
 
 st.set_page_config(page_title="🧑‍⚖️ Administração de Leilões (Fila)", layout="wide")
 
@@ -69,7 +69,7 @@ with st.form("novo_leilao"):
         supabase.table("leiloes").insert(novo).execute()
         st.success("✅ Jogador adicionado à fila.")
 
-# 🔄 Verificar e ativar até 3 leilões simultâneos
+# 🔄 Ativar até 3 leilões simultâneos
 ativos = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute().data
 
 if ativos:
@@ -117,7 +117,7 @@ else:
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
-# 📄 Leilões aguardando validação do administrador
+# 📄 Leilões aguardando validação
 pendentes = supabase.table("leiloes") \
     .select("*") \
     .eq("aguardando_validacao", True) \
@@ -148,14 +148,12 @@ if pendentes.data:
                 }
                 supabase.table("elenco").insert(jogador).execute()
 
+                # 💰 Registrar movimentação (versão simples)
                 registrar_movimentacao(
-                    id_time=item["id_time_atual"],
-                    jogador=nome,
-                    tipo="leilao",
-                    categoria="compra",
-                    valor=valor,
-                    origem=item.get("origem", ""),
-                    destino=None
+                    item["id_time_atual"],
+                    "saida",
+                    valor,
+                    f"Compra de {nome} via Leilão"
                 )
 
                 supabase.table("leiloes").update({
@@ -170,7 +168,7 @@ if pendentes.data:
             except Exception as e:
                 st.error(f"Erro ao validar o leilão: {e}")
 
-# 🪨 Botão para limpar histórico de leilões já enviados ao BID
+# 🪨 Limpar histórico
 st.markdown("---")
 st.subheader("🪨 Limpar Histórico de Leilões Enviados ao BID")
 
