@@ -6,7 +6,7 @@ from datetime import datetime
 from utils import verificar_sessao
 
 st.set_page_config(page_title="📊 Movimentações Financeiras", layout="wide")
-st.title("📊 Extrato Financeiro do Time")
+st.title("📊 Extrato Financeiro")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -15,8 +15,28 @@ supabase = create_client(url, key)
 
 # 🔒 Verifica login
 verificar_sessao()
-id_time = st.session_state["id_time"]
-nome_time = st.session_state.get("nome_time", "Seu Time")
+email_usuario = st.session_state.get("usuario", "")
+usuario_id = st.session_state["usuario_id"]
+
+# 👑 Verifica se é admin
+res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+is_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+
+# 🔽 Se admin, seleciona time
+if is_admin:
+    res_times = supabase.table("times").select("id, nome").order("nome", desc=False).execute()
+    times = res_times.data or []
+    if not times:
+        st.warning("Nenhum time encontrado.")
+        st.stop()
+
+    nome_para_id = {t["nome"]: t["id"] for t in times}
+    nome_selecionado = st.selectbox("👑 Selecione um time para visualizar o extrato:", list(nome_para_id.keys()))
+    id_time = nome_para_id[nome_selecionado]
+    nome_time = nome_selecionado
+else:
+    id_time = st.session_state["id_time"]
+    nome_time = st.session_state.get("nome_time", "Seu Time")
 
 # 📥 Buscar saldo atual
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
@@ -34,7 +54,7 @@ if not movs:
     st.info("Nenhuma movimentação encontrada.")
     st.stop()
 
-# 📊 Criar DataFrame e converter datas
+# 📊 Criar DataFrame
 df = pd.DataFrame(movs)
 df["data"] = pd.to_datetime(df["data"], errors="coerce")
 df = df.dropna(subset=["data"])
@@ -56,7 +76,6 @@ saldo = saldo_atual
 for _, row in df.iterrows():
     valor = float(row.get("valor", 0))
     tipo = row.get("tipo", "saida")
-
     if tipo == "entrada":
         saldo_anterior = saldo - valor
     else:
@@ -66,11 +85,10 @@ for _, row in df.iterrows():
     saldos_atuais.append(saldo)
     saldo = saldo_anterior
 
-# 🧮 Adicionar colunas
 df["caixa_atual"] = saldos_atuais
 df["caixa_anterior"] = saldos_anteriores
 
-# 🎨 Formatar valores
+# 🎨 Formatação
 def formatar_valor(v):
     try:
         return f"R${float(v):,.0f}".replace(",", ".")
@@ -84,17 +102,15 @@ df["📅 Data"] = df["data"].dt.strftime("%d/%m/%Y %H:%M")
 df["📌 Tipo"] = df["tipo"].astype(str).str.capitalize()
 df["📝 Descrição"] = df["descricao"].astype(str)
 
-# 🧾 Selecionar colunas finais
-colunas_exibir = [
-    "📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"
-]
-df_exibir = df[colunas_exibir].copy()
+# Seleção final de colunas
+colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
+df_exibir = df[colunas].copy()
 
-# 🔧 Força todas as colunas como string para evitar erro
+# Força todas as colunas como string
 for col in df_exibir.columns:
     df_exibir[col] = df_exibir[col].astype(str)
 
-# 🔍 Debug
+# 🔍 Debug (opcional - pode remover depois)
 st.subheader("🔍 Debug do DataFrame")
 st.write("Colunas:", df_exibir.columns.tolist())
 st.text("Tipos de dados:")
@@ -103,11 +119,9 @@ st.write("Amostra dos dados:")
 st.write(df_exibir.head())
 
 # 📋 Exibir
-try:
-    st.subheader(f"💼 Extrato do time **{nome_time}**")
-    st.dataframe(df_exibir, use_container_width=True)
-except Exception as e:
-    st.error(f"Erro ao exibir DataFrame formatado: {e}")
+st.subheader(f"💼 Extrato do time **{nome_time}**")
+st.dataframe(df_exibir, use_container_width=True)
+
 
 
 
