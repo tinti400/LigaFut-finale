@@ -163,7 +163,11 @@ for rodada in rodadas:
     st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
     for jogo in rodada.get("jogos", []):
         m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
-        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
+        gm = jogo.get("gols_mandante")
+        gv = jogo.get("gols_visitante")
+        gm = "?" if gm is None else gm
+        gv = "?" if gv is None else gv
+
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
         m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
@@ -171,14 +175,17 @@ for rodada in rodadas:
         m_nome = m.get("nome", "Desconhecido")
         v_nome = v.get("nome", "Desconhecido")
 
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-        with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+        placar_html = f"""
+        <div style='display: flex; justify-content: center; align-items: center; background-color: #f5f5f5; border-radius: 12px; padding: 10px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+            <div style='flex: 4; text-align: right; padding-right: 10px;'>
+                <img src="{m_logo}" width="30"> <b>{m_nome}</b>
+            </div>
+            <div style='flex: 1; text-align: center; font-size: 20px; font-weight: bold;'>
+                {gm} <span style='color: #555;'>x</span> {gv}
+            </div>
+            <div style='flex: 4; text-align: left; padding-left: 10px;'>
+                <b>{v_nome}</b> <img src="{v_logo}" width="30">
+            </div>
+        </div>
+        """
+        st.markdown(placar_html, unsafe_allow_html=True)
