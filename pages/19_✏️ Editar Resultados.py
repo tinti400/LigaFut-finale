@@ -230,6 +230,3 @@ if historico:
     st.dataframe(df, use_container_width=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
-
-
-
