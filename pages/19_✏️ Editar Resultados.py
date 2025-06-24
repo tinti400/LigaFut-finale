@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 import pandas as pd
-import html
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -30,13 +29,12 @@ temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporad
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-# 🔄 Times e nomes
-def buscar_times_nomes_logos():
+# 🔄 Times
+def buscar_times_nomes():
     res = supabase.table("times").select("id", "nome").execute()
-    times_data = res.data if res.data else []
-    return {t["id"]: {"nome": t["nome"]} for t in times_data}
+    return {t["id"]: t["nome"] for t in res.data} if res.data else {}
 
-times_info = buscar_times_nomes_logos()
+times_info = buscar_times_nomes()
 
 # 🔄 Rodadas
 try:
@@ -63,7 +61,7 @@ rodada = next((r for r in rodadas_data if r["numero"] == rodada_atual), None)
 
 # 🔍 Filtro por time
 todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in rodada["jogos"]]
-nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
+nomes_filtrados = sorted(set(times_info.get(id_, "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
 # 🧮 Atualizar classificação
@@ -120,7 +118,6 @@ def atualizar_classificacao():
         c["saldo"] = c["gols_pro"] - c["gols_contra"]
 
     supabase.table("classificacao").delete().eq("temporada", numero_temporada).eq("divisao", numero_divisao).execute()
-
     if classificacao:
         supabase.table("classificacao").insert(list(classificacao.values())).execute()
 
@@ -130,8 +127,8 @@ for idx, jogo in enumerate(rodada["jogos"]):
     if "FOLGA" in [id_m, id_v]:
         continue
 
-    nome_m = times_info.get(id_m, {}).get("nome", "Desconhecido")
-    nome_v = times_info.get(id_v, {}).get("nome", "Desconhecido")
+    nome_m = times_info.get(id_m, "Desconhecido")
+    nome_v = times_info.get(id_v, "Desconhecido")
 
     if nome_time_filtro != "Todos" and nome_time_filtro not in [nome_m, nome_v]:
         continue
@@ -176,10 +173,9 @@ for idx, jogo in enumerate(rodada["jogos"]):
                     j["gols_mandante"] = gols_m
                     j["gols_visitante"] = gols_v
                 novos_jogos.append(j)
-
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
             atualizar_classificacao()
-            st.success(f"✅ Resultado atualizado e classificação recalculada.")
+            st.success("✅ Resultado salvo e classificação atualizada.")
             st.rerun()
 
     with col_apagar:
@@ -190,17 +186,16 @@ for idx, jogo in enumerate(rodada["jogos"]):
                     j["gols_mandante"] = None
                     j["gols_visitante"] = None
                 novos_jogos.append(j)
-
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
             atualizar_classificacao()
-            st.warning(f"❌ Resultado apagado e classificação atualizada.")
+            st.warning("❌ Resultado apagado e classificação atualizada.")
             st.rerun()
 
-# 📜 Histórico do time
+# 📜 Histórico simples
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
 
-nomes_times = {v["nome"]: k for k, v in times_info.items()}
+nomes_times = {v: k for k, v in times_info.items()}
 time_nome = st.selectbox("Selecione um time para ver histórico:", sorted(nomes_times.keys()))
 id_escolhido = nomes_times[time_nome]
 
@@ -208,11 +203,11 @@ historico = []
 for r in rodadas_data:
     for j in r["jogos"]:
         if id_escolhido in [j["mandante"], j["visitante"]]:
-            nome_m = times_info.get(j["mandante"], {}).get("nome", "?")
-            nome_v = times_info.get(j["visitante"], {}).get("nome", "?")
+            nome_m = times_info.get(j["mandante"], "?")
+            nome_v = times_info.get(j["visitante"], "?")
             gm = j.get("gols_mandante")
             gv = j.get("gols_visitante")
-            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "❌ Não definido"
+            placar = f"{gm} x {gv}" if gm is not None and gv is not None else "Não definido"
 
             historico.append({
                 "Rodada": r["numero"],
@@ -222,71 +217,8 @@ for r in rodadas_data:
             })
 
 if historico:
-    try:
-        df = pd.DataFrame(historico).sort_values("Rodada")
-
-        def render_tabela_html(df):
-            html_str = """
-            <style>
-                table.custom-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 15px;
-                    margin-top: 10px;
-                }
-                table.custom-table th, table.custom-table td {
-                    border: 1px solid #ccc;
-                    padding: 8px;
-                    text-align: center;
-                }
-                table.custom-table th {
-                    background-color: #f0f0f0;
-                }
-                table.custom-table tr:nth-child(even) {
-                    background-color: #f9f9f9;
-                }
-                table.custom-table tr:hover {
-                    background-color: #f1f1f1;
-                }
-            </style>
-            <table class="custom-table">
-                <thead>
-                    <tr>
-                        <th>Rodada</th>
-                        <th>Mandante</th>
-                        <th>Visitante</th>
-                        <th>Placar</th>
-                    </tr>
-                </thead>
-                <tbody>
-            """
-
-            for _, row in df.iterrows():
-                rodada = html.escape(str(row['Rodada']))
-                mandante = html.escape(str(row['Mandante']).strip())
-                visitante = html.escape(str(row['Visitante']).strip())
-                placar = row['Placar']
-                if placar == "❌ Não definido":
-                    placar = "<span style='color:red;'>❌</span>"
-                else:
-                    placar = html.escape(placar)
-
-                html_str += f"""
-                    <tr>
-                        <td>{rodada}</td>
-                        <td>{mandante}</td>
-                        <td>{visitante}</td>
-                        <td>{placar}</td>
-                    </tr>
-                """
-
-            html_str += "</tbody></table>"
-            return html_str
-
-        st.markdown(render_tabela_html(df), unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"Erro ao exibir histórico: {e}")
+    df = pd.DataFrame(historico).sort_values("Rodada")
+    st.dataframe(df)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
 
