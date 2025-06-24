@@ -200,7 +200,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
             st.warning(f"❌ Resultado apagado e classificação atualizada.")
             st.rerun()
 
-# 📜 Histórico do time
+# 📜 Histórico
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
@@ -225,70 +225,61 @@ for r in rodadas_data:
             })
 
 if historico:
-    try:
-        df = pd.DataFrame(historico).sort_values("Rodada")
+    df = pd.DataFrame(historico).sort_values("Rodada")
 
-        def render_tabela_html(df):
-            html_str = """
-            <style>
-                table.custom-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 15px;
-                    margin-top: 10px;
-                }
-                table.custom-table th, table.custom-table td {
-                    border: 1px solid #ccc;
-                    padding: 8px;
-                    text-align: center;
-                }
-                table.custom-table th {
-                    background-color: #f0f0f0;
-                }
-                table.custom-table tr:nth-child(even) {
-                    background-color: #f9f9f9;
-                }
-                table.custom-table tr:hover {
-                    background-color: #f1f1f1;
-                }
-            </style>
-            <table class="custom-table">
-                <thead>
-                    <tr>
-                        <th>Rodada</th>
-                        <th>Mandante</th>
-                        <th>Visitante</th>
-                        <th>Placar</th>
-                    </tr>
-                </thead>
-                <tbody>
-            """
+    html_tabela = """
+    <style>
+        table.custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+            margin-top: 10px;
+        }
+        table.custom-table th, table.custom-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        table.custom-table th {
+            background-color: #f0f0f0;
+        }
+        table.custom-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        table.custom-table tr:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Rodada</th>
+                <th>Mandante</th>
+                <th>Visitante</th>
+                <th>Placar</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
 
-            for _, row in df.iterrows():
-                rodada = html.escape(str(row['Rodada']))
-                mandante = html.escape(str(row['Mandante']).replace('\n', ' ').strip())
-                visitante = html.escape(str(row['Visitante']).replace('\n', ' ').strip())
-                placar = row['Placar']
-                if placar == "❌ Não definido":
-                    placar = "<span style='color:red;'>❌</span>"
-                else:
-                    placar = html.escape(placar)
+    for _, row in df.iterrows():
+        rodada = html.escape(str(row['Rodada']))
+        mandante = html.escape(str(row['Mandante']))
+        visitante = html.escape(str(row['Visitante']))
+        placar = row['Placar']
+        placar = html.escape(placar) if "x" in placar else "<span style='color:red;'>❌</span>"
 
-                html_str += f"""
-                    <tr>
-                        <td>{rodada}</td>
-                        <td>{mandante}</td>
-                        <td>{visitante}</td>
-                        <td>{placar}</td>
-                    </tr>
-                """
+        html_tabela += f"""
+            <tr>
+                <td>{rodada}</td>
+                <td>{mandante}</td>
+                <td>{visitante}</td>
+                <td>{placar}</td>
+            </tr>
+        """
 
-            html_str += "</tbody></table>"
-            return html_str
-
-        st.markdown(render_tabela_html(df), unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"Erro ao exibir histórico: {e}")
+    html_tabela += "</tbody></table>"
+    st.markdown(html_tabela, unsafe_allow_html=True)
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
+
