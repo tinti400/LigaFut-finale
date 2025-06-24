@@ -149,9 +149,9 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Filtro de rodada
+# 🗕️ Filtro de rodada
 st.markdown("---")
-st.subheader("📅 Rodadas da Temporada")
+st.subheader("🗕️ Rodadas da Temporada")
 
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
 rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
@@ -171,14 +171,28 @@ for rodada in rodadas:
         m_nome = m.get("nome", "Desconhecido")
         v_nome = v.get("nome", "Desconhecido")
 
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-        with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+        placar_html = f"""
+        <div style='
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f5f5f5;
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+
+            <div style='flex: 4; text-align: right; padding-right: 10px;'>
+                <img src="{m_logo}" width="30"> <b>{m_nome}</b>
+            </div>
+
+            <div style='flex: 1; text-align: center; font-size: 20px; font-weight: bold;'>
+                {gm} <span style='color: #555;'>x</span> {gv}
+            </div>
+
+            <div style='flex: 4; text-align: left; padding-left: 10px;'>
+                <b>{v_nome}</b> <img src="{v_logo}" width="30">
+            </div>
+        </div>
+        """
+        st.markdown(placar_html, unsafe_allow_html=True)
