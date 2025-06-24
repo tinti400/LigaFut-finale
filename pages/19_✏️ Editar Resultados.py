@@ -65,7 +65,7 @@ todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in 
 nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
-# 🧮 Atualizar classificação
+# 🧮 Função para atualizar classificação
 def atualizar_classificacao():
     classificacao = {}
 
@@ -119,6 +119,7 @@ def atualizar_classificacao():
         c["saldo"] = c["gols_pro"] - c["gols_contra"]
 
     supabase.table("classificacao").delete().eq("temporada", numero_temporada).eq("divisao", numero_divisao).execute()
+
     if classificacao:
         supabase.table("classificacao").insert(list(classificacao.values())).execute()
 
@@ -182,7 +183,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
             atualizar_classificacao()
             st.success(f"✅ Resultado atualizado e classificação recalculada.")
-            st.experimental_rerun()
+            st.rerun()
 
     with col_apagar:
         if st.button("🗑️ Apagar Resultado", key=f"btn_apagar_{idx}"):
@@ -196,9 +197,9 @@ for idx, jogo in enumerate(rodada["jogos"]):
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
             atualizar_classificacao()
             st.warning(f"❌ Resultado apagado e classificação atualizada.")
-            st.experimental_rerun()
+            st.rerun()
 
-# 📜 Histórico do time
+# 🔎 Histórico geral
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
@@ -225,7 +226,7 @@ for r in rodadas_data:
 if historico:
     try:
         df = pd.DataFrame(historico).sort_values("Rodada")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df)
     except Exception as e:
         st.error(f"Erro ao exibir histórico: {e}")
 else:
