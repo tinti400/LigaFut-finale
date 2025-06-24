@@ -32,7 +32,6 @@ try:
     restricoes = {}
     if res_restricoes.data and isinstance(res_restricoes.data[0], dict):
         restricoes = res_restricoes.data[0].get("restricoes", {})
-
     if restricoes.get("mercado", False):
         st.error("🚫 Seu time está proibido de acessar o Mercado de Transferências.")
         st.stop()
@@ -43,8 +42,7 @@ except Exception as e:
 res_status = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
 mercado_aberto = res_status.data[0]["mercado_aberto"] if res_status.data else False
 if not mercado_aberto:
-    st.warning("🚫 O mercado está fechado no momento.")
-    st.stop()
+    st.warning("🚫 O mercado está fechado no momento. As compras estão temporariamente indisponíveis, mas você pode visualizar os jogadores disponíveis.")
 
 # 💰 Saldo do time
 res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
@@ -84,10 +82,8 @@ elif filtro_ordenacao == "Nome Z-A":
 jogadores_por_pagina = 15
 total_jogadores = len(jogadores_filtrados)
 total_paginas = (total_jogadores - 1) // jogadores_por_pagina + 1
-
 if "pagina_mercado" not in st.session_state:
     st.session_state["pagina_mercado"] = 1
-
 pagina_atual = st.session_state["pagina_mercado"]
 inicio = (pagina_atual - 1) * jogadores_por_pagina
 fim = inicio + jogadores_por_pagina
@@ -106,7 +102,6 @@ st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
 for jogador in jogadores_pagina:
     col1, col2, col3, col4, col5 = st.columns([0.3, 1.8, 2, 2, 2])
-    
     if is_admin:
         selecionado = col1.checkbox("", key=f"check_{jogador['id']}")
         if selecionado:
@@ -125,7 +120,6 @@ for jogador in jogadores_pagina:
     with col4:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
         st.markdown(f"🏠 Origem: {jogador.get('time_origem', 'Desconhecido')}")
-
         if is_admin:
             novo_valor = st.number_input(f"Editar valor de {jogador['nome']}", min_value=1, step=1,
                                          value=int(jogador["valor"]), key=f"val_{jogador['id']}")
@@ -140,29 +134,27 @@ for jogador in jogadores_pagina:
     with col5:
         if qtde_elenco >= 35:
             st.warning("⚠️ Elenco cheio (35 jogadores)")
+        elif not mercado_aberto:
+            st.info("⛔ Mercado fechado")
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
                 try:
-                    # Verifica saldo novamente
                     saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
 
                     if saldo_atual < jogador["valor"]:
                         st.error("❌ Saldo insuficiente.")
                         st.stop()
 
-                    # Verifica duplicado
                     for j in elenco_atual:
                         if j["nome"].lower() == jogador["nome"].lower() and j["posicao"] == jogador["posicao"]:
                             st.error(f"❌ {jogador['nome']} já está no seu elenco.")
                             st.stop()
 
-                    # Deleta do mercado
                     res_delete = supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                     if not res_delete.data:
                         st.error("❌ Este jogador já foi comprado por outro time.")
                         st.experimental_rerun()
 
-                    # Insere no elenco
                     valor = int(jogador["valor"])
                     salario = int(jogador.get("salario", valor * 0.01))
                     supabase.table("elenco").insert({
