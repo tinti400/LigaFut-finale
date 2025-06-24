@@ -32,9 +32,9 @@ numero_temporada = int(temporada.split()[-1])
 
 # 🔄 Times e nomes
 def buscar_times_nomes_logos():
-    res = supabase.table("times").select("id", "nome", "logo").execute()
+    res = supabase.table("times").select("id", "nome").execute()
     times_data = res.data if res.data else []
-    return {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in times_data}
+    return {t["id"]: {"nome": t["nome"]} for t in times_data}
 
 times_info = buscar_times_nomes_logos()
 
@@ -131,9 +131,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
         continue
 
     nome_m = times_info.get(id_m, {}).get("nome", "Desconhecido")
-    logo_m = times_info.get(id_m, {}).get("logo", "")
     nome_v = times_info.get(id_v, {}).get("nome", "Desconhecido")
-    logo_v = times_info.get(id_v, {}).get("logo", "")
 
     if nome_time_filtro != "Todos" and nome_time_filtro not in [nome_m, nome_v]:
         continue
@@ -142,7 +140,6 @@ for idx, jogo in enumerate(rodada["jogos"]):
     col1, col2, col3, col4, col5 = st.columns([2, 1, 0.5, 1, 2])
 
     with col1:
-        st.image(logo_m or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
         st.markdown(f"**{nome_m}**")
 
     with col2:
@@ -167,7 +164,6 @@ for idx, jogo in enumerate(rodada["jogos"]):
         )
 
     with col5:
-        st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
         st.markdown(f"**{nome_v}**")
 
     col_salvar, col_apagar = st.columns(2)
@@ -203,6 +199,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
 # 📜 Histórico do time
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
+
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
 time_nome = st.selectbox("Selecione um time para ver histórico:", sorted(nomes_times.keys()))
 id_escolhido = nomes_times[time_nome]
@@ -266,8 +263,8 @@ if historico:
 
             for _, row in df.iterrows():
                 rodada = html.escape(str(row['Rodada']))
-                mandante = html.escape(str(row['Mandante']).replace('\n', ' ').strip())
-                visitante = html.escape(str(row['Visitante']).replace('\n', ' ').strip())
+                mandante = html.escape(str(row['Mandante']).strip())
+                visitante = html.escape(str(row['Visitante']).strip())
                 placar = row['Placar']
                 if placar == "❌ Não definido":
                     placar = "<span style='color:red;'>❌</span>"
@@ -292,3 +289,4 @@ if historico:
         st.error(f"Erro ao exibir histórico: {e}")
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
+
