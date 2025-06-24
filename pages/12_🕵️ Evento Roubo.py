@@ -23,8 +23,8 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
-# ✅ Função local para registrar movimentação
-def registrar_movimentacao(id_time, jogador, tipo, direcao, valor):
+# ✅ Função local corrigida para registrar movimentação
+def registrar_movimentacao(id_time, jogador, tipo, valor):
     try:
         supabase.table("movimentacoes_financeiras").insert({
             "id": str(uuid.uuid4()),
@@ -32,7 +32,6 @@ def registrar_movimentacao(id_time, jogador, tipo, direcao, valor):
             "tipo": tipo,
             "descricao": f"{tipo.capitalize()} de {jogador}",
             "valor": valor,
-            "direcao": direcao,
             "data": str(datetime.utcnow())
         }).execute()
     except Exception as e:
@@ -178,8 +177,8 @@ if ativo and fase == "acao" and vez < len(ordem):
                     if st.button("💰 Roubar jogador"):
                         supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador_nome).execute()
                         supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
-                        registrar_movimentacao(id_time, jogador_nome, "roubo", "entrada", valor_pago)
-                        registrar_movimentacao(id_alvo, jogador_nome, "roubo", "saida", valor_pago)
+                        registrar_movimentacao(id_time, jogador_nome, "entrada", valor_pago)
+                        registrar_movimentacao(id_alvo, jogador_nome, "saida", valor_pago)
 
                         res_saldos = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute()
                         saldos = {item["id"]: item["saldo"] for item in res_saldos.data}
