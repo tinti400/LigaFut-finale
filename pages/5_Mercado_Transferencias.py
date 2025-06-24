@@ -202,6 +202,32 @@ if is_admin and selecionados:
         except Exception as e:
             st.error(f"Erro ao excluir jogadores: {e}")
 
+# 🧼 Exclusão por intervalo de overall (admin)
+if is_admin:
+    st.markdown("---")
+    st.subheader("🧼 Exclusão por Overall")
+    col_min, col_max = st.columns(2)
+    with col_min:
+        overall_min = st.number_input("⭐ Overall mínimo", min_value=0, max_value=99, value=0)
+    with col_max:
+        overall_max = st.number_input("⭐ Overall máximo", min_value=0, max_value=99, value=99)
+
+    if st.button("🚮 Excluir todos nesse intervalo"):
+        try:
+            jogadores_para_excluir = [
+                j for j in mercado
+                if overall_min <= j.get("overall", 0) <= overall_max
+            ]
+            if not jogadores_para_excluir:
+                st.info("🔍 Nenhum jogador encontrado nesse intervalo.")
+            else:
+                for jogador in jogadores_para_excluir:
+                    supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+                st.success(f"✅ {len(jogadores_para_excluir)} jogador(es) excluído(s).")
+                st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao excluir jogadores por overall: {e}")
+
 # 🔀 Navegação
 col1, col2, col3 = st.columns(3)
 with col1:
