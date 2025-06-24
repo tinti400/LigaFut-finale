@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 import pandas as pd
-import html
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -66,7 +65,7 @@ todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in 
 nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
-# 🧮 Atualizar classificação
+# 🧮 Função para atualizar classificação
 def atualizar_classificacao():
     classificacao = {}
 
@@ -200,7 +199,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
             st.warning(f"❌ Resultado apagado e classificação atualizada.")
             st.rerun()
 
-# 📜 Histórico
+# 🔎 Histórico geral
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
@@ -225,61 +224,11 @@ for r in rodadas_data:
             })
 
 if historico:
-    df = pd.DataFrame(historico).sort_values("Rodada")
-
-    html_tabela = """
-    <style>
-        table.custom-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 15px;
-            margin-top: 10px;
-        }
-        table.custom-table th, table.custom-table td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: center;
-        }
-        table.custom-table th {
-            background-color: #f0f0f0;
-        }
-        table.custom-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        table.custom-table tr:hover {
-            background-color: #f1f1f1;
-        }
-    </style>
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th>Rodada</th>
-                <th>Mandante</th>
-                <th>Visitante</th>
-                <th>Placar</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-
-    for _, row in df.iterrows():
-        rodada = html.escape(str(row['Rodada']))
-        mandante = html.escape(str(row['Mandante']))
-        visitante = html.escape(str(row['Visitante']))
-        placar = row['Placar']
-        placar = html.escape(placar) if "x" in placar else "<span style='color:red;'>❌</span>"
-
-        html_tabela += f"""
-            <tr>
-                <td>{rodada}</td>
-                <td>{mandante}</td>
-                <td>{visitante}</td>
-                <td>{placar}</td>
-            </tr>
-        """
-
-    html_tabela += "</tbody></table>"
-    st.markdown(html_tabela, unsafe_allow_html=True)
+    try:
+        df = pd.DataFrame(historico).sort_values("Rodada")
+        st.dataframe(df)
+    except Exception as e:
+        st.error(f"Erro ao exibir histórico: {e}")
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
 
