@@ -32,8 +32,7 @@ st.title("🤝 Negociações entre Clubes")
 st.markdown(f"### Seu Time: **{nome_time}**")
 
 if not mercado_aberto:
-    st.warning("🚫 O mercado está fechado no momento. As negociações entre clubes estão desativadas.")
-    st.stop()
+    st.warning("🚫 O mercado está fechado no momento. Você pode visualizar os elencos, mas não pode enviar propostas.")
 
 # 🔍 Buscar outros times
 res_times = supabase.table("times").select("id", "nome").neq("id", id_time).execute()
@@ -76,12 +75,12 @@ if id_time_selecionado:
                 img = jogador.get("imagem_url") or "https://cdn-icons-png.flaticon.com/512/147/147144.png"
                 st.image(img, width=60)
             with col2:
-                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}")
-                st.markdown(f"📌 **Posição:** {jogador.get('posicao', '-')}")
-                st.markdown(f"⭐ **Overall:** {jogador.get('overall', '-')}")
-                st.markdown(f"🌍 **Nacionalidade:** {jogador.get('nacionalidade', '-')}")
-                st.markdown(f"🏟️ **Origem:** {jogador.get('origem', '-')}")
-                st.markdown(f"🧩 **Classificação:** {jogador.get('classificacao', 'Não definida')}")
+                st.markdown(f"**👤 Nome:** {jogador.get('nome', '-')}") 
+                st.markdown(f"📌 **Posição:** {jogador.get('posicao', '-')}") 
+                st.markdown(f"⭐ **Overall:** {jogador.get('overall', '-')}") 
+                st.markdown(f"🌍 **Nacionalidade:** {jogador.get('nacionalidade', '-')}") 
+                st.markdown(f"🏟️ **Origem:** {jogador.get('origem', '-')}") 
+                st.markdown(f"🧩 **Classificação:** {jogador.get('classificacao', 'Não definida')}") 
                 valor_jogador = jogador.get("valor", 0)
                 st.markdown(f"💰 **Valor:** R$ {valor_jogador:,.0f}".replace(",", "."))
 
@@ -130,7 +129,8 @@ if id_time_selecionado:
                     key=f"valor_composta_{jogador['id']}"
                 )
 
-            if st.button("📩 Enviar Proposta", key=f"btn_proposta_{jogador['id']}"):
+            btn = st.button("📩 Enviar Proposta", key=f"btn_proposta_{jogador['id']}", disabled=not mercado_aberto)
+            if btn:
                 if tipo != "Somente Dinheiro" and not jogadores_oferecidos:
                     st.warning("Selecione ao menos um jogador do seu elenco para a troca.")
                 else:
