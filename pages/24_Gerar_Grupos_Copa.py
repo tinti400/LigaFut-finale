@@ -23,7 +23,7 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 email_usuario = st.session_state.get("usuario", "")
 admin_check = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 if not admin_check.data:
-    st.warning("🔐 Acesso permitido apenas para administradores.")
+    st.warning("🔒 Acesso permitido apenas para administradores.")
     st.stop()
 
 # 🔄 Buscar times
@@ -41,9 +41,10 @@ todos_nomes = list(opcoes.keys())
 selecionados = st.multiselect(
     "Desmarque os times que NÃO irão participar da Copa:",
     todos_nomes,
-    default=todos_nomes  # ✅ todos marcados por padrão
+    default=todos_nomes
 )
 
+# ⚙️ Gerar Grupos da Copa
 if st.button("⚙️ Gerar Grupos da Copa"):
     if len(selecionados) < 4:
         st.warning("🚨 É necessário no mínimo 4 times para formar grupos.")
@@ -53,7 +54,14 @@ if st.button("⚙️ Gerar Grupos da Copa"):
         st.warning("🚨 Para o formato Copa do Mundo, selecione exatamente 32 times.")
         st.stop()
 
-    # 🔀 Embaralha e divide em grupos
+    # 🧽 Limpa tabela copa_ligafut inteira
+    try:
+        supabase.table("copa_ligafut").delete().neq("fase", "").execute()
+    except Exception as e:
+        st.error(f"Erro ao limpar dados antigos da copa: {e}")
+        st.stop()
+
+    # 🔄 Embaralha e divide em grupos
     ids_times = [opcoes[nome] for nome in selecionados]
     random.shuffle(ids_times)
     grupos = {f"Grupo {chr(65+i)}": ids_times[i*4:(i+1)*4] for i in range(8)}
@@ -74,25 +82,11 @@ if st.button("⚙️ Gerar Grupos da Copa"):
 
     # ⚽ Gerar confrontos (turno e returno)
     try:
-        supabase.table("copa_ligafut").delete().eq("fase", "grupos").eq("data_criacao", data_copa).execute()
-
         for grupo_nome, times in grupos.items():
             jogos = []
             for mandante, visitante in itertools.combinations(times, 2):
-                # Turno
-                jogos.append({
-                    "mandante": mandante,
-                    "visitante": visitante,
-                    "gols_mandante": None,
-                    "gols_visitante": None
-                })
-                # Returno
-                jogos.append({
-                    "mandante": visitante,
-                    "visitante": mandante,
-                    "gols_mandante": None,
-                    "gols_visitante": None
-                })
+                jogos.append({"mandante": mandante, "visitante": visitante, "gols_mandante": None, "gols_visitante": None})
+                jogos.append({"mandante": visitante, "visitante": mandante, "gols_mandante": None, "gols_visitante": None})
 
             supabase.table("copa_ligafut").insert({
                 "grupo": grupo_nome,
@@ -105,8 +99,9 @@ if st.button("⚙️ Gerar Grupos da Copa"):
         st.error(f"Erro ao salvar confrontos: {e}")
         st.stop()
 
-    # 📊 Exibir grupos gerados
+    # 👁️ Visualização dos grupos
     st.subheader("📊 Grupos Gerados")
     for grupo, lista in grupos.items():
         nomes = [nome for nome, id_ in opcoes.items() if id_ in lista]
         st.markdown(f"**{grupo}**: {', '.join(nomes)}")
+
