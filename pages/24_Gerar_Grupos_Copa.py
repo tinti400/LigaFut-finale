@@ -23,29 +23,44 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 email_usuario = st.session_state.get("usuario", "")
 admin_check = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 if not admin_check.data:
-    st.warning("🔒 Acesso permitido apenas para administradores.")
+    st.warning("🔐 Acesso permitido apenas para administradores.")
     st.stop()
 
 # 🔄 Buscar times
-times_data = supabase.table("times").select("id, nome").execute().data
-opcoes = {t["nome"]: t["id"] for t in times_data}
-selecionados = st.multiselect("📌 Escolha os times participantes da Copa:", list(opcoes.keys()))
+try:
+    todos_times = supabase.table("times").select("id, nome").execute().data
+except Exception as e:
+    st.error(f"Erro ao buscar times: {e}")
+    st.stop()
+
+# 📌 Seleção dos times (todos selecionados por padrão)
+st.subheader("📌 Selecione os times participantes (desmarque para excluir)")
+opcoes = {t['nome']: t['id'] for t in todos_times}
+todos_nomes = list(opcoes.keys())
+
+selecionados = st.multiselect(
+    "Desmarque os times que NÃO irão participar da Copa:",
+    todos_nomes,
+    default=todos_nomes  # ✅ todos marcados por padrão
+)
 
 if st.button("⚙️ Gerar Grupos da Copa"):
-    if len(selecionados) != 32:
-        st.warning("🚨 É necessário selecionar exatamente 32 times para o formato Copa do Mundo.")
+    if len(selecionados) < 4:
+        st.warning("🚨 É necessário no mínimo 4 times para formar grupos.")
         st.stop()
 
-    # 🔄 Embaralhar e organizar os grupos
+    if len(selecionados) != 32:
+        st.warning("🚨 Para o formato Copa do Mundo, selecione exatamente 32 times.")
+        st.stop()
+
+    # 🔀 Embaralha e divide em grupos
     ids_times = [opcoes[nome] for nome in selecionados]
     random.shuffle(ids_times)
-
     grupos = {f"Grupo {chr(65+i)}": ids_times[i*4:(i+1)*4] for i in range(8)}
     data_copa = datetime.now().strftime("%Y-%m-%d")
 
     try:
         supabase.table("grupos_copa").delete().neq("grupo", "").execute()
-
         for grupo_nome, times in grupos.items():
             for id_time in times:
                 supabase.table("grupos_copa").insert({
@@ -57,7 +72,7 @@ if st.button("⚙️ Gerar Grupos da Copa"):
         st.error(f"Erro ao salvar grupos: {e}")
         st.stop()
 
-    # 🏆 Gerar confrontos (turno e returno)
+    # ⚽ Gerar confrontos (turno e returno)
     try:
         supabase.table("copa_ligafut").delete().eq("fase", "grupos").eq("data_criacao", data_copa).execute()
 
@@ -90,7 +105,7 @@ if st.button("⚙️ Gerar Grupos da Copa"):
         st.error(f"Erro ao salvar confrontos: {e}")
         st.stop()
 
-    # 👁️ Visualização
+    # 📊 Exibir grupos gerados
     st.subheader("📊 Grupos Gerados")
     for grupo, lista in grupos.items():
         nomes = [nome for nome, id_ in opcoes.items() if id_ in lista]
