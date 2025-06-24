@@ -39,6 +39,10 @@ def registrar_movimentacao(id_time, jogador, tipo, valor):
 
 def registrar_bid(id_time_origem, id_time_destino, jogador, tipo, valor):
     try:
+        if not jogador or not isinstance(jogador, dict):
+            st.error("❌ Dados do jogador inválidos para o BID.")
+            return
+
         nome_jogador = jogador.get("nome") or "Desconhecido"
         posicao = jogador.get("posicao") or "?"
         valor_final = int(valor) if valor else 0
@@ -115,7 +119,7 @@ if eh_admin:
         st.success("✅ Evento iniciado.")
         st.experimental_rerun()
 
-# 🔒 Fase de Bloqueio
+# 🔐 Fase de Bloqueio
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
     bloqueios_atual = bloqueios.get(id_time, [])
@@ -214,13 +218,12 @@ if ativo and fase == "acao" and vez < len(ordem):
             st.success("⏭️ Pulado.")
             st.experimental_rerun()
 
-# ✅ Finalizar evento
+# ✅ Finaliza evento e mostra resumo
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
     st.experimental_rerun()
 
-# 📊 Exibir resumo
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
     resumo = []
@@ -229,7 +232,7 @@ if evento.get("finalizado"):
         for jogador in lista:
             nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
             resumo.append({
-                "🏴 Time que Roubou": nome_destino,
+                "🌟 Time que Roubou": nome_destino,
                 "👤 Jogador": jogador["nome"],
                 "⚽ Posição": jogador["posicao"],
                 "💰 Pago": f"R$ {int(jogador['valor'])//2:,.0f}",
