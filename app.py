@@ -1,56 +1,10 @@
 # app.py
 import streamlit as st
-from PIL import Image
-import os
 
 st.set_page_config(page_title="LigaFut 2025", page_icon="⚽", layout="wide")
 
-# 🧠 Sessão inicial
-if "usuario" not in st.session_state:
-    st.session_state["usuario"] = None
-
-# 🎨 Layout inicial
-col1, col2 = st.columns([1, 3])
-with col1:
-    logo = Image.open("logo_ligafut.png") if os.path.exists("logo_ligafut.png") else None
-    if logo:
-        st.image(logo, width=150)
-with col2:
-    st.markdown("<h1 style='color: #1E90FF;'>🏆 Bem-vindo à LigaFut 2025</h1>", unsafe_allow_html=True)
-    st.markdown("Gerencie sua equipe, participe dos leilões, negocie com outros clubes e dispute títulos!")
-
-st.markdown("---")
-
-# 🔗 Menu lateral
-st.sidebar.title("📂 Navegação")
-pagina = st.sidebar.radio("Ir para:", [
-    "Login",
-    "Cadastro",
-    "Elenco",
-    "Classificação & Rodadas",
-    "Editar Resultados",
-    "Mercado de Transferências",
-    "Leilão",
-    "Negociações",
-    "Propostas Recebidas",
-    "Painel Financeiro"
-])
-
-# 🔄 Redirecionamento
-paginas_arquivos = {
-    "Login": "pages/1_🔐 Login.py",
-    "Cadastro": "pages/2_📝 Cadastro.py",
-    "Elenco": "pages/4_Elenco.py",
-    "Classificação & Rodadas": "pages/4_📊 Classificacao & Rodadas.py",
-    "Editar Resultados": "pages/19_✏️ Editar Resultados.py",
-    "Mercado de Transferências": "pages/5_Mercado_Transferencias.py",
-    "Leilão": "pages/10_Leilao_Sistema.py",
-    "Negociações": "pages/11_Negociacoes.py",
-    "Propostas Recebidas": "pages/12_Propostas_Recebidas.py",
-    "Painel Financeiro": "pages/7_Painel_Financeiro.py",
-}
-
-# Executa o script correto
-if pagina in paginas_arquivos:
-    with open(paginas_arquivos[pagina], encoding="utf-8") as f:
-        exec(f.read(), globals())
+# 🔄 Redireciona para o login ao abrir o app
+if "usuario_id" not in st.session_state:
+    st.switch_page("pages/1_🔐 Login.py")
+else:
+    st.switch_page("pages/3_Home.py")
