@@ -96,6 +96,11 @@ if "usuario" not in st.session_state and "usuario" in params:
 
 # 🔓 Se já estiver logado
 if "usuario" in st.session_state:
+    if st.session_state.get("login_realizado"):
+        st.session_state.pop("login_realizado", None)
+        st.sidebar.success("✅ Login realizado com sucesso! Use o menu ao lado.")
+        st.stop()
+
     st.success(f"🔓 Logado como: {st.session_state['usuario']}")
     if st.button("🔒 Sair"):
         for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao", "session_id", "administrador"]:
@@ -137,7 +142,7 @@ with st.container():
                         st.experimental_set_query_params(usuario=user["usuario"])
                         time_res = supabase.table("times").select("nome").eq("id", user["time_id"]).execute()
                         st.session_state["nome_time"] = time_res.data[0]["nome"] if time_res.data else "Sem Nome"
-                        st.success("✅ Login realizado com sucesso! Redirecionando...")
+                        st.session_state["login_realizado"] = True
                         st.experimental_rerun()
                     else:
                         st.error("❌ Usuário ou senha inválidos.")
