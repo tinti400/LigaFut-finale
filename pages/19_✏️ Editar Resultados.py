@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 import pandas as pd
+import html
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -199,7 +200,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
             st.warning(f"❌ Resultado apagado e classificação atualizada.")
             st.rerun()
 
-# 🔎 Histórico geral
+# 📜 Histórico do time
 st.markdown("---")
 st.subheader("📜 Histórico do Time em Todas as Rodadas")
 nomes_times = {v["nome"]: k for k, v in times_info.items()}
@@ -228,12 +229,13 @@ if historico:
         df = pd.DataFrame(historico).sort_values("Rodada")
 
         def render_tabela_html(df):
-            html = """
+            html_str = """
             <style>
                 table.custom-table {
                     width: 100%;
                     border-collapse: collapse;
                     font-size: 15px;
+                    margin-top: 10px;
                 }
                 table.custom-table th, table.custom-table td {
                     border: 1px solid #ccc;
@@ -261,20 +263,28 @@ if historico:
                 </thead>
                 <tbody>
             """
+
             for _, row in df.iterrows():
-                placar = row["Placar"]
+                rodada = html.escape(str(row['Rodada']))
+                mandante = html.escape(str(row['Mandante']).replace('\n', ' ').strip())
+                visitante = html.escape(str(row['Visitante']).replace('\n', ' ').strip())
+                placar = row['Placar']
                 if placar == "❌ Não definido":
                     placar = "<span style='color:red;'>❌</span>"
-                html += f"""
+                else:
+                    placar = html.escape(placar)
+
+                html_str += f"""
                     <tr>
-                        <td>{row['Rodada']}</td>
-                        <td>{row['Mandante']}</td>
-                        <td>{row['Visitante']}</td>
+                        <td>{rodada}</td>
+                        <td>{mandante}</td>
+                        <td>{visitante}</td>
                         <td>{placar}</td>
                     </tr>
                 """
-            html += "</tbody></table>"
-            return html
+
+            html_str += "</tbody></table>"
+            return html_str
 
         st.markdown(render_tabela_html(df), unsafe_allow_html=True)
 
