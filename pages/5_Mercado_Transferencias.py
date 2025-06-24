@@ -94,8 +94,9 @@ fim = inicio + jogadores_por_pagina
 jogadores_pagina = jogadores_filtrados[inicio:fim]
 
 # 🗉️ Elenco atual
-res_elenco = supabase.table("elenco").select("id").eq("id_time", id_time).execute()
-qtde_elenco = len(res_elenco.data) if res_elenco.data else 0
+res_elenco = supabase.table("elenco").select("id", "nome", "posicao").eq("id_time", id_time).execute()
+elenco_atual = res_elenco.data if res_elenco.data else []
+qtde_elenco = len(elenco_atual)
 
 # 📦 Lista de jogadores selecionados (somente admins)
 selecionados = set()
@@ -106,7 +107,6 @@ st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 for jogador in jogadores_pagina:
     col1, col2, col3, col4, col5 = st.columns([0.3, 1.8, 2, 2, 2])
     
-    # ✅ Checkbox admin
     if is_admin:
         selecionado = col1.checkbox("", key=f"check_{jogador['id']}")
         if selecionado:
@@ -126,7 +126,6 @@ for jogador in jogadores_pagina:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
         st.markdown(f"🏠 Origem: {jogador.get('time_origem', 'Desconhecido')}")
 
-        # ✏️ Editar valor (apenas admin)
         if is_admin:
             novo_valor = st.number_input(f"Editar valor de {jogador['nome']}", min_value=1, step=1,
                                          value=int(jogador["valor"]), key=f"val_{jogador['id']}")
@@ -144,22 +143,26 @@ for jogador in jogadores_pagina:
         else:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
                 try:
-                    res_atual = supabase.table("times").select("saldo").eq("id", id_time).execute()
-                    saldo_atual = res_atual.data[0]["saldo"] if res_atual.data else 0
+                    # Verifica saldo novamente
+                    saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
+
                     if saldo_atual < jogador["valor"]:
                         st.error("❌ Saldo insuficiente.")
                         st.stop()
 
-                    verifica_duplicado = supabase.table("elenco").select("id").eq("id_time", id_time).eq("nome", jogador["nome"]).eq("posicao", jogador["posicao"]).execute()
-                    if verifica_duplicado.data:
-                        st.error(f"❌ {jogador['nome']} já está no seu elenco.")
-                        st.stop()
+                    # Verifica duplicado
+                    for j in elenco_atual:
+                        if j["nome"].lower() == jogador["nome"].lower() and j["posicao"] == jogador["posicao"]:
+                            st.error(f"❌ {jogador['nome']} já está no seu elenco.")
+                            st.stop()
 
+                    # Deleta do mercado
                     res_delete = supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
                     if not res_delete.data:
                         st.error("❌ Este jogador já foi comprado por outro time.")
                         st.experimental_rerun()
 
+                    # Insere no elenco
                     valor = int(jogador["valor"])
                     salario = int(jogador.get("salario", valor * 0.01))
                     supabase.table("elenco").insert({
@@ -174,15 +177,9 @@ for jogador in jogadores_pagina:
                         "origem": jogador.get("origem", jogador.get("time_origem", "Desconhecido"))
                     }).execute()
 
-                    registrar_movimentacao(
-                        id_time=id_time,
-                        tipo="saida",
-                        valor=valor,
-                        descricao=f"Compra de {jogador['nome']} no mercado"
-                    )
+                    registrar_movimentacao(id_time, "saida", valor, f"Compra de {jogador['nome']} no mercado")
 
-                    novo_saldo = saldo_atual - valor
-                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+                    supabase.table("times").update({"saldo": saldo_atual - valor}).eq("id", id_time).execute()
 
                     registrar_bid(
                         id_time=id_time,
@@ -223,4 +220,3 @@ with col3:
     if st.button("➡ Próxima página") and pagina_atual < total_paginas:
         st.session_state["pagina_mercado"] += 1
         st.experimental_rerun()
-
