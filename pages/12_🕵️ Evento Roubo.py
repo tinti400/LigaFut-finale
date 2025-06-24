@@ -23,7 +23,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
-# ✅ Função corrigida para registrar movimentação
+# ✅ Funções utilitárias
 def registrar_movimentacao(id_time, jogador, tipo, valor):
     try:
         supabase.table("movimentacoes_financeiras").insert({
@@ -37,7 +37,22 @@ def registrar_movimentacao(id_time, jogador, tipo, valor):
     except Exception as e:
         st.error(f"Erro ao registrar movimentação: {e}")
 
-# 🚫 Verifica restrição de participação
+def registrar_bid(id_time_origem, id_time_destino, jogador, tipo, valor):
+    try:
+        supabase.table("bid_transferencias").insert({
+            "id": str(uuid.uuid4()),
+            "id_time_origem": id_time_origem,
+            "id_time_destino": id_time_destino,
+            "nome_jogador": jogador.get("nome", "Desconhecido"),
+            "posicao": jogador.get("posicao", ""),
+            "valor": valor,
+            "tipo": tipo,
+            "data": str(datetime.utcnow())
+        }).execute()
+    except Exception as e:
+        st.error(f"Erro ao registrar no BID: {e}")
+
+# 🚫 Verifica se o time está proibido de participar
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
     restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
@@ -72,7 +87,7 @@ eh_admin = res_admin.data and res_admin.data[0]["administrador"]
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
-# 🔐 Admin inicia o evento
+# 🔐 Início do evento (admin)
 if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
     novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=3, step=1)
@@ -137,6 +152,7 @@ if ativo and fase == "bloqueio":
         supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
         st.success("🚀 Fase de ação iniciada.")
         st.experimental_rerun()
+
 # ⚔️ Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
     id_atual = ordem[vez]
@@ -178,6 +194,7 @@ if ativo and fase == "acao" and vez < len(ordem):
                         supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
                         registrar_movimentacao(id_time, jogador_nome, "entrada", valor_pago)
                         registrar_movimentacao(id_alvo, jogador_nome, "saida", valor_pago)
+                        registrar_bid(id_alvo, id_time, jogador, "roubo", valor_pago)
 
                         res_saldos = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute()
                         saldos = {item["id"]: item["saldo"] for item in res_saldos.data}
@@ -205,36 +222,26 @@ if ativo and fase == "acao" and vez < len(ordem):
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
-                supabase.table("configuracoes").update({
-                    "concluidos": concluidos,
-                    "vez": str(vez + 1)
-                }).eq("id", ID_CONFIG).execute()
+                supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.success("🔄 Sua vez foi encerrada.")
                 st.experimental_rerun()
     else:
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.warning(f"⏳ Aguarde, é a vez de **{nome_proximo}**")
         if eh_admin and st.button("⏭️ Pular vez deste time"):
-            supabase.table("configuracoes").update({
-                "vez": str(vez + 1),
-                "concluidos": concluidos + [id_atual]
-            }).eq("id", ID_CONFIG).execute()
+            supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success(f"⏭️ Vez de {nome_proximo} pulada com sucesso.")
             st.experimental_rerun()
-# ✅ Finalizar evento e mostrar resumo
+
+# ✅ Finalizar e mostrar resumo
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado. Veja o resumo.")
-    supabase.table("configuracoes").update({
-        "ativo": False,
-        "finalizado": True
-    }).eq("id", ID_CONFIG).execute()
+    supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
     st.experimental_rerun()
 
-# 📋 Exibição do resumo após finalização
 if evento.get("finalizado"):
     st.success("✅ Evento encerrado. Veja as transferências:")
     resumo = []
-
     if roubos and isinstance(roubos, dict):
         for id_destino, lista in roubos.items():
             try:
@@ -251,8 +258,7 @@ if evento.get("finalizado"):
             except Exception as e:
                 st.error(f"Erro ao processar resumo do time {id_destino}: {e}")
 
-    if resumo and isinstance(resumo, list):
-        df_resumo = pd.DataFrame(resumo)
-        st.dataframe(df_resumo, use_container_width=True)
+    if resumo:
+        st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
