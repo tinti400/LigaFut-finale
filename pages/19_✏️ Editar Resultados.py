@@ -65,7 +65,7 @@ todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in 
 nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
-# 🧮 Função para atualizar classificação
+# 🧮 Atualizar classificação
 def atualizar_classificacao():
     classificacao = {}
 
@@ -226,7 +226,58 @@ for r in rodadas_data:
 if historico:
     try:
         df = pd.DataFrame(historico).sort_values("Rodada")
-        st.dataframe(df)
+
+        def render_tabela_html(df):
+            html = """
+            <style>
+                table.custom-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 15px;
+                }
+                table.custom-table th, table.custom-table td {
+                    border: 1px solid #ccc;
+                    padding: 8px;
+                    text-align: center;
+                }
+                table.custom-table th {
+                    background-color: #f0f0f0;
+                }
+                table.custom-table tr:nth-child(even) {
+                    background-color: #f9f9f9;
+                }
+                table.custom-table tr:hover {
+                    background-color: #f1f1f1;
+                }
+            </style>
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Rodada</th>
+                        <th>Mandante</th>
+                        <th>Visitante</th>
+                        <th>Placar</th>
+                    </tr>
+                </thead>
+                <tbody>
+            """
+            for _, row in df.iterrows():
+                placar = row["Placar"]
+                if placar == "❌ Não definido":
+                    placar = "<span style='color:red;'>❌</span>"
+                html += f"""
+                    <tr>
+                        <td>{row['Rodada']}</td>
+                        <td>{row['Mandante']}</td>
+                        <td>{row['Visitante']}</td>
+                        <td>{placar}</td>
+                    </tr>
+                """
+            html += "</tbody></table>"
+            return html
+
+        st.markdown(render_tabela_html(df), unsafe_allow_html=True)
+
     except Exception as e:
         st.error(f"Erro ao exibir histórico: {e}")
 else:
