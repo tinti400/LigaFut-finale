@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+import pandas as pd
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
 
@@ -107,38 +108,36 @@ if nivel < 5:
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 📊 Ranking de Capacidade dos Estádios
+# 📊 Ranking de Estádios
 st.markdown("---")
-st.subheader("🏟️ Ranking de Capacidade dos Estádios")
+st.markdown("## 🏟️ Ranking de Estádios da LigaFut")
 
 try:
-    res_all = supabase.table("estadios").select("*").execute()
-    estadios = res_all.data if res_all.data else []
+    ests = supabase.table("estadios").select("*").execute().data
+    times = supabase.table("times").select("id", "nome").execute().data
+    mapa_nomes = {t["id"]: t["nome"] for t in times}
 
-    df_estadios = []
-    res_times = supabase.table("times").select("id", "nome").execute()
-    map_times = {t["id"]: t["nome"] for t in res_times.data}
-
-    for e in estadios:
-        try:
-            capacidade = int(e.get("capacidade") or 0)
-        except:
-            capacidade = 0
-
-        try:
-            nivel = int(e.get("nivel") or 1)
-        except:
-            nivel = 1
-
-        df_estadios.append({
-            "Time": map_times.get(e.get("id_time"), "Desconhecido"),
-            "Estádio": e.get("nome", "Estádio"),
-            "Capacidade": capacidade,
-            "Nível": nivel
+    dados = []
+    for est in ests:
+        id_t = est["id_time"]
+        nome_t = mapa_nomes.get(id_t, "Desconhecido")
+        cap = est.get("capacidade", 0)
+        preco = float(est.get("preco_ingresso", 20.0))
+        nivel = est.get("nivel", 1)
+        pub = calcular_publico(cap, preco, nivel)
+        renda = pub * preco
+        dados.append({
+            "Time": nome_t,
+            "Capacidade": cap,
+            "Preço Ingresso (R$)": preco,
+            "Público Estimado": pub,
+            "Renda Estimada (R$)": renda
         })
 
-    df_estadios = sorted(df_estadios, key=lambda x: x["Capacidade"], reverse=True)
-    st.dataframe(pd.DataFrame(df_estadios), height=500)
+    df_estadios = pd.DataFrame(sorted(dados, key=lambda x: x["Renda Estimada (R$)"], reverse=True))
+
+    st.dataframe(df_estadios)
+
 except Exception as e:
     st.error(f"Erro ao carregar ranking: {e}")
 
