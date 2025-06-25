@@ -42,7 +42,6 @@ def calcular_renda_jogo(estadio):
     renda = publico * preco
     return renda, publico
 
-# 🔄 Buscar rodadas
 @st.cache(ttl=60)
 def buscar_resultados(temporada, divisao):
     try:
@@ -51,7 +50,6 @@ def buscar_resultados(temporada, divisao):
     except Exception:
         return []
 
-# 👥 Buscar nomes e logos dos times
 @st.cache(ttl=60)
 def obter_nomes_times(divisao):
     try:
@@ -70,7 +68,6 @@ def obter_nomes_times(divisao):
     except:
         return {}
 
-# 🧠 Calcular classificação
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
     for rodada in rodadas:
@@ -115,12 +112,10 @@ def calcular_classificacao(rodadas, times_map):
         pass
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🔄 Dados
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
 times_map = obter_nomes_times(numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Tabela de classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -151,7 +146,6 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# 📅 Rodadas
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
@@ -183,43 +177,36 @@ for rodada in rodadas:
             st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
 
         if gm != "" and gv != "":
-            try:
-                descricao = f"Renda da partida rodada {rodada_selecionada}"
-                check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).eq("descricao", descricao).execute()
-                if check.data:
-                    valor_registrado = check.data[0]["valor"]
-                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                    estadio = res_estadio.data[0] if res_estadio.data else None
-                    preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
-                    publico_estimado = int(valor_registrado / preco_ingresso)
-                    st.info(f"📊 Público estimado: {publico_estimado:,} pessoas | 💰 Renda registrada: R${valor_registrado:,.2f}")
-                else:
-                    col_a, col_b = st.columns([5, 1])
-with col_b:
-    if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
-        try:
-            st.write("🔄 Registrando renda para:", m_nome)
-            res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-            estadio = res_estadio.data[0] if res_estadio.data else None
-            st.write("🏟️ Estádio encontrado:", estadio)
+            descricao = f"Renda da partida rodada {rodada_selecionada}"
+            check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).eq("descricao", descricao).execute()
+            if check.data:
+                valor_registrado = check.data[0]["valor"]
+                res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                estadio = res_estadio.data[0] if res_estadio.data else None
+                preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
+                publico_estimado = int(valor_registrado / preco_ingresso)
+                st.info(f"📊 Público estimado: {publico_estimado:,} pessoas | 💰 Renda registrada: R${valor_registrado:,.2f}")
+            else:
+                col_a, col_b = st.columns([5, 1])
+                try:
+                    with col_b:
+                        if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
+                            st.write("🔄 Registrando renda para:", m_nome)
+                            res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                            estadio = res_estadio.data[0] if res_estadio.data else None
+                            st.write("🏟️ Estádio encontrado:", estadio)
 
-            if estadio:
-                renda, publico = calcular_renda_jogo(estadio)
-                st.write("💰 Renda:", renda, "| 👥 Público:", publico)
-                saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                novo_saldo = saldo_atual + renda
-                st.write("💳 Saldo atual:", saldo_atual, "➡️ Novo saldo:", novo_saldo)
+                            if estadio:
+                                renda, publico = calcular_renda_jogo(estadio)
+                                st.write("💰 Renda:", renda, "| 👥 Público:", publico)
+                                saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+                                novo_saldo = saldo_atual + renda
+                                st.write("💳 Saldo atual:", saldo_atual, "➡️ Novo saldo:", novo_saldo)
 
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
-                registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
-                st.success(f"✅ Renda registrada: R${renda:,.2f} para {m_nome}")
-                st.experimental_rerun()
-        except Exception as e:
-            st.error(f"❌ Erro ao registrar renda: {e}")
-    except Exception as e:
-        st.error(f"Erro ao registrar renda: {e}")
-                            except Exception as e:
-                                st.warning(f"Erro ao registrar renda: {e}")
-            except Exception as e:
-                st.warning(f"Erro ao calcular renda do jogo: {e}")
+                                supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
+                                registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+                                st.success(f"✅ Renda registrada: R${renda:,.2f} para {m_nome}")
+                                st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao registrar renda: {e}")
 
