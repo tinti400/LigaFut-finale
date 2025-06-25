@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -97,7 +98,6 @@ def calcular_classificacao(rodadas, times_map):
             else:
                 tabela[m]["pontos"] += 1; tabela[v]["pontos"] += 1
                 tabela[m]["e"] += 1; tabela[v]["e"] += 1
-
     for tid in times_map:
         if tid not in tabela:
             tabela[tid] = {
@@ -106,7 +106,6 @@ def calcular_classificacao(rodadas, times_map):
                 "tecnico": times_map[tid].get("tecnico", ""),
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
-
     try:
         res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
         puni_map = {p["id_time"]: p["pontos_retirados"] for p in res_punicoes.data}
@@ -115,7 +114,6 @@ def calcular_classificacao(rodadas, times_map):
                 tabela[tid]["pontos"] -= puni_map[tid]
     except:
         pass
-
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
 # 🔄 Dados
@@ -143,7 +141,10 @@ if classificacao:
         html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
         for i, row in df.iterrows():
             cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            html += f"<tr style='background-color: {cor};'>" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
+            linha = "<tr style='background-color: {};'>".format(cor)
+            linha += ''.join(f"<td>{val}</td>" for val in row)
+            linha += "</tr>"
+            html += linha
         html += "</tbody></table>"
         return html
 
@@ -186,8 +187,15 @@ for rodada in rodadas:
         if gm != "" and gv != "":
             try:
                 descricao = f"Renda da partida rodada {rodada_selecionada}"
-                check = supabase.table("movimentacoes_financeiras").select("id").eq("id_time", m_id).eq("descricao", descricao).execute()
-                if not check.data:
+                check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).eq("descricao", descricao).execute()
+                if check.data:
+                    valor_registrado = check.data[0]["valor"]
+                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                    estadio = res_estadio.data[0] if res_estadio.data else None
+                    preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
+                    publico_estimado = int(valor_registrado / preco_ingresso)
+                    st.info(f"📊 Público estimado: {publico_estimado:,} pessoas | 💰 Renda registrada: R${valor_registrado:,.2f}")
+                else:
                     res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
                     estadio = res_estadio.data[0] if res_estadio.data else None
                     if estadio:
