@@ -16,8 +16,11 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
 # 🧠 Funções auxiliares
-def calcular_renda(capacidade, nivel):
-    return capacidade * 10 * nivel
+def calcular_publico(capacidade, preco_ingresso, nivel):
+    demanda_base = capacidade * (0.9 + nivel * 0.02)
+    fator_preco = max(0.3, 1 - (preco_ingresso - 20) * 0.03)
+    publico = int(min(capacidade, demanda_base * fator_preco))
+    return publico
 
 def custo_melhoria(nivel_atual):
     custos = {
@@ -38,6 +41,7 @@ if not estadio:
         "nome": f"Estádio {nome_time}",
         "nivel": 1,
         "capacidade": 10000,
+        "preco_ingresso": 20.0,
         "em_melhorias": False
     }
     supabase.table("estadios").insert(estadio_novo).execute()
@@ -48,17 +52,29 @@ nome = estadio["nome"]
 nivel = estadio["nivel"]
 capacidade = estadio["capacidade"]
 em_melhorias = estadio.get("em_melhorias", False)
-renda = calcular_renda(capacidade, nivel)
+preco_ingresso = float(estadio.get("preco_ingresso", 20.0))
+publico_estimado = calcular_publico(capacidade, preco_ingresso, nivel)
+renda = publico_estimado * preco_ingresso
 
 # 🎨 Exibição
 st.markdown(f"## 🏟️ {nome}")
 st.markdown(f"""
 - **Nível atual:** {nivel}
 - **Capacidade:** {capacidade:,} torcedores
+- **Preço do ingresso:** R${preco_ingresso:.2f}
+- **Público médio estimado:** {publico_estimado:,} torcedores
 - **Renda por jogo (como mandante):** R${renda:,.2f}
 """)
 
-# 💡 Melhorar estádio
+# 💵 Atualizar preço do ingresso
+novo_preco = st.number_input("🎫 Definir novo preço médio do ingresso (R$)", value=preco_ingresso, min_value=5.0, max_value=100.0, step=1.0)
+if novo_preco != preco_ingresso:
+    if st.button("💾 Atualizar Preço do Ingresso"):
+        supabase.table("estadios").update({"preco_ingresso": novo_preco}).eq("id_time", id_time).execute()
+        st.success("✅ Preço atualizado com sucesso!")
+        st.rerun()
+
+# 🏗️ Melhorar estádio
 if nivel < 5:
     custo = custo_melhoria(nivel)
     if em_melhorias:
@@ -67,7 +83,7 @@ if nivel < 5:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
 
-        # Buscar saldo do time
+        # Buscar saldo
         res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
         saldo = res_saldo.data[0]["saldo"]
 
@@ -82,16 +98,11 @@ if nivel < 5:
                     "em_melhorias": True
                 }).eq("id_time", id_time).execute()
 
-                # Debita o valor do time
                 novo_saldo = saldo - custo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                # Registra movimentação
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
-
                 st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
                 st.rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
-
-# ✅ Futuras melhorias: aplicar tempo real ou por rodada para finalizar a obra
