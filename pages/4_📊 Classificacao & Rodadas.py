@@ -31,6 +31,18 @@ temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
+# 🧠 Função de renda variável por jogo
+def calcular_renda_jogo(estadio):
+    preco = float(estadio.get("preco_ingresso", 20.0))
+    nivel = estadio.get("nivel", 1)
+    capacidade = estadio.get("capacidade", 10000)
+
+    demanda_base = capacidade * (0.9 + nivel * 0.02)
+    fator_preco = max(0.3, 1 - (preco - 20) * 0.03)
+    publico = int(min(capacidade, demanda_base * fator_preco))
+    renda = publico * preco
+    return renda, publico
+
 # 🔄 Buscar rodadas
 @st.cache(ttl=60)
 def buscar_resultados(temporada, divisao):
@@ -182,3 +194,21 @@ for rodada in rodadas:
             st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
             st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+
+        # 💰 Renda variável do mandante
+        if gm != "" and gv != "":
+            try:
+                descricao = f"Renda da partida rodada {rodada_selecionada}"
+                check = supabase.table("movimentacoes_financeiras").select("id").eq("id_time", m_id).eq("descricao", descricao).execute()
+                if not check.data:
+                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                    estadio = res_estadio.data[0] if res_estadio.data else None
+                    if estadio:
+                        renda, publico = calcular_renda_jogo(estadio)
+                        saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+                        novo_saldo = saldo_atual + renda
+                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
+                        registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+                        st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
+            except Exception as e:
+                st.warning(f"Erro ao calcular renda do jogo: {e}")
