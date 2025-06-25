@@ -205,7 +205,7 @@ for rodada in rodadas:
                             supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
                             registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
                             st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
-                            st.rerun()
+                            st.experimental_rerun()
             except Exception as e:
                 st.warning(f"Erro ao calcular renda do jogo: {e}")
                 st.warning(f"Erro ao calcular renda do jogo: {e}")
