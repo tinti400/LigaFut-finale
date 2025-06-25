@@ -14,20 +14,24 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
+# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
+# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
+# 🔹 Seleção da divisão e temporada
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
+# 💰 Função de renda variável por jogo
 def calcular_renda_jogo(estadio):
     try:
         preco = float(estadio.get("preco_ingresso") or 20.0)
@@ -105,23 +109,46 @@ def calcular_classificacao(rodadas, times_map):
                 "tecnico": times_map[tid].get("tecnico", ""),
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
-    try:
-        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
-        puni_map = {p["id_time"]: p["pontos_retirados"] for p in res_punicoes.data}
-        for tid in tabela:
-            if tid in puni_map:
-                tabela[tid]["pontos"] -= puni_map[tid]
-    except:
-        pass
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-rodadas = buscar_resultados(numero_temporada, numero_divisao)
+# Carrega dados
 times_map = obter_nomes_times(numero_divisao)
+rodadas = buscar_resultados(numero_temporada, numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
-st.markdown("---")
-st.subheader("📅 Rodadas da Temporada")
+# Tabela
+if classificacao:
+    df = pd.DataFrame([{
+        "Posição": i + 1,
+        "Time": f"<img src='{t['logo']}' width='25'> <b>{t['nome']}</b><br><small>{t['tecnico']}</small>",
+        "Pontos": t["pontos"],
+        "Jogos": t["v"] + t["e"] + t["d"],
+        "Vitórias": t["v"],
+        "Empates": t["e"],
+        "Derrotas": t["d"],
+        "Gols Pró": t["gp"],
+        "Gols Contra": t["gc"],
+        "Saldo de Gols": t["sg"]
+    } for i, (tid, t) in enumerate(classificacao)])
 
+    def aplicar_estilo(df):
+        html = "<table style='width: 100%; border-collapse: collapse;'>"
+        html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
+        for i, row in df.iterrows():
+            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
+            linha = "<tr style='background-color: {};'>".format(cor)
+            linha += ''.join(f"<td>{val}</td>" for val in row)
+            linha += "</tr>"
+            html += linha
+        html += "</tbody></table>"
+        return html
+
+    st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
+else:
+    st.info("Nenhum dado de classificação disponível.")
+
+st.markdown("---")
+st.subheader("🗕️ Rodadas da Temporada")
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
 rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
 
@@ -136,46 +163,41 @@ for rodada in rodadas:
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
         m_logo = m.get("logo", ""); v_logo = v.get("logo", "")
         m_nome = m.get("nome", "Desconhecido"); v_nome = v.get("nome", "Desconhecido")
-        descricao = f"Renda da partida rodada {rodada_selecionada}"
 
         col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
         with col1:
             st.markdown(f"<div style='text-align: right; line-height: 1.2;'>"
-                        f"<img src='{m_logo}' width='30'> <b>{m_nome}</b>", unsafe_allow_html=True)
+                        f"<img src='{m_logo}' width='30'> <b>{m_nome}</b><br>", unsafe_allow_html=True)
 
-            if gm != "" and gv != "":
-                check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
-                if check.data:
-                    valor_registrado = check.data[0]["valor"]
-                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                    estadio = res_estadio.data[0] if res_estadio.data else None
-                    preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
-                    publico_estimado = int(valor_registrado / preco_ingresso)
-                    st.markdown(f"<br><small>👥 {publico_estimado:,} pessoas<br>💰 R${valor_registrado:,.2f}</small></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<br><small style='color:gray;'>💬 Renda não registrada</small></div>", unsafe_allow_html=True)
+        if gm != "" and gv != "":
+            descricao = f"Renda da partida rodada {rodada_selecionada}"
+            check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
 
-                    if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
-                        try:
-                            res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                            estadio = res_estadio.data[0] if res_estadio.data else None
-
-                            if estadio:
-                                renda, publico = calcular_renda_jogo(estadio)
-
-                                saldo_data = supabase.table("times").select("saldo").eq("id", m_id).execute().data
-                                saldo_atual = saldo_data[0]["saldo"] if saldo_data else 0
-                                novo_saldo = int(saldo_atual + renda)
-
-                                supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
-                                registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
-
-                                st.success(f"✅ Renda registrada: R${renda:,.2f} para {m_nome}")
-                                st.experimental_rerun()
-                        except Exception as e:
-                            st.error(f"❌ Erro ao registrar renda: {e}")
+            if check.data:
+                valor_registrado = check.data[0]["valor"]
+                res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                estadio = res_estadio.data[0] if res_estadio.data else None
+                preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
+                publico_estimado = int(valor_registrado / preco_ingresso)
+                st.markdown(f"<small>👥 {publico_estimado:,} pessoas<br>💰 R${valor_registrado:,.2f}</small></div>", unsafe_allow_html=True)
             else:
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("<small style='color:gray;'>💬 Renda não registrada</small></div>", unsafe_allow_html=True)
+                if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
+                    try:
+                        res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                        estadio = res_estadio.data[0] if res_estadio.data else None
+
+                        if estadio:
+                            renda, publico = calcular_renda_jogo(estadio)
+                            saldo_atual_data = supabase.table("times").select("saldo").eq("id", m_id).execute().data
+                            saldo_atual = saldo_atual_data[0]["saldo"] if saldo_atual_data else 0
+                            novo_saldo = int(saldo_atual + renda)
+                            supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
+                            registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+                            st.success(f"✅ Renda registrada: R${renda:,.2f} para {m_nome}")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao registrar renda: {e}")
 
         with col2:
             st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
