@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -196,14 +195,18 @@ for rodada in rodadas:
                     publico_estimado = int(valor_registrado / preco_ingresso)
                     st.info(f"📊 Público estimado: {publico_estimado:,} pessoas | 💰 Renda registrada: R${valor_registrado:,.2f}")
                 else:
-                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                    estadio = res_estadio.data[0] if res_estadio.data else None
-                    if estadio:
-                        renda, publico = calcular_renda_jogo(estadio)
-                        saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                        novo_saldo = saldo_atual + renda
-                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
-                        registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
-                        st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
+                    if st.button(f"💸 Forçar registro de renda ({m_nome})", key=f"forcar_renda_{m_id}_{rodada_selecionada}"):
+                        res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+                        estadio = res_estadio.data[0] if res_estadio.data else None
+                        if estadio:
+                            renda, publico = calcular_renda_jogo(estadio)
+                            saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+                            novo_saldo = saldo_atual + renda
+                            supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
+                            registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+                            st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
+                            st.rerun()
             except Exception as e:
                 st.warning(f"Erro ao calcular renda do jogo: {e}")
+                st.warning(f"Erro ao calcular renda do jogo: {e}")
+
