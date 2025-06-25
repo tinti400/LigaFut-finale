@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
+import pandas as pd
 
 st.set_page_config(page_title="🏟️ Estádio - LigaFut", layout="wide")
 
@@ -106,4 +107,34 @@ if nivel < 5:
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
+
+# 🔍 Painel administrativo de auditoria (apenas admins)
+email_usuario = st.session_state.get("usuario", "")
+res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+is_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+
+if is_admin:
+    st.markdown("---")
+    st.markdown("## 🧾 Auditoria de Estádios (Admin Only)")
+
+    res_estadios = supabase.table("estadios").select("id_time, preco_ingresso, nivel, capacidade").execute().data
+    res_times = supabase.table("times").select("id", "nome").execute().data
+    times_dict = {t["id"]: t["nome"] for t in res_times}
+
+    df_estadios = pd.DataFrame([{
+        "Time": times_dict.get(e["id_time"], "Desconhecido"),
+        "Preço": e.get("preco_ingresso", "❌"),
+        "Nível": e.get("nivel", "❌"),
+        "Capacidade": e.get("capacidade", "❌"),
+        "Problema": "✅ OK" if all([
+            isinstance(e.get("preco_ingresso"), (int, float)),
+            isinstance(e.get("nivel"), int),
+            isinstance(e.get("capacidade"), int)
+        ]) else "❌ Dados ausentes ou inválidos"
+    } for e in res_estadios])
+
+    def cor_linha(row):
+        return ['background-color: #f8d7da' if row.Problema != '✅ OK' else '' for _ in row]
+
+    st.dataframe(df_estadios.style.apply(cor_linha, axis=1), use_container_width=True)
 
