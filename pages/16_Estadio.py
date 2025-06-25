@@ -13,6 +13,12 @@ supabase = create_client(url, key)
 
 # ✅ Verifica sessão
 verificar_sessao()
+
+# ⚠️ Verifica se 'nome_time' está na sessão
+if "nome_time" not in st.session_state:
+    st.warning("Você precisa estar logado com um time válido para acessar esta página.")
+    st.stop()
+
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
@@ -84,7 +90,7 @@ if novo_preco != preco_ingresso:
     if st.button("💾 Atualizar Preço do Ingresso"):
         supabase.table("estadios").update({"preco_ingresso": novo_preco}).eq("id_time", id_time).execute()
         st.success("✅ Preço atualizado com sucesso!")
-        st.experimental_rerun()
+        st.rerun()
 
 # 🏗️ Melhorar estádio
 if nivel < 5:
@@ -114,7 +120,7 @@ if nivel < 5:
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
                 st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
-                st.experimental_rerun()
+                st.rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
@@ -152,4 +158,3 @@ if res_admin.data:
         st.dataframe(df, height=600)
     except Exception as e:
         st.error(f"Erro ao carregar ranking: {e}")
-
