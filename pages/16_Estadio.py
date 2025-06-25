@@ -83,6 +83,7 @@ if nivel < 5:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
 
+        # Buscar saldo
         res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
         saldo = res_saldo.data[0]["saldo"]
 
@@ -99,36 +100,45 @@ if nivel < 5:
 
                 novo_saldo = saldo - custo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
 
+                registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
                 st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 📊 Ranking dos Estádios
+# 📊 Ranking de Capacidade dos Estádios
 st.markdown("---")
-st.markdown("## 🏟️ Ranking de Estádios")
+st.subheader("🏟️ Ranking de Capacidade dos Estádios")
 
 try:
-    estadios = supabase.table("estadios").select("id_time, nome, nivel, capacidade").execute().data
-    times = supabase.table("times").select("id, nome").execute().data
-    map_times = {t["id"]: t["nome"] for t in times}
+    res_all = supabase.table("estadios").select("*").execute()
+    estadios = res_all.data if res_all.data else []
 
     df_estadios = []
+    res_times = supabase.table("times").select("id", "nome").execute()
+    map_times = {t["id"]: t["nome"] for t in res_times.data}
+
     for e in estadios:
+        try:
+            capacidade = int(e.get("capacidade") or 0)
+        except:
+            capacidade = 0
+
+        try:
+            nivel = int(e.get("nivel") or 1)
+        except:
+            nivel = 1
+
         df_estadios.append({
-            "Time": map_times.get(e["id_time"], "Desconhecido"),
-            "Estádio": e["nome"],
-            "Capacidade": e["capacidade"],
-            "Nível": e["nivel"]
+            "Time": map_times.get(e.get("id_time"), "Desconhecido"),
+            "Estádio": e.get("nome", "Estádio"),
+            "Capacidade": capacidade,
+            "Nível": nivel
         })
 
-    df_estadios = sorted(df_estadios, key=lambda x: (-x["capacidade"], -x["nivel"]))
-    df_estadios = st.session_state.get("df_estadios_cache", df_estadios)  # evita recarregar à toa
-
-    st.dataframe(df_estadios)  # ✅ Sem use_container_width para evitar erro
-
+    df_estadios = sorted(df_estadios, key=lambda x: x["Capacidade"], reverse=True)
+    st.dataframe(pd.DataFrame(df_estadios), height=500)
 except Exception as e:
     st.error(f"Erro ao carregar ranking: {e}")
 
