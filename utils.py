@@ -10,10 +10,12 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão ativa
+# ✅ Verifica sessão ativa (agora inclui nome_time também)
 def verificar_sessao():
-    if "usuario_id" not in st.session_state or "id_time" not in st.session_state:
-        st.warning("Você precisa estar logado para acessar esta página.")
+    campos_obrigatorios = ["usuario_id", "id_time", "nome_time"]
+    faltando = [campo for campo in campos_obrigatorios if campo not in st.session_state]
+    if faltando:
+        st.warning("⚠️ Você precisa estar logado para acessar esta página.")
         st.stop()
 
 # 💰 Registrar movimentação financeira e opcionalmente no BID
@@ -85,15 +87,9 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
             "destino": destino or ""
         }
 
-        # 🐞 DEBUG OPCIONAL
-        # st.markdown("### 🐞 DEBUG BID:")
-        # st.json(registro)
-
         supabase.table("movimentacoes").insert(registro).execute()
         return True
 
     except Exception as e:
         st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
-
-
