@@ -72,7 +72,7 @@ if novo_preco != preco_ingresso:
     if st.button("💾 Atualizar Preço do Ingresso"):
         supabase.table("estadios").update({"preco_ingresso": novo_preco}).eq("id_time", id_time).execute()
         st.success("✅ Preço atualizado com sucesso!")
-        st.rerun()
+        st.experimental_rerun()
 
 # 🏗️ Melhorar estádio
 if nivel < 5:
@@ -103,6 +103,7 @@ if nivel < 5:
 
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
                 st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
-                st.rerun()
+                st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
+
