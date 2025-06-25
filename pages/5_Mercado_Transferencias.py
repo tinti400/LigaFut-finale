@@ -141,7 +141,7 @@ for jogador in jogadores_pagina:
                 try:
                     saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
 
-                    if saldo_atual < jogador["valor"]:
+                    if saldo_atual < jogador.get("valor", 0):
                         st.error("❌ Saldo insuficiente.")
                         st.stop()
 
@@ -155,8 +155,16 @@ for jogador in jogadores_pagina:
                         st.error("❌ Este jogador já foi comprado por outro time.")
                         st.experimental_rerun()
 
-                    valor = int(jogador["valor"])
-                    salario = int(jogador.get("salario", valor * 0.01))
+                    # ✅ Correção: proteger conversão de valor
+                    valor_raw = jogador.get("valor")
+                    if valor_raw is None:
+                        st.error(f"❌ O valor de {jogador['nome']} não está definido.")
+                        st.stop()
+                    valor = int(valor_raw)
+
+                    salario_raw = jogador.get("salario")
+                    salario = int(salario_raw) if salario_raw is not None else int(valor * 0.01)
+
                     supabase.table("elenco").insert({
                         "nome": jogador["nome"],
                         "posicao": jogador["posicao"],
@@ -188,7 +196,6 @@ for jogador in jogadores_pagina:
 
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
-
 # 🧹 Excluir múltiplos jogadores (admin)
 if is_admin and selecionados:
     st.markdown("---")
