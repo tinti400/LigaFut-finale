@@ -93,7 +93,35 @@ res_admin = supabase.table("usuarios").select("administrador").eq("usuario", ema
 eh_admin = res_admin.data and res_admin.data[0]["administrador"]
 
 if st.button("🔄 Atualizar Página"):
-    st.experimental_rerun()
+    st.rerun()
+
+# 🔍 Mostrar jogadores bloqueados do time atual
+st.subheader("🛡️ Seus jogadores bloqueados")
+
+bloqueios_atual = bloqueios.get(id_time, [])
+ultimos_bloqueios_time = ultimos_bloqueios.get(id_time, [])
+todos_bloqueados = bloqueios_atual + ultimos_bloqueios_time
+
+if todos_bloqueados:
+    for jogador in todos_bloqueados:
+        st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']})")
+else:
+    st.info("Você ainda não bloqueou nenhum jogador.")
+
+# 📋 Exibir a ordem do sorteio (fila dos times)
+st.subheader("📋 Ordem de Participação (Sorteio)")
+
+try:
+    if ordem:
+        times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
+        mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
+        for i, idt in enumerate(ordem):
+            indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
+            st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
+    else:
+        st.warning("Ainda não foi definido o sorteio dos times.")
+except Exception as e:
+    st.error(f"Erro ao exibir a ordem dos times: {e}")
 
 # 🔐 Início do evento (admin)
 if eh_admin:
@@ -117,7 +145,7 @@ if eh_admin:
             "limite_bloqueios": novo_limite
         }).eq("id", ID_CONFIG).execute()
         st.success("✅ Evento iniciado.")
-        st.experimental_rerun()
+        st.rerun()
 
 # 🔐 Fase de Bloqueio
 if ativo and fase == "bloqueio":
@@ -135,15 +163,31 @@ if ativo and fase == "bloqueio":
         max_selecao = limite_bloqueios - len(nomes_bloqueados)
         selecionados = st.multiselect(f"Selecione até {max_selecao} jogador(es):", nomes_livres)
         if selecionados and st.button("🔐 Confirmar proteção"):
-            novos_bloqueios = [{"nome": j["nome"], "posicao": j["posicao"]} for j in jogadores_livres if j["nome"] in selecionados]
+            novos_bloqueios = []
+            for j in jogadores_livres:
+                if j["nome"] in selecionados:
+                    bloqueio = {"nome": j["nome"], "posicao": j["posicao"]}
+                    novos_bloqueios.append(bloqueio)
+                    # Salvar também na tabela jogadores_bloqueados_roubo
+                    try:
+                        supabase.table("jogadores_bloqueados_roubo").insert({
+                            "id": str(uuid.uuid4()),
+                            "id_jogador": j["id"],
+                            "id_time": id_time,
+                            "temporada": 1,
+                            "evento": "roubo",
+                            "data_bloqueio": str(datetime.utcnow())
+                        }).execute()
+                    except Exception as e:
+                        st.warning(f"Erro ao salvar bloqueio no histórico: {e}")
             bloqueios[id_time] = bloqueios_atual + novos_bloqueios
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
             st.success("✅ Proteção realizada.")
-            st.experimental_rerun()
+            st.rerun()
 
     if eh_admin and st.button("👉 Iniciar Fase de Ação"):
         supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
-        st.experimental_rerun()
+        st.rerun()
 
 # ⚔️ Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
@@ -203,26 +247,26 @@ if ativo and fase == "acao" and vez < len(ordem):
                             "ja_perderam": ja_perderam
                         }).eq("id", ID_CONFIG).execute()
                         st.success("✅ Jogador roubado!")
-                        st.experimental_rerun()
+                        st.rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.success("✅ Vez encerrada.")
-                st.experimental_rerun()
+                st.rerun()
     else:
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.info(f"⏳ Aguardando: {nome_proximo}")
         if eh_admin and st.button("⏭️ Pular vez"):
             supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success("⏭️ Pulado.")
-            st.experimental_rerun()
+            st.rerun()
 
 # ✅ Finaliza evento e mostra resumo
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
-    st.experimental_rerun()
+    st.rerun()
 
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
