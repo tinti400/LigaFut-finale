@@ -93,7 +93,7 @@ res_admin = supabase.table("usuarios").select("administrador").eq("usuario", ema
 eh_admin = res_admin.data and res_admin.data[0]["administrador"]
 
 if st.button("🔄 Atualizar Página"):
-    st.rerun()
+    st.experimental_rerun()
 
 # 🔍 Mostrar jogadores bloqueados do time atual
 st.subheader("🛡️ Seus jogadores bloqueados")
@@ -145,8 +145,7 @@ if eh_admin:
             "limite_bloqueios": novo_limite
         }).eq("id", ID_CONFIG).execute()
         st.success("✅ Evento iniciado.")
-        st.rerun()
-
+        st.experimental_rerun()
 # 🔐 Fase de Bloqueio
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
@@ -183,11 +182,11 @@ if ativo and fase == "bloqueio":
             bloqueios[id_time] = bloqueios_atual + novos_bloqueios
             supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
             st.success("✅ Proteção realizada.")
-            st.rerun()
+            st.experimental_rerun()
 
     if eh_admin and st.button("👉 Iniciar Fase de Ação"):
         supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
-        st.rerun()
+        st.experimental_rerun()
 
 # ⚔️ Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
@@ -247,26 +246,26 @@ if ativo and fase == "acao" and vez < len(ordem):
                             "ja_perderam": ja_perderam
                         }).eq("id", ID_CONFIG).execute()
                         st.success("✅ Jogador roubado!")
-                        st.rerun()
+                        st.experimental_rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
                 supabase.table("configuracoes").update({"concluidos": concluidos, "vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.success("✅ Vez encerrada.")
-                st.rerun()
+                st.experimental_rerun()
     else:
         nome_proximo = supabase.table("times").select("nome").eq("id", id_atual).execute().data[0]["nome"]
         st.info(f"⏳ Aguardando: {nome_proximo}")
         if eh_admin and st.button("⏭️ Pular vez"):
             supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success("⏭️ Pulado.")
-            st.rerun()
+            st.experimental_rerun()
 
 # ✅ Finaliza evento e mostra resumo
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
-    st.rerun()
+    st.experimental_rerun()
 
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
