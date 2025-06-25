@@ -31,17 +31,17 @@ temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-# 💰 Função de renda variável por jogo
+# 📊 Função para calcular renda com escalonamento
 def calcular_renda_jogo(estadio):
     try:
         preco = float(estadio.get("preco_ingresso") or 20.0)
         nivel = int(estadio.get("nivel") or 1)
-        capacidade = int(estadio.get("capacidade") or 10000)
+        capacidade = 25000 + (nivel - 1) * int((110000 - 25000) / 9)
     except Exception as e:
         st.warning(f"⚠️ Erro nos dados do estádio: {e}. Usando valores padrão.")
         preco = 20.0
         nivel = 1
-        capacidade = 10000
+        capacidade = 25000
 
     demanda_base = capacidade * (0.9 + nivel * 0.02)
     fator_preco = max(0.3, 1 - (preco - 20) * 0.03)
@@ -119,10 +119,12 @@ def calcular_classificacao(rodadas, times_map):
         pass
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
+# 🔄 Processamento
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
 times_map = obter_nomes_times(numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
+# 🧾 Exibe tabela
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -198,22 +200,15 @@ for rodada in rodadas:
                 try:
                     with col_b:
                         if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
-                            st.write("🔄 Registrando renda para:", m_nome)
                             res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
                             estadio = res_estadio.data[0] if res_estadio.data else None
-                            st.write("🏟️ Estádio encontrado:", estadio)
-
                             if estadio:
                                 renda, publico = calcular_renda_jogo(estadio)
-                                st.write("💰 Renda:", renda, "| 👥 Público:", publico)
                                 saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                                novo_saldo = saldo_atual + renda
-                                st.write("💳 Saldo atual:", saldo_atual, "➡️ Novo saldo:", novo_saldo)
-
+                                novo_saldo = int(saldo_atual + renda)
                                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
                                 registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
                                 st.success(f"✅ Renda registrada: R${renda:,.2f} para {m_nome}")
                                 st.experimental_rerun()
                 except Exception as e:
                     st.error(f"❌ Erro ao registrar renda: {e}")
-
