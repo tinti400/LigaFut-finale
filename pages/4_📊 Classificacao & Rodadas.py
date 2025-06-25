@@ -197,17 +197,23 @@ for rodada in rodadas:
                     col_a, col_b = st.columns([5, 1])
                     with col_b:
                         if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
-                            try:
-                                res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                                estadio = res_estadio.data[0] if res_estadio.data else None
-                                if estadio:
-                                    renda, publico = calcular_renda_jogo(estadio)
-                                    saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                                    novo_saldo = saldo_atual + renda
-                                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
-                                    registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
-                                    st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
-                                    st.experimental_rerun()
+    try:
+        st.write("Registrando renda para:", m_nome)
+        res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
+        st.write("Estádio:", res_estadio)
+        estadio = res_estadio.data[0] if res_estadio.data else None
+        if estadio:
+            renda, publico = calcular_renda_jogo(estadio)
+            st.write("Renda calculada:", renda, "Público:", publico)
+            saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+            novo_saldo = saldo_atual + renda
+            st.write("Saldo atual:", saldo_atual, "Novo saldo:", novo_saldo)
+            supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
+            registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+            st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
+            st.experimental_rerun()
+    except Exception as e:
+        st.error(f"Erro ao registrar renda: {e}")
                             except Exception as e:
                                 st.warning(f"Erro ao registrar renda: {e}")
             except Exception as e:
