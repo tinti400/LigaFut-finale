@@ -50,10 +50,22 @@ if not estadio:
 
 # 🔢 Dados do estádio
 nome = estadio["nome"]
-nivel = estadio["nivel"]
-capacidade = estadio["capacidade"]
+try:
+    preco_ingresso = float(estadio.get("preco_ingresso", 20.0) or 20.0)
+except:
+    preco_ingresso = 20.0
+
+try:
+    nivel = int(estadio.get("nivel", 1) or 1)
+except:
+    nivel = 1
+
+try:
+    capacidade = int(estadio.get("capacidade", 10000) or 10000)
+except:
+    capacidade = 10000
+
 em_melhorias = estadio.get("em_melhorias", False)
-preco_ingresso = float(estadio.get("preco_ingresso", 20.0))
 publico_estimado = calcular_publico(capacidade, preco_ingresso, nivel)
 renda = publico_estimado * preco_ingresso
 
@@ -108,34 +120,51 @@ if nivel < 5:
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 📊 Ranking de Estádios
+# 🧾 Ranking de Estádios
 st.markdown("---")
-st.subheader("📊 Ranking dos Estádios")
+st.subheader("📊 Ranking de Estádios da Liga")
 
-res_todos = supabase.table("estadios").select("id_time, nome, nivel, capacidade, preco_ingresso").execute().data
-dados = []
-for est in res_todos:
-    idt = est["id_time"]
-    preco = float(est.get("preco_ingresso", 20.0))
-    nivel = est.get("nivel", 1)
-    capacidade = est.get("capacidade", 10000)
-    publico = calcular_publico(capacidade, preco, nivel)
-    renda = publico * preco
+try:
+    res_all = supabase.table("estadios").select("id_time, nome, capacidade, preco_ingresso, nivel").execute()
+    todos_estadios = res_all.data
 
-    # Nome do time
-    nome_time_res = supabase.table("times").select("nome").eq("id", idt).execute()
-    nome_time_est = nome_time_res.data[0]["nome"] if nome_time_res.data else "Desconhecido"
+    if todos_estadios:
+        df_estadios = []
 
-    dados.append({
-        "Time": nome_time_est,
-        "Estádio": est.get("nome", "Estádio"),
-        "Nível": nivel,
-        "Capacidade": capacidade,
-        "Preço Ingresso (R$)": preco,
-        "Público Médio": publico,
-        "Renda Média (R$)": renda
-    })
+        for est in todos_estadios:
+            tid = est["id_time"]
+            time = supabase.table("times").select("nome").eq("id", tid).execute().data[0]
+            nome_time = time["nome"]
 
-df_estadios = pd.DataFrame(dados).sort_values(by="Renda Média (R$)", ascending=False).reset_index(drop=True)
-st.dataframe(df_estadios, use_container_width=True)
+            try:
+                preco = float(est.get("preco_ingresso", 20.0) or 20.0)
+            except:
+                preco = 20.0
+            try:
+                nivel = int(est.get("nivel", 1) or 1)
+            except:
+                nivel = 1
+            try:
+                capacidade = int(est.get("capacidade", 10000) or 10000)
+            except:
+                capacidade = 10000
+
+            publico = calcular_publico(capacidade, preco, nivel)
+            renda = publico * preco
+
+            df_estadios.append({
+                "Time": nome_time,
+                "Capacidade": capacidade,
+                "Preço Ingresso (R$)": preco,
+                "Nível": nivel,
+                "Público Estimado": publico,
+                "Renda Média (R$)": float(renda or 0)
+            })
+
+        df_estadios = pd.DataFrame(df_estadios).sort_values(by="Renda Média (R$)", ascending=False)
+        st.dataframe(df_estadios, use_container_width=True)
+    else:
+        st.info("Nenhum estádio cadastrado.")
+except Exception as e:
+    st.error(f"Erro ao carregar ranking: {e}")
 
