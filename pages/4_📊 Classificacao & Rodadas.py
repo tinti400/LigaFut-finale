@@ -32,14 +32,21 @@ numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
 # 🧠 Função de renda variável por jogo
-def calcular_renda_jogo(estadio):
+
+def calcular_renda_jogo(estadio, fase=None, decisivo=False):
     preco = float(estadio.get("preco_ingresso", 20.0))
     nivel = estadio.get("nivel", 1)
     capacidade = estadio.get("capacidade", 10000)
-
     demanda_base = capacidade * (0.9 + nivel * 0.02)
     fator_preco = max(0.3, 1 - (preco - 20) * 0.03)
-    publico = int(min(capacidade, demanda_base * fator_preco))
+    bonus = 1.0
+    if fase == "boa":
+        bonus += 0.10
+    elif fase == "ruim":
+        bonus -= 0.10
+    if decisivo:
+        bonus += 0.20
+    publico = int(min(capacidade, demanda_base * fator_preco * bonus))
     renda = publico * preco
     return renda, publico
 
@@ -76,98 +83,52 @@ def obter_nomes_times(divisao):
     except:
         return {}
 
-# 🧠 Calcular classificação
-def calcular_classificacao(rodadas, times_map):
-    tabela = {}
+# 📊 Calcular fase dos times com base nos últimos 3 jogos
 
+def avaliar_fase_dos_times(rodadas, rodada_atual):
+    fases = {}
     for rodada in rodadas:
+        if rodada["numero"] >= rodada_atual:
+            continue
         for jogo in rodada.get("jogos", []):
             m, v = jogo.get("mandante"), jogo.get("visitante")
             gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
-            if None in [m, v, gm, gv]: continue
-            try: gm, gv = int(gm), int(gv)
-            except: continue
+            if None in [m, v, gm, gv]:
+                continue
+            try:
+                gm, gv = int(gm), int(gv)
+            except:
+                continue
+            for time_id, resultado in [(m, gm - gv), (v, gv - gm)]:
+                if time_id not in fases:
+                    fases[time_id] = []
+                if resultado > 0:
+                    fases[time_id].append("v")
+                elif resultado < 0:
+                    fases[time_id].append("d")
+                else:
+                    fases[time_id].append("e")
+    fases_finais = {}
+    for tid, ultimos in fases.items():
+        ultimos = ultimos[-3:]
+        v = ultimos.count("v")
+        d = ultimos.count("d")
+        if v >= 2:
+            fases_finais[tid] = "boa"
+        elif d >= 2:
+            fases_finais[tid] = "ruim"
+        else:
+            fases_finais[tid] = None
+    return fases_finais
 
-            for t in (m, v):
-                if t not in tabela:
-                    tabela[t] = {
-                        "nome": times_map.get(t, {}).get("nome", "Desconhecido"),
-                        "logo": times_map.get(t, {}).get("logo", ""),
-                        "tecnico": times_map.get(t, {}).get("tecnico", ""),
-                        "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
-                    }
-
-            tabela[m]["gp"] += gm; tabela[m]["gc"] += gv; tabela[m]["sg"] += gm - gv
-            tabela[v]["gp"] += gv; tabela[v]["gc"] += gm; tabela[v]["sg"] += gv - gm
-
-            if gm > gv:
-                tabela[m]["pontos"] += 3; tabela[m]["v"] += 1; tabela[v]["d"] += 1
-            elif gv > gm:
-                tabela[v]["pontos"] += 3; tabela[v]["v"] += 1; tabela[m]["d"] += 1
-            else:
-                tabela[m]["pontos"] += 1; tabela[v]["pontos"] += 1
-                tabela[m]["e"] += 1; tabela[v]["e"] += 1
-
-    for tid in times_map:
-        if tid not in tabela:
-            tabela[tid] = {
-                "nome": times_map[tid]["nome"],
-                "logo": times_map[tid]["logo"],
-                "tecnico": times_map[tid].get("tecnico", ""),
-                "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
-            }
-
-    try:
-        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").execute()
-        puni_map = {p["id_time"]: p["pontos_retirados"] for p in res_punicoes.data}
-        for tid in tabela:
-            if tid in puni_map:
-                tabela[tid]["pontos"] -= puni_map[tid]
-    except:
-        pass
-
-    return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
-
-# 🔄 Dados
+# 🔄 Dados e rodadas
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
 times_map = obter_nomes_times(numero_divisao)
-classificacao = calcular_classificacao(rodadas, times_map)
-
-# 📊 Tabela de classificação
-if classificacao:
-    df = pd.DataFrame([{
-        "Posição": i + 1,
-        "Time": f"<img src='{t['logo']}' width='25'> <b>{t['nome']}</b><br><small>{t['tecnico']}</small>",
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    } for i, (tid, t) in enumerate(classificacao)])
-
-    def aplicar_estilo(df):
-        html = "<table style='width: 100%; border-collapse: collapse;'>"
-        html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
-        for i, row in df.iterrows():
-            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            html += f"<tr style='background-color: {cor};'>" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
-        html += "</tbody></table>"
-        return html
-
-    st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
-else:
-    st.info("Nenhum dado de classificação disponível.")
-
-# 📅 Filtro de rodada
-st.markdown("---")
-st.subheader("📅 Rodadas da Temporada")
-
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
 rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
+fases_times = avaliar_fase_dos_times(rodadas, rodada_selecionada)
 
+# 📅 Mostrar jogos da rodada com renda
 for rodada in rodadas:
     if rodada["numero"] != rodada_selecionada:
         continue
@@ -178,37 +139,31 @@ for rodada in rodadas:
         gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
         m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
 
-        m_logo = m.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        v_logo = v.get("logo", "https://cdn-icons-png.flaticon.com/512/147/147144.png")
-        m_nome = m.get("nome", "Desconhecido")
-        v_nome = v.get("nome", "Desconhecido")
-
         col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
         with col1:
-            st.markdown(f"<div style='text-align: right;'><img src='{m_logo}' width='30'> <b>{m_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: right;'><img src='{m.get('logo', '')}' width='30'> <b>{m.get('nome', 'Desconhecido')}</b></div>", unsafe_allow_html=True)
         with col2:
             st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
         with col3:
-            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
+            st.markdown("<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
         with col4:
             st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
         with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: left;'><img src='{v.get('logo', '')}' width='30'> <b>{v.get('nome', 'Desconhecido')}</b></div>", unsafe_allow_html=True)
 
-        # 💰 Renda variável do mandante
+        # 💰 Renda do mandante
         if gm != "" and gv != "":
             try:
                 descricao = f"Renda da partida rodada {rodada_selecionada}"
                 check = supabase.table("movimentacoes_financeiras").select("id").eq("id_time", m_id).eq("descricao", descricao).execute()
                 if not check.data:
-                    res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                    estadio = res_estadio.data[0] if res_estadio.data else None
-                    if estadio:
-                        renda, publico = calcular_renda_jogo(estadio)
-                        saldo_atual = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                        novo_saldo = saldo_atual + renda
-                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", m_id).execute()
-                        registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
-                        st.success(f"💰 Renda registrada: R${renda:,.2f} para {m_nome}")
+                    estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute().data[0]
+                    fase = fases_times.get(m_id)
+                    decisivo = rodada_selecionada == max(rodadas_disponiveis)
+                    renda, publico = calcular_renda_jogo(estadio, fase=fase, decisivo=decisivo)
+                    saldo = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+                    supabase.table("times").update({"saldo": saldo + renda}).eq("id", m_id).execute()
+                    registrar_movimentacao(m_id, "entrada", renda, f"{descricao} (público: {publico:,})")
+                    st.success(f"💰 Renda registrada: R${renda:,.2f} para {m.get('nome')}")
             except Exception as e:
                 st.warning(f"Erro ao calcular renda do jogo: {e}")
