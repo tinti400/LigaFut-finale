@@ -104,8 +104,11 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 
 # Seleção final de colunas
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
-df_exibir = df[colunas].astype(str)
+df_exibir = df[colunas].copy()
 
-# 📋 Exibir extrato final
+# ✅ Garante que todas as colunas sejam strings para evitar erro no Streamlit
+df_exibir = df_exibir.astype(str)
+
+# 📋 Exibir
 st.subheader(f"💼 Extrato do time **{nome_time}**")
 st.dataframe(df_exibir, use_container_width=True)
