@@ -108,33 +108,34 @@ if nivel < 5:
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 🔍 Painel administrativo de auditoria (apenas admins)
-email_usuario = st.session_state.get("usuario", "")
-res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
-is_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+# 📊 Ranking de Estádios
+st.markdown("---")
+st.subheader("📊 Ranking dos Estádios")
 
-if is_admin:
-    st.markdown("---")
-    st.markdown("## 🧾 Auditoria de Estádios (Admin Only)")
+res_todos = supabase.table("estadios").select("id_time, nome, nivel, capacidade, preco_ingresso").execute().data
+dados = []
+for est in res_todos:
+    idt = est["id_time"]
+    preco = float(est.get("preco_ingresso", 20.0))
+    nivel = est.get("nivel", 1)
+    capacidade = est.get("capacidade", 10000)
+    publico = calcular_publico(capacidade, preco, nivel)
+    renda = publico * preco
 
-    res_estadios = supabase.table("estadios").select("id_time, preco_ingresso, nivel, capacidade").execute().data
-    res_times = supabase.table("times").select("id", "nome").execute().data
-    times_dict = {t["id"]: t["nome"] for t in res_times}
+    # Nome do time
+    nome_time_res = supabase.table("times").select("nome").eq("id", idt).execute()
+    nome_time_est = nome_time_res.data[0]["nome"] if nome_time_res.data else "Desconhecido"
 
-    df_estadios = pd.DataFrame([{
-        "Time": times_dict.get(e["id_time"], "Desconhecido"),
-        "Preço": e.get("preco_ingresso", "❌"),
-        "Nível": e.get("nivel", "❌"),
-        "Capacidade": e.get("capacidade", "❌"),
-        "Problema": "✅ OK" if all([
-            isinstance(e.get("preco_ingresso"), (int, float)),
-            isinstance(e.get("nivel"), int),
-            isinstance(e.get("capacidade"), int)
-        ]) else "❌ Dados ausentes ou inválidos"
-    } for e in res_estadios])
+    dados.append({
+        "Time": nome_time_est,
+        "Estádio": est.get("nome", "Estádio"),
+        "Nível": nivel,
+        "Capacidade": capacidade,
+        "Preço Ingresso (R$)": preco,
+        "Público Médio": publico,
+        "Renda Média (R$)": renda
+    })
 
-    def cor_linha(row):
-        return ['background-color: #f8d7da' if row.Problema != '✅ OK' else '' for _ in row]
-
-    st.dataframe(df_estadios.style.apply(cor_linha, axis=1), use_container_width=True)
+df_estadios = pd.DataFrame(dados).sort_values(by="Renda Média (R$)", ascending=False).reset_index(drop=True)
+st.dataframe(df_estadios, use_container_width=True)
 
