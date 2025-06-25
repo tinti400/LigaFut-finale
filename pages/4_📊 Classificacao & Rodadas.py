@@ -131,13 +131,16 @@ if classificacao:
     } for i, (tid, t) in enumerate(classificacao)])
 
     def aplicar_estilo(df):
-        html = "<table style='width: 100%; border-collapse: collapse;'>"
-        html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
-        for i, row in df.iterrows():
-            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            html += f"<tr style='background-color: {cor};">" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
-        html += "</tbody></table>"
-        return html
+    html = "<table style='width: 100%; border-collapse: collapse;'>"
+    html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
+    for i, row in df.iterrows():
+        cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
+        linha = "<tr style='background-color: {};'>".format(cor)
+        linha += ''.join(f"<td>{val}</td>" for val in row)
+        linha += "</tr>"
+        html += linha
+    html += "</tbody></table>"
+    return html
 
     st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
 else:
