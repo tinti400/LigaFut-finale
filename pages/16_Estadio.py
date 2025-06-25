@@ -24,13 +24,19 @@ def calcular_publico(capacidade, preco_ingresso, nivel):
     return publico
 
 def custo_melhoria(nivel_atual):
-    custos = {
-        1: 5_000_000,
-        2: 10_000_000,
-        3: 20_000_000,
-        4: 30_000_000
+    base = 250_000_000
+    incremento = 120_000_000
+    return base + (nivel_atual - 1) * incremento
+
+def capacidade_por_nivel(nivel):
+    capacidades = {
+        1: 25000,
+        2: 40000,
+        3: 60000,
+        4: 85000,
+        5: 110000
     }
-    return custos.get(nivel_atual, None)
+    return capacidades.get(nivel, 25000)
 
 # 🔄 Buscar ou criar estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
@@ -41,7 +47,7 @@ if not estadio:
         "id_time": id_time,
         "nome": f"Estádio {nome_time}",
         "nivel": 1,
-        "capacidade": 10000,
+        "capacidade": capacidade_por_nivel(1),
         "preco_ingresso": 20.0,
         "em_melhorias": False
     }
@@ -92,7 +98,7 @@ if nivel < 5:
             st.error("💰 Saldo insuficiente para realizar a melhoria.")
         else:
             if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
-                nova_capacidade = capacidade + 10000
+                nova_capacidade = capacidade_por_nivel(nivel + 1)
                 supabase.table("estadios").update({
                     "nivel": nivel + 1,
                     "capacidade": nova_capacidade,
@@ -107,37 +113,4 @@ if nivel < 5:
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
-
-# 📊 Ranking de Estádios
-st.markdown("---")
-st.markdown("## 🏟️ Ranking de Estádios da LigaFut")
-
-try:
-    ests = supabase.table("estadios").select("*").execute().data
-    times = supabase.table("times").select("id", "nome").execute().data
-    mapa_nomes = {t["id"]: t["nome"] for t in times}
-
-    dados = []
-    for est in ests:
-        id_t = est["id_time"]
-        nome_t = mapa_nomes.get(id_t, "Desconhecido")
-        cap = est.get("capacidade", 0)
-        preco = float(est.get("preco_ingresso", 20.0))
-        nivel = est.get("nivel", 1)
-        pub = calcular_publico(cap, preco, nivel)
-        renda = pub * preco
-        dados.append({
-            "Time": nome_t,
-            "Capacidade": cap,
-            "Preço Ingresso (R$)": preco,
-            "Público Estimado": pub,
-            "Renda Estimada (R$)": renda
-        })
-
-    df_estadios = pd.DataFrame(sorted(dados, key=lambda x: x["Renda Estimada (R$)"], reverse=True))
-
-    st.dataframe(df_estadios)
-
-except Exception as e:
-    st.error(f"Erro ao carregar ranking: {e}")
 
