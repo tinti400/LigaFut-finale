@@ -33,9 +33,16 @@ numero_temporada = int(temporada.split()[-1])
 
 # 💰 Função de renda variável por jogo
 def calcular_renda_jogo(estadio):
-    preco = float(estadio.get("preco_ingresso", 20.0))
-    nivel = estadio.get("nivel", 1)
-    capacidade = estadio.get("capacidade", 10000)
+    try:
+        preco = float(estadio.get("preco_ingresso") or 20.0)
+        nivel = int(estadio.get("nivel") or 1)
+        capacidade = int(estadio.get("capacidade") or 10000)
+    except Exception as e:
+        st.warning(f"⚠️ Erro nos dados do estádio: {e}. Usando valores padrão.")
+        preco = 20.0
+        nivel = 1
+        capacidade = 10000
+
     demanda_base = capacidade * (0.9 + nivel * 0.02)
     fator_preco = max(0.3, 1 - (preco - 20) * 0.03)
     publico = int(min(capacidade, demanda_base * fator_preco))
