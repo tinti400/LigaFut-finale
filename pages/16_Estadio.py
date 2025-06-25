@@ -2,7 +2,6 @@
 import streamlit as st
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
-import pandas as pd
 
 st.set_page_config(page_title="🏟️ Estádio - LigaFut", layout="wide")
 
@@ -50,22 +49,10 @@ if not estadio:
 
 # 🔢 Dados do estádio
 nome = estadio["nome"]
-try:
-    preco_ingresso = float(estadio.get("preco_ingresso", 20.0) or 20.0)
-except:
-    preco_ingresso = 20.0
-
-try:
-    nivel = int(estadio.get("nivel", 1) or 1)
-except:
-    nivel = 1
-
-try:
-    capacidade = int(estadio.get("capacidade", 10000) or 10000)
-except:
-    capacidade = 10000
-
+nivel = estadio["nivel"]
+capacidade = estadio["capacidade"]
 em_melhorias = estadio.get("em_melhorias", False)
+preco_ingresso = float(estadio.get("preco_ingresso", 20.0))
 publico_estimado = calcular_publico(capacidade, preco_ingresso, nivel)
 renda = publico_estimado * preco_ingresso
 
@@ -96,7 +83,6 @@ if nivel < 5:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
 
-        # Buscar saldo
         res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
         saldo = res_saldo.data[0]["saldo"]
 
@@ -113,58 +99,36 @@ if nivel < 5:
 
                 novo_saldo = saldo - custo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
+
                 st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 🧾 Ranking de Estádios
+# 📊 Ranking dos Estádios
 st.markdown("---")
-st.subheader("📊 Ranking de Estádios da Liga")
+st.markdown("## 🏟️ Ranking de Estádios")
 
 try:
-    res_all = supabase.table("estadios").select("id_time, nome, capacidade, preco_ingresso, nivel").execute()
-    todos_estadios = res_all.data
+    estadios = supabase.table("estadios").select("id_time, nome, nivel, capacidade").execute().data
+    times = supabase.table("times").select("id, nome").execute().data
+    map_times = {t["id"]: t["nome"] for t in times}
 
-    if todos_estadios:
-        df_estadios = []
+    df_estadios = []
+    for e in estadios:
+        df_estadios.append({
+            "Time": map_times.get(e["id_time"], "Desconhecido"),
+            "Estádio": e["nome"],
+            "Capacidade": e["capacidade"],
+            "Nível": e["nivel"]
+        })
 
-        for est in todos_estadios:
-            tid = est["id_time"]
-            time = supabase.table("times").select("nome").eq("id", tid).execute().data[0]
-            nome_time = time["nome"]
+    df_estadios = sorted(df_estadios, key=lambda x: (-x["capacidade"], -x["nivel"]))
+    df_estadios = st.session_state.get("df_estadios_cache", df_estadios)  # evita recarregar à toa
 
-            try:
-                preco = float(est.get("preco_ingresso", 20.0) or 20.0)
-            except:
-                preco = 20.0
-            try:
-                nivel = int(est.get("nivel", 1) or 1)
-            except:
-                nivel = 1
-            try:
-                capacidade = int(est.get("capacidade", 10000) or 10000)
-            except:
-                capacidade = 10000
+    st.dataframe(df_estadios)  # ✅ Sem use_container_width para evitar erro
 
-            publico = calcular_publico(capacidade, preco, nivel)
-            renda = publico * preco
-
-            df_estadios.append({
-                "Time": nome_time,
-                "Capacidade": capacidade,
-                "Preço Ingresso (R$)": preco,
-                "Nível": nivel,
-                "Público Estimado": publico,
-                "Renda Média (R$)": float(renda or 0)
-            })
-
-        df_estadios = pd.DataFrame(df_estadios).sort_values(by="Renda Média (R$)", ascending=False)
-        st.dataframe(df_estadios, use_container_width=True)
-    else:
-        st.info("Nenhum estádio cadastrado.")
 except Exception as e:
     st.error(f"Erro ao carregar ranking: {e}")
 
