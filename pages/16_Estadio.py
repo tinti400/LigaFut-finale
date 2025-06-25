@@ -35,10 +35,25 @@ capacidade_por_nivel = {
 def custo_melhoria(nivel):
     return 250_000_000 + (nivel - 1) * 120_000_000
 
-def calcular_publico(capacidade, preco_medio, nivel):
+def calcular_desempenho(supabase, id_time):
+    try:
+        res = supabase.table("resultados").select("*").eq("id_time", id_time).order("rodada", desc=True).limit(5).execute()
+        jogos = res.data
+        pontuacao = 0
+        for jogo in jogos:
+            if jogo.get("resultado") == "vitoria":
+                pontuacao += 3
+            elif jogo.get("resultado") == "empate":
+                pontuacao += 1
+        return pontuacao
+    except:
+        return 7
+
+def calcular_publico(capacidade, preco_ingresso, nivel, desempenho):
     demanda_base = capacidade * (0.9 + nivel * 0.02)
-    fator_preco = max(0.3, 1 - (preco_medio - 20) * 0.03)
-    return int(min(capacidade, demanda_base * fator_preco))
+    fator_desempenho = 0.8 + (desempenho / 15) * 0.4
+    fator_preco = max(0.3, 1 - (preco_ingresso - 20) * 0.03)
+    return int(min(capacidade, demanda_base * fator_preco * fator_desempenho))
 
 # 🔄 Buscar ou criar estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
@@ -51,11 +66,7 @@ if not estadio:
         "nome": f"Estádio {nome_time}",
         "nivel": 1,
         "capacidade": capacidade_por_nivel[1],
-        "preco_geral": 20.0,
-        "preco_sul": 25.0,
-        "preco_norte": 25.0,
-        "preco_central": 40.0,
-        "preco_camarote": 100.0,
+        "preco_ingresso": 20.0,
         "em_melhorias": False
     }
     supabase.table("estadios").insert(estadio_novo).execute()
@@ -71,67 +82,29 @@ else:
 nome = estadio["nome"]
 nivel = estadio["nivel"]
 capacidade = estadio["capacidade"]
+preco_ingresso = float(estadio.get("preco_ingresso", 20.0))
 em_melhorias = estadio.get("em_melhorias", False)
 
-preco_geral = float(estadio.get("preco_geral", 20.0))
-preco_sul = float(estadio.get("preco_sul", 25.0))
-preco_norte = float(estadio.get("preco_norte", 25.0))
-preco_central = float(estadio.get("preco_central", 40.0))
-preco_camarote = float(estadio.get("preco_camarote", 100.0))
-
-# 🧮 Percentuais por setor
-percentuais = {
-    "geral": 0.4,
-    "sul": 0.15,
-    "norte": 0.15,
-    "central": 0.2,
-    "camarote": 0.1
-}
-
-preco_medio = (preco_geral * percentuais["geral"] +
-               preco_sul * percentuais["sul"] +
-               preco_norte * percentuais["norte"] +
-               preco_central * percentuais["central"] +
-               preco_camarote * percentuais["camarote"])
-
-publico_total = calcular_publico(capacidade, preco_medio, nivel)
-setores = {
-    "Geral": (int(publico_total * percentuais["geral"]), preco_geral),
-    "Arquibancada Sul": (int(publico_total * percentuais["sul"]), preco_sul),
-    "Arquibancada Norte": (int(publico_total * percentuais["norte"]), preco_norte),
-    "Arquibancada Central": (int(publico_total * percentuais["central"]), preco_central),
-    "Camarote": (int(publico_total * percentuais["camarote"]), preco_camarote)
-}
-
-renda_total = sum(qtd * preco for qtd, preco in setores.values())
+desempenho = calcular_desempenho(supabase, id_time)
+publico_estimado = calcular_publico(capacidade, preco_ingresso, nivel, desempenho)
+renda = publico_estimado * preco_ingresso
 
 st.markdown(f"## 🏟️ {nome}")
-st.markdown(f"**Capacidade Total:** {capacidade:,} torcedores\n\n**Público Estimado:** {publico_total:,} torcedores\n\n**Renda Estimada:** R${renda_total:,.2f}")
+st.markdown(f"""
+- **Nível atual:** {nivel}
+- **Capacidade:** {capacidade:,} torcedores
+- **Preço do ingresso:** R${preco_ingresso:.2f}
+- **Público médio estimado:** {publico_estimado:,} torcedores
+- **Renda por jogo (como mandante):** R${renda:,.2f}
+""")
 
-st.markdown("### 📊 Setores do Estádio")
-for setor, (qtd, preco) in setores.items():
-    st.markdown(f"- **{setor}**: {qtd:,} torcedores x R${preco:.2f} = R${qtd * preco:,.2f}")
-
-st.markdown("### ✏️ Definir Preços por Setor (entre R$1 e R$2.000)")
-col1, col2 = st.columns(2)
-with col1:
-    novo_geral = st.number_input("🎫 Geral", value=preco_geral, min_value=1.0, max_value=2000.0)
-    novo_sul = st.number_input("🎫 Arquibancada Sul", value=preco_sul, min_value=1.0, max_value=2000.0)
-    novo_norte = st.number_input("🎫 Arquibancada Norte", value=preco_norte, min_value=1.0, max_value=2000.0)
-with col2:
-    novo_central = st.number_input("🎫 Arquibancada Central", value=preco_central, min_value=1.0, max_value=2000.0)
-    novo_camarote = st.number_input("🎫 Camarote", value=preco_camarote, min_value=1.0, max_value=2000.0)
-
-if st.button("💾 Salvar preços dos setores"):
-    supabase.table("estadios").update({
-        "preco_geral": novo_geral,
-        "preco_sul": novo_sul,
-        "preco_norte": novo_norte,
-        "preco_central": novo_central,
-        "preco_camarote": novo_camarote
-    }).eq("id_time", id_time).execute()
-    st.success("✅ Preços atualizados com sucesso!")
-    st.rerun()
+# 💰 Atualizar preço do ingresso
+novo_preco = st.number_input("🎫 Definir novo preço médio do ingresso (R$)", value=preco_ingresso, min_value=1.0, max_value=2000.0, step=1.0)
+if novo_preco != preco_ingresso:
+    if st.button("💾 Atualizar Preço do Ingresso"):
+        supabase.table("estadios").update({"preco_ingresso": novo_preco}).eq("id_time", id_time).execute()
+        st.success("✅ Preço atualizado com sucesso!")
+        st.rerun()
 
 # 🏗️ Melhorar estádio
 if nivel < 5:
@@ -143,7 +116,7 @@ if nivel < 5:
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
 
         res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-        saldo = res_saldo.data[0]["saldo"]
+        saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 
         if saldo < custo:
             st.error("💰 Saldo insuficiente para realizar a melhoria.")
@@ -181,19 +154,16 @@ if res_admin.data:
             nome = nomes_times.get(id_t, "Desconhecido")
             nivel = est.get("nivel", 1)
             capacidade = est.get("capacidade", 0)
-            preco_medio_est = (float(est.get("preco_geral", 20.0)) * percentuais["geral"] +
-                               float(est.get("preco_sul", 25.0)) * percentuais["sul"] +
-                               float(est.get("preco_norte", 25.0)) * percentuais["norte"] +
-                               float(est.get("preco_central", 40.0)) * percentuais["central"] +
-                               float(est.get("preco_camarote", 100.0)) * percentuais["camarote"])
-
-            publico = calcular_publico(capacidade, preco_medio_est, nivel)
-            renda = publico * preco_medio_est
+            preco = float(est.get("preco_ingresso", 20.0))
+            desempenho = calcular_desempenho(supabase, id_t)
+            publico = calcular_publico(capacidade, preco, nivel, desempenho)
+            renda = publico * preco
 
             dados.append({
                 "Time": nome,
                 "Nível": nivel,
                 "Capacidade": capacidade,
+                "Ingresso": f"R${preco:.2f}",
                 "Público": publico,
                 "Renda Estimada": f"R${renda:,.2f}"
             })
@@ -202,3 +172,4 @@ if res_admin.data:
         st.dataframe(df, height=600)
     except Exception as e:
         st.error(f"Erro ao carregar ranking: {e}")
+
