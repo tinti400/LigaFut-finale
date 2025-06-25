@@ -14,24 +14,20 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção da divisão e temporada
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-# 💰 Função de renda variável por jogo
 def calcular_renda_jogo(estadio):
     try:
         preco = float(estadio.get("preco_ingresso") or 20.0)
@@ -123,36 +119,6 @@ rodadas = buscar_resultados(numero_temporada, numero_divisao)
 times_map = obter_nomes_times(numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
-if classificacao:
-    df = pd.DataFrame([{
-        "Posição": i + 1,
-        "Time": f"<img src='{t['logo']}' width='25'> <b>{t['nome']}</b><br><small>{t['tecnico']}</small>",
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    } for i, (tid, t) in enumerate(classificacao)])
-
-    def aplicar_estilo(df):
-        html = "<table style='width: 100%; border-collapse: collapse;'>"
-        html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
-        for i, row in df.iterrows():
-            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            linha = "<tr style='background-color: {};'>".format(cor)
-            linha += ''.join(f"<td>{val}</td>" for val in row)
-            linha += "</tr>"
-            html += linha
-        html += "</tbody></table>"
-        return html
-
-    st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
-else:
-    st.info("Nenhum dado de classificação disponível.")
-
 st.markdown("---")
 st.subheader("📅 Rodadas da Temporada")
 
@@ -178,7 +144,7 @@ for rodada in rodadas:
                         f"<img src='{m_logo}' width='30'> <b>{m_nome}</b>", unsafe_allow_html=True)
 
             if gm != "" and gv != "":
-                check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).eq("descricao", descricao).execute()
+                check = supabase.table("movimentacoes_financeiras").select("descricao", "valor").eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
                 if check.data:
                     valor_registrado = check.data[0]["valor"]
                     res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
