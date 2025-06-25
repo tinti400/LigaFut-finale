@@ -15,6 +15,7 @@ supabase = create_client(url, key)
 verificar_sessao()
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
+email_usuario = st.session_state.get("usuario", "")
 
 # 📐 Regras atualizadas
 capacidade_por_nivel = {
@@ -116,4 +117,39 @@ if nivel < 5:
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
+
+# 👑 Painel de Administrador
+res_admin = supabase.table("admins").select("*").eq("email", email_usuario).execute()
+if res_admin.data:
+    st.markdown("---")
+    st.markdown("## 👑 Ranking de Estádios (Admin)")
+
+    try:
+        res_est = supabase.table("estadios").select("*").execute()
+        res_times = supabase.table("times").select("id, nome").execute()
+        nomes_times = {t["id"]: t["nome"] for t in res_times.data}
+
+        dados = []
+        for est in res_est.data:
+            id_t = est["id_time"]
+            nome = nomes_times.get(id_t, "Desconhecido")
+            nivel = est.get("nivel", 1)
+            capacidade = est.get("capacidade", 0)
+            preco = float(est.get("preco_ingresso", 20.0))
+            publico = calcular_publico(capacidade, preco, nivel)
+            renda = publico * preco
+
+            dados.append({
+                "Time": nome,
+                "Nível": nivel,
+                "Capacidade": capacidade,
+                "Ingresso": f"R${preco:.2f}",
+                "Público": publico,
+                "Renda Estimada": f"R${renda:,.2f}"
+            })
+
+        df = pd.DataFrame(dados).sort_values(by="Capacidade", ascending=False)
+        st.dataframe(df, height=600)
+    except Exception as e:
+        st.error(f"Erro ao carregar ranking: {e}")
 
