@@ -203,8 +203,8 @@ if ativo and fase == "acao" and vez < len(ordem):
             time_alvo_nome = st.selectbox("Selecione o time alvo:", list(times_dict.values()))
             id_alvo = next(i for i, n in times_dict.items() if n == time_alvo_nome)
 
-            if ja_perderam.get(id_alvo, 0) >= 4:
-                st.warning("❌ Esse time já perdeu 4 jogadores.")
+            if ja_perderam.get(id_alvo, 0) >= 5:
+                st.warning("❌ Esse time já perdeu 5 jogadores.")
             else:
                 if len([r for r in roubos.get(id_time, []) if r["de"] == id_alvo]) >= 2:
                     st.warning("❌ Já roubou 2 desse time.")
