@@ -106,9 +106,14 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
 df_exibir = df[colunas].copy()
 
-# ✅ Garante que todas as colunas sejam strings para evitar erro no Streamlit
+# ✅ Garante que todas as colunas sejam strings
 df_exibir = df_exibir.astype(str)
 
-# 📋 Exibir
+# 📋 Exibir com fallback seguro
 st.subheader(f"💼 Extrato do time **{nome_time}**")
-st.dataframe(df_exibir, use_container_width=True)
+
+try:
+    st.dataframe(df_exibir)
+except Exception as e:
+    st.warning("⚠️ Erro ao exibir com `st.dataframe`. Exibindo com `st.table()`.")
+    st.table(df_exibir)
