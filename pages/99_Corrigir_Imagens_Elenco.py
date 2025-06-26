@@ -31,22 +31,21 @@ def corrigir_imagens():
     for jogador in jogadores:
         id_jogador = jogador["id"]
         nome = jogador.get("nome", "Sem nome")
-        imagem_url = jogador.get("imagem_url", "")
+        imagem_url = jogador.get("imagem_url") or ""
 
-        # Verifica se a imagem está vazia ou é .svg
         if not imagem_url or ".svg" in imagem_url or "player_0" in imagem_url:
-            # Extrai padrão da URL atual (ex: /183/394/)
             match = re.search(r'/players/(\d{3})/(\d{3})/', imagem_url)
+
             if match:
                 parte1, parte2 = match.groups()
                 nova_url = f"https://cdn.sofifa.net/players/{parte1}/{parte2}/25.png"
-
-                supabase.table("elenco").update({"imagem_url": nova_url}).eq("id", id_jogador).execute()
-                resultado.append(f"✅ {nome} atualizado para: {nova_url}")
             else:
-                resultado.append(f"⚠️ {nome} ignorado (link inválido): {imagem_url}")
+                nova_url = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
+
+            supabase.table("elenco").update({"imagem_url": nova_url}).eq("id", id_jogador).execute()
+            resultado.append(f"✅ {nome} atualizado para: {nova_url}")
         else:
-            resultado.append(f"🔒 {nome} já tem imagem válida.")
+            resultado.append(f"🔒 {nome} já possui imagem válida.")
 
     return resultado
 
