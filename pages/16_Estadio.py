@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
+from datetime import datetime, timedelta
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
 
@@ -85,6 +86,14 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
+# 🔄 Atualiza status da obra se passou 3 dias
+data_inicio = estadio.get("data_inicio_melhoria")
+if estadio.get("em_melhorias") and data_inicio:
+    inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+    if datetime.now() >= inicio + timedelta(days=3):
+        supabase.table("estadios").update({"em_melhorias": False, "data_inicio_melhoria": None}).eq("id_time", id_time).execute()
+        estadio["em_melhorias"] = False
+
 # 🔄 Buscar desempenho e posição
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
@@ -101,7 +110,6 @@ st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torc
 
 # 🎛 Edição dos setores
 st.markdown("### 🎛 Preços por Setor")
-precos_setores = {}
 publico_total = 0
 renda_total = 0
 
@@ -129,7 +137,7 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     if em_melhorias:
-        st.info("⌛ O estádio já está em obras.")
+        st.info("⌛ O estádio já está em obras. Conclusão prevista para 3 dias após o início.")
     else:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
@@ -144,12 +152,13 @@ if nivel < 5:
                 supabase.table("estadios").update({
                     "nivel": nivel + 1,
                     "capacidade": nova_capacidade,
-                    "em_melhorias": True
+                    "em_melhorias": True,
+                    "data_inicio_melhoria": datetime.now().strftime("%Y-%m-%d")
                 }).eq("id_time", id_time).execute()
                 novo_saldo = saldo - custo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
-                st.success("🏗️ Estádio em obras!")
+                st.success("🏗️ Estádio em obras! Conclusão em 3 dias.")
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
