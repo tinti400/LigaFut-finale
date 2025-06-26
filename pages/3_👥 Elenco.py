@@ -76,7 +76,9 @@ for idx, jogador in enumerate(jogadores_filtrados):
         posicao = jogador.get("posicao", "-")
         overall = jogador.get("overall", "-")
         valor = jogador.get("valor", 0)
-        imagem = jogador.get("imagem_url", "")
+        imagem = jogador.get("imagem_url") or ""
+        if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
+            imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
         classificacao = jogador.get("classificacao", "Sem classificação").capitalize()
         nacionalidade = jogador.get("nacionalidade", "🌍")
         origem = jogador.get("origem", "Desconhecida")
