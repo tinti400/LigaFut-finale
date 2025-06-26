@@ -23,7 +23,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
-# 📐 Regras atualizadas
+# 📊 Regras atualizadas
 capacidade_por_nivel = {
     1: 25000,
     2: 47500,
@@ -48,16 +48,25 @@ precos_padrao = {
     "camarote": 100.0
 }
 
-def calcular_publico_setor(lugares, preco, desempenho):
-    fator_base = 0.9 + desempenho * 0.01
-    fator_preco = max(0.3, 1 - (preco - 20) * 0.02)
+# 🔢 Buscar posição do time na tabela
+def buscar_posicao_time(id_time):
+    try:
+        res = supabase.table("classificacao").select("id_time").order("pontos", desc=True).execute()
+        lista_ids = [t["id_time"] for t in res.data]
+        return lista_ids.index(id_time) + 1 if id_time in lista_ids else 20
+    except:
+        return 20
+
+# 📊 Novo cálculo com posição
+def calcular_publico_setor(lugares, preco, desempenho, posicao):
+    fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005
+    fator_preco = max(0.05, 1 - (preco - 20) * 0.02)
     return int(min(lugares, lugares * fator_base * fator_preco))
 
 # 🔄 Buscar ou criar estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
-# 🆕 Criar novo estádio se não existir
 if not estadio:
     estadio_novo = {
         "id_time": id_time,
@@ -76,11 +85,12 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
-# 🔄 Buscar desempenho do time
+# 🔄 Buscar desempenho e posição
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
+posicao = buscar_posicao_time(id_time)
 
-# 📊 Dados do estádio
+# 📊 Dados
 nome = estadio["nome"]
 nivel = estadio["nivel"]
 capacidade = estadio["capacidade"]
@@ -89,8 +99,8 @@ em_melhorias = estadio.get("em_melhorias", False)
 st.markdown(f"## 🏟️ {nome}")
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
-# 🎫 Edição de preços por setor
-st.markdown("### 🎫 Preços por Setor")
+# 🎛 Edição dos setores
+st.markdown("### 🎛 Preços por Setor")
 precos_setores = {}
 publico_total = 0
 renda_total = 0
@@ -104,7 +114,7 @@ for setor, proporcao in setores.items():
         supabase.table("estadios").update({f"preco_{setor}": novo_preco}).eq("id_time", id_time).execute()
         st.experimental_rerun()
 
-    publico = calcular_publico_setor(lugares, novo_preco, desempenho)
+    publico = calcular_publico_setor(lugares, novo_preco, desempenho, posicao)
     renda = publico * novo_preco
     col2.markdown(f"👥 Público estimado: **{publico:,}**")
     col3.markdown(f"💰 Renda estimada: **R${renda:,.2f}**")
@@ -119,7 +129,7 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     if em_melhorias:
-        st.info("⏳ O estádio já está em obras. Aguarde a finalização antes de nova melhoria.")
+        st.info("⌛ O estádio já está em obras.")
     else:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
@@ -127,7 +137,7 @@ if nivel < 5:
         saldo = res_saldo.data[0].get("saldo", 0) if res_saldo.data else 0
 
         if saldo < custo:
-            st.error("💰 Saldo insuficiente para realizar a melhoria.")
+            st.error("💰 Saldo insuficiente.")
         else:
             if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
                 nova_capacidade = capacidade_por_nivel[nivel + 1]
@@ -139,12 +149,12 @@ if nivel < 5:
                 novo_saldo = saldo - custo
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
                 registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
-                st.success("🏗️ Estádio em obras! A melhoria será concluída em breve.")
+                st.success("🏗️ Estádio em obras!")
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
 
-# 👑 Painel de Administrador
+# 👑 Painel Admin
 res_admin = supabase.table("admins").select("*").eq("email", email_usuario).execute()
 if res_admin.data:
     st.markdown("---")
@@ -163,17 +173,9 @@ if res_admin.data:
             for setor, proporcao in setores.items():
                 preco = float(est.get(f"preco_{setor}", precos_padrao[setor]))
                 lugares = int(capacidade * proporcao)
-                publico = calcular_publico_setor(lugares, preco, desempenho)
-                renda_estimativa += publico * preco
-
-            dados.append({
-                "Time": nome,
-                "Nível": nivel,
-                "Capacidade": capacidade,
-                "Renda Estimada": f"R${renda_estimativa:,.2f}"
-            })
+                renda_estimativa += calcular_publico_setor(lugares, preco, desempenho, posicao) * preco
+            dados.append({"Time": nome, "Nível": nivel, "Capacidade": capacidade, "Renda Estimada": f"R${renda_estimativa:,.2f}"})
         df = pd.DataFrame(dados).sort_values(by="Capacidade", ascending=False)
         st.dataframe(df, height=600)
     except Exception as e:
         st.error(f"Erro ao carregar ranking: {e}")
-
