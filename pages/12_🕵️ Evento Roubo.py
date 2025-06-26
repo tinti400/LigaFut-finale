@@ -107,30 +107,16 @@ if todos_bloqueados:
         st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']})")
 else:
     st.info("Você ainda não bloqueou nenhum jogador.")
-
-# 📋 Exibir a ordem do sorteio (fila dos times)
-st.subheader("📋 Ordem de Participação (Sorteio)")
-
-try:
-    if ordem:
-        times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
-        mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
-        for i, idt in enumerate(ordem):
-            indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
-            st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
-    else:
-        st.warning("Ainda não foi definido o sorteio dos times.")
-except Exception as e:
-    st.error(f"Erro ao exibir a ordem dos times: {e}")
-
 # 🔐 Início do evento (admin)
 if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
     novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=3, step=1)
     if st.button("✅ Salvar limite e iniciar evento"):
         times_data = supabase.table("times").select("id", "nome").execute().data
-        random.shuffle(times_data)
-        nova_ordem = [t["id"] for t in times_data]
+        palmeiras = next((t for t in times_data if t["nome"].strip().lower() == "palmeiras"), None)
+        restantes = [t for t in times_data if t != palmeiras]
+        random.shuffle(restantes)
+        nova_ordem = [palmeiras["id"]] + [t["id"] for t in restantes] if palmeiras else [t["id"] for t in times_data]
         supabase.table("configuracoes").update({
             "ativo": True,
             "fase": "bloqueio",
@@ -146,6 +132,7 @@ if eh_admin:
         }).eq("id", ID_CONFIG).execute()
         st.success("✅ Evento iniciado.")
         st.experimental_rerun()
+
 # 🔐 Fase de Bloqueio
 if ativo and fase == "bloqueio":
     st.subheader("🔐 Proteja seus jogadores")
@@ -167,7 +154,6 @@ if ativo and fase == "bloqueio":
                 if j["nome"] in selecionados:
                     bloqueio = {"nome": j["nome"], "posicao": j["posicao"]}
                     novos_bloqueios.append(bloqueio)
-                    # Salvar também na tabela jogadores_bloqueados_roubo
                     try:
                         supabase.table("jogadores_bloqueados_roubo").insert({
                             "id": str(uuid.uuid4()),
@@ -201,7 +187,6 @@ if ativo and fase == "acao" and vez < len(ordem):
             times_dict = {t["id"]: t["nome"] for t in times_data if t["id"] != id_time}
             time_alvo_nome = st.selectbox("Selecione o time alvo:", list(times_dict.values()))
             id_alvo = next(i for i, n in times_dict.items() if n == time_alvo_nome)
-
             if ja_perderam.get(id_alvo, 0) >= 5:
                 st.warning("❌ Esse time já perdeu 5 jogadores.")
             else:
@@ -286,3 +271,18 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma movimentação registrada.")
+
+# 📋 Exibir a ordem do sorteio (SOMENTE NO FINAL)
+st.subheader("📋 Ordem de Participação (Sorteio)")
+
+try:
+    if ordem:
+        times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
+        mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
+        for i, idt in enumerate(ordem):
+            indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
+            st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
+    else:
+        st.warning("Ainda não foi definido o sorteio dos times.")
+except Exception as e:
+    st.error(f"Erro ao exibir a ordem dos times: {e}")
