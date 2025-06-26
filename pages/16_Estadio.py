@@ -77,7 +77,21 @@ def buscar_resultados_recentes(id_time, limite=5):
 def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recentes, derrotas_recentes):
     fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005
     fator_base += vitorias_recentes * 0.01 - derrotas_recentes * 0.005
-    fator_preco = max(0.05, 1 - (preco - 20) * 0.02)
+
+    # Penalidade realista baseada no preço
+    if preco <= 20:
+        fator_preco = 1.0
+    elif preco <= 50:
+        fator_preco = 0.8
+    elif preco <= 100:
+        fator_preco = 0.6
+    elif preco <= 200:
+        fator_preco = 0.4
+    elif preco <= 500:
+        fator_preco = 0.2
+    else:
+        fator_preco = 0.01
+
     return int(min(lugares, lugares * fator_base * fator_preco))
 
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
@@ -102,7 +116,7 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
-# ✅ Atualiza status da melhoria após 3 dias
+# Atualiza melhoria
 data_inicio = estadio.get("data_inicio_melhoria")
 if estadio.get("em_melhorias") and data_inicio:
     try:
@@ -132,7 +146,7 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
-# 🎛 Preços
+# Preços
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
@@ -156,11 +170,11 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
-# 🏗️ Melhorar estádio
+# Melhorias
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     if em_melhorias:
-        st.info("⌛ O estádio já está em obras. Conclusão prevista para 3 dias após o início.")
+        st.info("⌛ O estádio já está em obras. Conclusão prevista para 3 dias.")
     else:
         st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
         st.markdown(f"💸 **Custo:** R${custo:,.2f}")
@@ -185,29 +199,3 @@ if nivel < 5:
                 st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
-
-# 👑 Painel Admin
-res_admin = supabase.table("admins").select("*").eq("email", email_usuario).execute()
-if res_admin.data:
-    st.markdown("---")
-    st.markdown("## 👑 Ranking de Estádios (Admin)")
-    try:
-        res_est = supabase.table("estadios").select("*").execute()
-        res_times = supabase.table("times").select("id, nome").execute()
-        nomes_times = {t["id"]: t["nome"] for t in res_times.data}
-        dados = []
-        for est in res_est.data:
-            id_t = est["id_time"]
-            nome = nomes_times.get(id_t, "Desconhecido")
-            nivel = est.get("nivel", 1)
-            capacidade = est.get("capacidade", 0)
-            renda_estimativa = 0
-            for setor, proporcao in setores.items():
-                preco = float(est.get(f"preco_{setor}", precos_padrao[setor]))
-                lugares = int(capacidade * proporcao)
-                renda_estimativa += calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recentes, derrotas_recentes) * preco
-            dados.append({"Time": nome, "Nível": nivel, "Capacidade": capacidade, "Renda Estimada": f"R${renda_estimativa:,.2f}"})
-        df = pd.DataFrame(dados).sort_values(by="Capacidade", ascending=False)
-        st.dataframe(df, height=600)
-    except Exception as e:
-        st.error(f"Erro ao carregar ranking: {e}")
