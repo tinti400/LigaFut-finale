@@ -57,7 +57,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 🎯 Filtro de classificação
+# 🎯 Filtro
 classificacoes = ["Todos", "Titular", "Reserva", "Negociavel", "Sem classificação"]
 classificacao_selecionada = st.selectbox("📌 Filtrar por classificação:", classificacoes)
 
@@ -68,62 +68,49 @@ elif classificacao_selecionada == "Todos":
 else:
     jogadores_filtrados = [j for j in jogadores if j.get("classificacao") == classificacao_selecionada.lower()]
 
-# 📋 Listagem
-for jogador in jogadores_filtrados:
-    col1, col2, col3, col4, col5, col6, col7 = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 2.5, 2])
-
-    with col1:
+# 📋 Cards em grid
+cols = st.columns(4)
+for idx, jogador in enumerate(jogadores_filtrados):
+    with cols[idx % 4]:
+        nome = jogador.get("nome", "Sem nome")
+        posicao = jogador.get("posicao", "-")
+        overall = jogador.get("overall", "-")
+        valor = jogador.get("valor", 0)
         imagem = jogador.get("imagem_url") or ""
         if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
             imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
-        st.markdown(
-            f"<img src='{imagem}' width='60' style='border-radius: 8px; border: 1px solid #ccc;'>",
-            unsafe_allow_html=True
-        )
+        classificacao = jogador.get("classificacao", "Sem classificação").capitalize()
+        nacionalidade = jogador.get("nacionalidade", "🌍")
+        origem = jogador.get("origem", "Desconhecida")
+        salario = jogador.get("salario") if jogador.get("salario") is not None else int(valor * 0.007)
 
-    with col2:
-        st.markdown(f"**{jogador.get('nome', 'Sem nome')}**")
-        st.markdown(f"🌍 {jogador.get('nacionalidade', 'Desconhecida')}")
+        st.markdown(f"""
+        <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg, #f0e6d2, #e2d6be); box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
+            <div style="font-size:26px; font-weight:bold;">{overall}</div>
+            <div style="font-size:13px; margin-top:-4px;">{posicao}</div>
+            <div style="font-size:20px; margin:6px 0;"><strong>{nome}</strong></div>
+            <img src="{imagem}" style="width:80px;height:80px;border-radius:8px;border:1px solid #999;"><br>
+            <div style="font-size:14px;margin-top:10px;">
+                🌍 {nacionalidade}<br>
+                🏠 {origem}<br>
+                💰 <strong>R$ {valor:,.0f}</strong><br>
+                💳 Salário: R$ {salario:,.0f}<br>
+                🏷️ {classificacao}
+            </div>
+        """.replace(",", "."), unsafe_allow_html=True)
 
-    with col3:
-        st.markdown(f"📌 {jogador.get('posicao', '-')}")
-
-    with col4:
-        st.markdown(f"⭐ {jogador.get('overall', '-')}")
-
-    with col5:
-        classificacao_atual = jogador.get("classificacao", "Sem classificação")
         nova_classificacao = st.selectbox(
-            "",
-            ["Titular", "Reserva", "Negociavel", "Sem classificação"],
-            index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(
-                classificacao_atual.capitalize() if classificacao_atual else "Sem classificação"
-            ),
+            "Classificação", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
+            index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao),
             key=f"class_{jogador['id']}"
         )
-        if nova_classificacao.lower() != classificacao_atual:
+        if nova_classificacao.lower() != jogador.get("classificacao", ""):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
-    with col6:
-        valor = jogador.get("valor", 0)
-        salario_jogador = int(jogador.get("salario")) if jogador.get("salario") is not None else int(valor * 0.007)
-        origem = jogador.get("origem", "Desconhecida")
-        st.markdown(
-            f"""
-            <div style='line-height:1.4'>
-                💰 <strong>R$ {valor:,.0f}</strong><br>
-                🏠 {origem}<br>
-                💳 <span style='color:#28a745;'>Salário: R$ {salario_jogador:,.0f}</span>
-            </div>
-            """.replace(",", "."),
-            unsafe_allow_html=True
-        )
-
-    with col7:
-        if st.button(f"💸 Vender {jogador['nome']}", key=f"vender_{jogador['id']}"):
+        if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             try:
-                valor_venda = round(jogador["valor"] * 0.7)
+                valor_venda = round(valor * 0.7)
                 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
                 saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
                 novo_saldo = saldo_atual + valor_venda
@@ -132,37 +119,39 @@ for jogador in jogadores_filtrados:
                 supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
                 supabase.table("mercado_transferencias").insert({
-                    "nome": jogador["nome"],
-                    "posicao": jogador["posicao"],
-                    "overall": jogador["overall"],
-                    "valor": jogador["valor"],
+                    "nome": nome,
+                    "posicao": posicao,
+                    "overall": overall,
+                    "valor": valor,
                     "id_time": id_time,
                     "time_origem": nome_time,
-                    "imagem_url": jogador.get("imagem_url", ""),
-                    "nacionalidade": jogador.get("nacionalidade", "Desconhecida"),
-                    "origem": jogador.get("origem", "Desconhecida"),
-                    "classificacao": jogador.get("classificacao", ""),
-                    "salario": jogador.get("salario") if jogador.get("salario") is not None else int(jogador.get("valor", 0) * 0.007)
+                    "imagem_url": imagem,
+                    "nacionalidade": nacionalidade,
+                    "origem": origem,
+                    "classificacao": nova_classificacao.lower(),
+                    "salario": salario
                 }).execute()
 
                 registrar_movimentacao(
                     id_time=id_time,
                     tipo="entrada",
                     valor=valor_venda,
-                    descricao=f"Venda de {jogador['nome']} para o mercado"
+                    descricao=f"Venda de {nome} para o mercado"
                 )
 
                 registrar_bid(
                     id_time=id_time,
                     tipo="venda",
                     categoria="mercado",
-                    jogador=jogador["nome"],
+                    jogador=nome,
                     valor=valor_venda,
                     origem=nome_time
                 )
 
-                st.success(f"{jogador['nome']} foi vendido com sucesso!")
+                st.success(f"{nome} foi vendido com sucesso!")
                 st.experimental_rerun()
 
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
