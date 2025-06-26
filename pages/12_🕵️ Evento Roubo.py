@@ -209,8 +209,10 @@ if ativo and fase == "acao" and vez < len(ordem):
                     if st.button("💰 Roubar jogador"):
                         supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador_nome).execute()
                         supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
-                        registrar_movimentacao(id_time, jogador_nome, "entrada", valor_pago)
-                        registrar_movimentacao(id_alvo, jogador_nome, "saida", valor_pago)
+
+                        # ✅ CORRIGIDO: quem rouba perde, quem foi roubado recebe
+                        registrar_movimentacao(id_time, jogador_nome, "saida", valor_pago)
+                        registrar_movimentacao(id_alvo, jogador_nome, "entrada", valor_pago)
                         registrar_bid(id_alvo, id_time, jogador, "roubo", valor_pago)
 
                         saldo = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute().data
@@ -272,7 +274,7 @@ if evento.get("finalizado"):
     else:
         st.info("Nenhuma movimentação registrada.")
 
-# 📋 Exibir a ordem do sorteio (SOMENTE NO FINAL)
+# 📋 Exibir a ordem do sorteio (final da página)
 st.subheader("📋 Ordem de Participação (Sorteio)")
 
 try:
@@ -286,3 +288,4 @@ try:
         st.warning("Ainda não foi definido o sorteio dos times.")
 except Exception as e:
     st.error(f"Erro ao exibir a ordem dos times: {e}")
+
