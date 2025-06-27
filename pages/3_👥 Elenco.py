@@ -87,7 +87,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
         sofifa_url = jogador.get("link_sofifa", "").strip()
 
         html_card = f"""
-        <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg, #f0e6d2, #e2d6be);
+        <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg,#fdf8ee,#f2e6c8);
                     box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
             <div style="font-size:26px; font-weight:bold;">{overall}</div>
             <div style="font-size:13px; margin-top:-4px;">{posicao}</div>
