@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
+import uuid
 from supabase import create_client
 from utils import verificar_sessao
 
@@ -16,6 +17,7 @@ verificar_sessao()
 
 st.title("🛒 Administração do Mercado de Transferências")
 
+# 🔽 Inserção manual
 st.markdown("### 📤 Adicionar Jogadores Manualmente")
 with st.form("form_adicionar"):
     col1, col2, col3 = st.columns(3)
@@ -39,6 +41,7 @@ with st.form("form_adicionar"):
                 st.warning("⚠️ Preencha todos os campos obrigatórios.")
             else:
                 supabase.table("mercado_transferencias").insert({
+                    "id": str(uuid.uuid4()),
                     "nome": nome,
                     "overall": overall,
                     "posicao": posicao,
@@ -56,6 +59,7 @@ with st.form("form_adicionar"):
 
 st.markdown("---")
 
+# 🔽 Importação via planilha Excel
 st.markdown("### 📥 Importar Jogadores via Planilha Excel")
 arquivo = st.file_uploader("Envie o arquivo .xlsx com os jogadores", type=["xlsx"])
 
@@ -69,6 +73,7 @@ if arquivo:
             for _, row in df_excel.iterrows():
                 try:
                     supabase.table("mercado_transferencias").insert({
+                        "id": str(uuid.uuid4()),
                         "nome": row.get("nome", "").strip(),
                         "overall": int(row.get("overall", 0)),
                         "posicao": row.get("posicao", "").strip(),
@@ -89,22 +94,33 @@ if arquivo:
 
 st.markdown("---")
 
+# 🔽 Exibir jogadores no mercado
 st.markdown("### 📋 Jogadores no Mercado")
 try:
     res = supabase.table("mercado_transferencias").select("id, nome, overall, posicao, valor, nacionalidade, time_origem, foto").execute()
     jogadores = res.data if res.data else []
     if jogadores:
         df = pd.DataFrame(jogadores)
+
+        # Corrigir imagem com proxy se for do SoFIFA
+        def corrigir_imagem(url):
+            if url and "cdn.sofifa.net" in url:
+                return f"https://images.weserv.nl/?url={url.replace('https://', '')}"
+            return url or "https://cdn-icons-png.flaticon.com/512/147/147144.png"
+
+        df["Imagem"] = df["foto"].apply(corrigir_imagem)
+        df = df.drop(columns=["foto"])
+
         df = df.rename(columns={
             "nome": "Nome",
             "overall": "Overall",
             "posicao": "Posição",
             "valor": "Valor",
             "nacionalidade": "Nacionalidade",
-            "time_origem": "Origem",
-            "foto": "Imagem"
+            "time_origem": "Origem"
         })
-        st.dataframe(df)
+
+        st.dataframe(df, use_container_width=True)
     else:
         st.info("Nenhum jogador no mercado.")
 except Exception as e:
