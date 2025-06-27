@@ -89,6 +89,7 @@ with st.form("form_mercado"):
     time_origem = st.text_input("Time de Origem").strip()
     nacionalidade = st.text_input("Nacionalidade").strip()
     imagem_url = st.text_input("URL da Imagem do Jogador")
+    link_sofifa = st.text_input("🔗 Link do Jogador no SoFIFA (opcional)").strip()
     botao = st.form_submit_button("Adicionar ao Mercado")
 
 if botao:
@@ -97,7 +98,7 @@ if botao:
     else:
         try:
             imagem_url = imagem_url if imagem_url else "https://cdn-icons-png.flaticon.com/512/147/147144.png"
-            supabase.table("mercado_transferencias").insert({
+            jogador = {
                 "nome": nome,
                 "posicao": posicao,
                 "overall": overall,
@@ -105,7 +106,10 @@ if botao:
                 "time_origem": time_origem if time_origem else "N/A",
                 "nacionalidade": nacionalidade if nacionalidade else "N/A",
                 "foto": imagem_url
-            }).execute()
+            }
+            if link_sofifa:
+                jogador["link_sofifa"] = link_sofifa
+            supabase.table("mercado_transferencias").insert(jogador).execute()
             st.success(f"✅ {nome} foi adicionado ao mercado!")
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
