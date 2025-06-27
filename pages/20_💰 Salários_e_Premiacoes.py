@@ -13,15 +13,23 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login e admin
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado.")
+# ✅ Verifica sessão com segurança
+usuario_id = st.session_state.get("usuario_id")
+id_time = st.session_state.get("id_time")
+email_usuario = st.session_state.get("usuario")
+
+if not usuario_id or not email_usuario:
+    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.stop()
 
-email_usuario = st.session_state.get("usuario", "")
-res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
-if not res_admin.data:
-    st.error("Acesso restrito apenas para administradores.")
+# 🔒 Verifica se é administrador
+try:
+    res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+    if not res_admin.data:
+        st.error("Acesso restrito apenas para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
     st.stop()
 
 # 📅 Filtros
@@ -31,28 +39,30 @@ temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporad
 num_divisao = int(divisao.split()[-1])
 num_temporada = int(temporada.split()[-1])
 
-# 🔄 Mapeamento de ID para nome
-res_times = supabase.table("times").select("id, nome").execute()
-id_para_nome = {item["id"]: item["nome"] for item in res_times.data}
+# 🔄 Mapeamento times
+try:
+    res_times = supabase.table("times").select("id, nome").execute()
+    id_para_nome = {item["id"]: item["nome"] for item in res_times.data}
+except:
+    st.error("Erro ao carregar times.")
+    st.stop()
 
-# ⚙️ Valores
+# ⚙️ Premiações por divisão
 premios = {
     1: {"vitoria": 12_000_000, "empate": 8_000_000, "derrota": 5_000_000, "gol_feito": 400_000, "gol_sofrido": 80_000},
     2: {"vitoria": 9_000_000, "empate": 6_000_000, "derrota": 3_000_000, "gol_feito": 300_000, "gol_sofrido": 60_000},
     3: {"vitoria": 6_000_000, "empate": 4_000_000, "derrota": 2_000_000, "gol_feito": 200_000, "gol_sofrido": 40_000},
 }
 
-# 🔄 Buscar rodadas e pagamentos realizados
+# 🔄 Rodadas e pagamentos
 try:
-    res_rodadas = supabase.table("rodadas").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).order("numero", desc=False).execute()
-    rodadas = res_rodadas.data if res_rodadas.data else []
-    res_pagamentos = supabase.table("pagamentos_realizados").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).execute()
-    pagos = res_pagamentos.data or []
+    rodadas = supabase.table("rodadas").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).order("numero", desc=False).execute().data
+    pagos = supabase.table("pagamentos_realizados").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).execute().data
 except Exception as e:
     st.error(f"Erro ao buscar dados: {e}")
     st.stop()
 
-# 🔁 Exibir apenas jogos não totalmente pagos
+# 🔁 Rodadas visíveis
 for rodada in rodadas:
     jogos_visiveis = []
     for jogo in rodada["jogos"]:
@@ -72,12 +82,10 @@ for rodada in rodadas:
     if jogos_visiveis:
         st.markdown(f"### 📅 Rodada {rodada.get('numero', '?')}")
         for jogo in jogos_visiveis:
-            mandante = jogo["mandante"]
-            visitante = jogo["visitante"]
-            gm = jogo.get("gols_mandante")
-            gv = jogo.get("gols_visitante")
-            nome_mandante = id_para_nome.get(mandante, mandante)
-            nome_visitante = id_para_nome.get(visitante, visitante)
+            mandante, visitante = jogo["mandante"], jogo["visitante"]
+            gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
+            nome_mandante = id_para_nome.get(mandante, "Desconhecido")
+            nome_visitante = id_para_nome.get(visitante, "Desconhecido")
 
             col1, col2, col3, col4, col5 = st.columns([3, 1, 3, 3, 3])
             col1.markdown(f"**{nome_mandante}**")
@@ -87,7 +95,7 @@ for rodada in rodadas:
             if col4.button(f"💸 Cobrar salário ({nome_mandante})", key=f"sal_m_{mandante}_{visitante}"):
                 try:
                     elenco = supabase.table("elenco").select("valor").eq("id_time", mandante).execute().data
-                    total = round(sum(j.get("valor", 0) * 0.01 for j in elenco if isinstance(j, dict)))
+                    total = round(sum(j.get("valor", 0) * 0.007 for j in elenco))
                     saldo = supabase.table("times").select("saldo").eq("id", mandante).execute().data[0]["saldo"]
                     supabase.table("times").update({"saldo": int(saldo - total)}).eq("id", mandante).execute()
                     registrar_movimentacao(mandante, "saida", total, "Pagamento de salário")
@@ -103,7 +111,7 @@ for rodada in rodadas:
             if col5.button(f"💸 Cobrar salário ({nome_visitante})", key=f"sal_v_{mandante}_{visitante}"):
                 try:
                     elenco = supabase.table("elenco").select("valor").eq("id_time", visitante).execute().data
-                    total = round(sum(j.get("valor", 0) * 0.01 for j in elenco if isinstance(j, dict)))
+                    total = round(sum(j.get("valor", 0) * 0.007 for j in elenco))
                     saldo = supabase.table("times").select("saldo").eq("id", visitante).execute().data[0]["saldo"]
                     supabase.table("times").update({"saldo": int(saldo - total)}).eq("id", visitante).execute()
                     registrar_movimentacao(visitante, "saida", total, "Pagamento de salário")
