@@ -33,9 +33,17 @@ except Exception as e:
     st.stop()
 
 # 📅 Filtros
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 divisao = col1.selectbox("Divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
+
+# 🔄 Buscar times para filtro
+res_times_filtro = supabase.table("times").select("id, nome").execute()
+mapa_times = {item["id"]: item["nome"] for item in res_times_filtro.data}
+mapa_nomes = {v: k for k, v in mapa_times.items()}
+opcoes_filtro_time = ["Todos os times"] + sorted(list(mapa_nomes.keys()))
+time_selecionado = col3.selectbox("Filtrar por Time", opcoes_filtro_time)
+
 num_divisao = int(divisao.split()[-1])
 num_temporada = int(temporada.split()[-1])
 
@@ -63,6 +71,13 @@ for rodada in rodadas:
     for jogo in rodada["jogos"]:
         mandante = jogo["mandante"]
         visitante = jogo["visitante"]
+
+        # Filtra por time
+        if time_selecionado != "Todos os times":
+            id_filtrado = mapa_nomes.get(time_selecionado)
+            if mandante != id_filtrado and visitante != id_filtrado:
+                continue
+
         numero_rodada = rodada.get("numero", 0)
 
         tipos_requeridos = {"salario_mandante", "salario_visitante", "premiacao", "bonus"}
@@ -169,7 +184,7 @@ for rodada in rodadas:
                 except Exception as e:
                     st.error(f"Erro bônus gols: {e}")
 
-            # ✅ Checkboxes de status
+            # ✅ Checkboxes de status de pagamento
             col_status1, col_status2, col_status3, col_status4 = st.columns(4)
             tipos_jogo = {
                 "salario_mandante": "💰 Salário Mandante",
