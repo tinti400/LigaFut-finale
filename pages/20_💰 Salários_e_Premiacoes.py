@@ -13,7 +13,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão com segurança
+# ✅ Verifica sessão
 usuario_id = st.session_state.get("usuario_id")
 id_time = st.session_state.get("id_time")
 email_usuario = st.session_state.get("usuario")
@@ -22,7 +22,7 @@ if not usuario_id or not email_usuario:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 🔒 Verifica se é administrador
+# 🔒 Verifica se é admin
 try:
     res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
     if not res_admin.data:
@@ -39,30 +39,25 @@ temporada = col2.selectbox("Temporada", ["Temporada 1", "Temporada 2", "Temporad
 num_divisao = int(divisao.split()[-1])
 num_temporada = int(temporada.split()[-1])
 
-# 🔄 Mapeamento times
-try:
-    res_times = supabase.table("times").select("id, nome").execute()
-    id_para_nome = {item["id"]: item["nome"] for item in res_times.data}
-except:
-    st.error("Erro ao carregar times.")
-    st.stop()
-
-# ⚙️ Premiações por divisão
+# ⚙️ Premiações
 premios = {
     1: {"vitoria": 12_000_000, "empate": 8_000_000, "derrota": 5_000_000, "gol_feito": 400_000, "gol_sofrido": 80_000},
     2: {"vitoria": 9_000_000, "empate": 6_000_000, "derrota": 3_000_000, "gol_feito": 300_000, "gol_sofrido": 60_000},
     3: {"vitoria": 6_000_000, "empate": 4_000_000, "derrota": 2_000_000, "gol_feito": 200_000, "gol_sofrido": 40_000},
 }
 
-# 🔄 Rodadas e pagamentos
+# 🔄 Buscar times e rodadas
 try:
-    rodadas = supabase.table("rodadas").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).order("numero", desc=False).execute().data
+    res_times = supabase.table("times").select("id, nome").execute()
+    id_para_nome = {item["id"]: item["nome"] for item in res_times.data}
+
+    rodadas = supabase.table("rodadas").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).order("numero").execute().data
     pagos = supabase.table("pagamentos_realizados").select("*").eq("temporada", num_temporada).eq("divisao", num_divisao).execute().data
 except Exception as e:
-    st.error(f"Erro ao buscar dados: {e}")
+    st.error(f"Erro ao carregar dados: {e}")
     st.stop()
 
-# 🔁 Rodadas visíveis
+# 🔁 Rodadas
 for rodada in rodadas:
     jogos_visiveis = []
     for jogo in rodada["jogos"]:
@@ -81,6 +76,7 @@ for rodada in rodadas:
 
     if jogos_visiveis:
         st.markdown(f"### 📅 Rodada {rodada.get('numero', '?')}")
+
         for jogo in jogos_visiveis:
             mandante, visitante = jogo["mandante"], jogo["visitante"]
             gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
@@ -125,6 +121,7 @@ for rodada in rodadas:
                     st.error(f"Erro ao cobrar salário: {e}")
 
             col6, col7 = st.columns([3, 3])
+
             if col6.button("🏆 Premiação Resultado", key=f"res_{mandante}_{visitante}"):
                 try:
                     if gm is None or gv is None:
@@ -171,3 +168,29 @@ for rodada in rodadas:
                     st.success("Bônus de gols processado.")
                 except Exception as e:
                     st.error(f"Erro bônus gols: {e}")
+
+            # ✅ Checkboxes de status de pagamento
+            col_status1, col_status2, col_status3, col_status4 = st.columns(4)
+            tipos_jogo = {
+                "salario_mandante": "💰 Salário Mandante",
+                "salario_visitante": "💰 Salário Visitante",
+                "premiacao": "🏆 Premiação",
+                "bonus": "⚽ Bônus de Gols"
+            }
+
+            for tipo, texto in tipos_jogo.items():
+                ja_pago = any(
+                    p["rodada"] == rodada["numero"]
+                    and p["mandante"] == mandante
+                    and p["visitante"] == visitante
+                    and p["tipo"] == tipo
+                    for p in pagos
+                )
+                if tipo == "salario_mandante":
+                    col_status1.checkbox(texto, value=ja_pago, disabled=True)
+                elif tipo == "salario_visitante":
+                    col_status2.checkbox(texto, value=ja_pago, disabled=True)
+                elif tipo == "premiacao":
+                    col_status3.checkbox(texto, value=ja_pago, disabled=True)
+                elif tipo == "bonus":
+                    col_status4.checkbox(texto, value=ja_pago, disabled=True)
