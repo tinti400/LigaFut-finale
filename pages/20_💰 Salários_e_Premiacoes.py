@@ -88,7 +88,7 @@ for rodada in rodadas:
             col2.markdown(f"<h3 style='text-align:center'>{gm if gm is not None else '-'} x {gv if gv is not None else '-'}</h3>", unsafe_allow_html=True)
             col3.markdown(f"**{nome_visitante}**")
 
-            if col4.button(f"💸 Cobrar salário ({nome_mandante})", key=f"sal_m_{mandante}_{visitante}"):
+            if col4.button(f"💸 Cobrar salário ({nome_mandante})", key=f"sal_m_{mandante}_{visitante}_{rodada['numero']}"):
                 try:
                     elenco = supabase.table("elenco").select("valor").eq("id_time", mandante).execute().data
                     total = round(sum(j.get("valor", 0) * 0.007 for j in elenco))
@@ -104,7 +104,7 @@ for rodada in rodadas:
                 except Exception as e:
                     st.error(f"Erro ao cobrar salário: {e}")
 
-            if col5.button(f"💸 Cobrar salário ({nome_visitante})", key=f"sal_v_{mandante}_{visitante}"):
+            if col5.button(f"💸 Cobrar salário ({nome_visitante})", key=f"sal_v_{mandante}_{visitante}_{rodada['numero']}"):
                 try:
                     elenco = supabase.table("elenco").select("valor").eq("id_time", visitante).execute().data
                     total = round(sum(j.get("valor", 0) * 0.007 for j in elenco))
@@ -122,54 +122,54 @@ for rodada in rodadas:
 
             col6, col7 = st.columns([3, 3])
 
-            if col6.button("🏆 Premiação Resultado", key=f"res_{mandante}_{visitante}"):
+            if col6.button("🏆 Premiação Resultado", key=f"res_{mandante}_{visitante}_{rodada['numero']}"):
                 try:
                     if gm is None or gv is None:
                         st.warning("Resultado incompleto.")
-                        continue
-                    val = premios[num_divisao]
-                    if gm > gv:
-                        vencedores = [(mandante, val["vitoria"]), (visitante, val["derrota"])]
-                    elif gv > gm:
-                        vencedores = [(visitante, val["vitoria"]), (mandante, val["derrota"])]
                     else:
-                        vencedores = [(mandante, val["empate"]), (visitante, val["empate"])]
-                    for t, valor in vencedores:
-                        saldo = supabase.table("times").select("saldo").eq("id", t).execute().data[0]["saldo"]
-                        supabase.table("times").update({"saldo": int(saldo + valor)}).eq("id", t).execute()
-                        registrar_movimentacao(t, "entrada", valor, "Premiação por resultado")
-                    supabase.table("pagamentos_realizados").insert({
-                        "id": str(uuid.uuid4()), "temporada": num_temporada, "divisao": num_divisao,
-                        "rodada": rodada["numero"], "mandante": mandante, "visitante": visitante, "tipo": "premiacao",
-                        "data": str(datetime.utcnow())
-                    }).execute()
-                    st.success("Premiação paga.")
+                        val = premios[num_divisao]
+                        if gm > gv:
+                            vencedores = [(mandante, val["vitoria"]), (visitante, val["derrota"])]
+                        elif gv > gm:
+                            vencedores = [(visitante, val["vitoria"]), (mandante, val["derrota"])]
+                        else:
+                            vencedores = [(mandante, val["empate"]), (visitante, val["empate"])]
+                        for t, valor in vencedores:
+                            saldo = supabase.table("times").select("saldo").eq("id", t).execute().data[0]["saldo"]
+                            supabase.table("times").update({"saldo": int(saldo + valor)}).eq("id", t).execute()
+                            registrar_movimentacao(t, "entrada", valor, "Premiação por resultado")
+                        supabase.table("pagamentos_realizados").insert({
+                            "id": str(uuid.uuid4()), "temporada": num_temporada, "divisao": num_divisao,
+                            "rodada": rodada["numero"], "mandante": mandante, "visitante": visitante, "tipo": "premiacao",
+                            "data": str(datetime.utcnow())
+                        }).execute()
+                        st.success("Premiação paga.")
                 except Exception as e:
                     st.error(f"Erro na premiação: {e}")
 
-            if col7.button("⚽ Bônus de Gols", key=f"gol_{mandante}_{visitante}"):
+            if col7.button("⚽ Bônus de Gols", key=f"gol_{mandante}_{visitante}_{rodada['numero']}"):
                 try:
                     if gm is None or gv is None:
                         st.warning("Resultado incompleto.")
-                        continue
-                    val = premios[num_divisao]
-                    dados = [(mandante, gm, gv), (visitante, gv, gm)]
-                    for t, g_feito, g_sofrido in dados:
-                        valor = (g_feito * val["gol_feito"]) - (g_sofrido * val["gol_sofrido"])
-                        saldo = supabase.table("times").select("saldo").eq("id", t).execute().data[0]["saldo"]
-                        novo = saldo + valor if valor >= 0 else saldo - abs(valor)
-                        supabase.table("times").update({"saldo": int(novo)}).eq("id", t).execute()
-                        registrar_movimentacao(t, "entrada" if valor >= 0 else "saida", abs(valor), "Bônus de gols")
-                    supabase.table("pagamentos_realizados").insert({
-                        "id": str(uuid.uuid4()), "temporada": num_temporada, "divisao": num_divisao,
-                        "rodada": rodada["numero"], "mandante": mandante, "visitante": visitante, "tipo": "bonus",
-                        "data": str(datetime.utcnow())
-                    }).execute()
-                    st.success("Bônus de gols processado.")
+                    else:
+                        val = premios[num_divisao]
+                        dados = [(mandante, gm, gv), (visitante, gv, gm)]
+                        for t, g_feito, g_sofrido in dados:
+                            valor = (g_feito * val["gol_feito"]) - (g_sofrido * val["gol_sofrido"])
+                            saldo = supabase.table("times").select("saldo").eq("id", t).execute().data[0]["saldo"]
+                            novo = saldo + valor if valor >= 0 else saldo - abs(valor)
+                            supabase.table("times").update({"saldo": int(novo)}).eq("id", t).execute()
+                            registrar_movimentacao(t, "entrada" if valor >= 0 else "saida", abs(valor), "Bônus de gols")
+                        supabase.table("pagamentos_realizados").insert({
+                            "id": str(uuid.uuid4()), "temporada": num_temporada, "divisao": num_divisao,
+                            "rodada": rodada["numero"], "mandante": mandante, "visitante": visitante, "tipo": "bonus",
+                            "data": str(datetime.utcnow())
+                        }).execute()
+                        st.success("Bônus de gols processado.")
                 except Exception as e:
                     st.error(f"Erro bônus gols: {e}")
 
-            # ✅ Checkboxes de status de pagamento
+            # ✅ Checkboxes de status
             col_status1, col_status2, col_status3, col_status4 = st.columns(4)
             tipos_jogo = {
                 "salario_mandante": "💰 Salário Mandante",
@@ -186,11 +186,12 @@ for rodada in rodadas:
                     and p["tipo"] == tipo
                     for p in pagos
                 )
+                key_unique = f"{tipo}_{mandante}_{visitante}_{rodada['numero']}"
                 if tipo == "salario_mandante":
-                    col_status1.checkbox(texto, value=ja_pago, disabled=True)
+                    col_status1.checkbox(texto, value=ja_pago, disabled=True, key=key_unique)
                 elif tipo == "salario_visitante":
-                    col_status2.checkbox(texto, value=ja_pago, disabled=True)
+                    col_status2.checkbox(texto, value=ja_pago, disabled=True, key=key_unique)
                 elif tipo == "premiacao":
-                    col_status3.checkbox(texto, value=ja_pago, disabled=True)
+                    col_status3.checkbox(texto, value=ja_pago, disabled=True, key=key_unique)
                 elif tipo == "bonus":
-                    col_status4.checkbox(texto, value=ja_pago, disabled=True)
+                    col_status4.checkbox(texto, value=ja_pago, disabled=True, key=key_unique)
