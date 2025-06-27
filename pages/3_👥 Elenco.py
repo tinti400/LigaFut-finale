@@ -41,10 +41,7 @@ jogadores = res.data if res.data else []
 # 📊 Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
-salario_total = sum(
-    int(j.get("salario")) if j.get("salario") is not None else int(float(j.get("valor", 0)) * 0.007)
-    for j in jogadores
-)
+salario_total = sum(int(j.get("valor", 0) * 0.007) for j in jogadores)
 
 st.markdown(
     f"""
@@ -82,7 +79,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
         classificacao = (jogador.get("classificacao") or "Sem classificação").capitalize()
         nacionalidade = jogador.get("nacionalidade", "🌍")
         origem = jogador.get("origem", "Desconhecida")
-        salario = jogador.get("salario") if jogador.get("salario") is not None else int(valor * 0.007)
+        salario = int(valor * 0.007)
 
         if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
             imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
