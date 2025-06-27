@@ -1,85 +1,111 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-from supabase import create_client
-from datetime import datetime
 import pandas as pd
+from supabase import create_client
+from utils import verificar_sessao
 
-st.set_page_config(page_title="🛒 Admin - Mercado", layout="wide")
+st.set_page_config(page_title="🛒 Admin Mercado", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica login
-if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("Você precisa estar logado para acessar esta página.")
-    st.stop()
-
-email_usuario = st.session_state.get("usuario", "")
-
-# 👑 Verifica se é admin
-admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
-eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
-if not eh_admin:
-    st.warning("🔐 Acesso permitido apenas para administradores.")
-    st.stop()
+# ✅ Verifica sessão
+verificar_sessao()
 
 st.title("🛒 Administração do Mercado de Transferências")
-st.markdown("---")
 
-# 📦 Cadastro manual de jogador no mercado
-with st.expander("➕ Adicionar Jogador Manualmente ao Mercado"):
-    nome = st.text_input("Nome do Jogador")
-    posicao = st.text_input("Posição do Jogador")
-    overall = st.number_input("Overall", min_value=0, max_value=99, value=70)
-    valor = st.number_input("Valor de Mercado (R$)", min_value=0, step=100000, value=10000000)
-    time_origem = st.text_input("Time de Origem")
-    nacionalidade = st.text_input("Nacionalidade")
-    imagem_url = st.text_input("URL da Imagem do Jogador")
-    link_sofifa = st.text_input("🔗 Link do Jogador no SoFIFA (opcional)")
+st.markdown("### 📤 Adicionar Jogadores Manualmente")
+with st.form("form_adicionar"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        nome = st.text_input("Nome do jogador")
+        overall = st.number_input("Overall", min_value=0, max_value=99, step=1)
+        posicao = st.text_input("Posição")
+    with col2:
+        valor = st.number_input("Valor R$", min_value=1, step=1)
+        nacionalidade = st.text_input("Nacionalidade")
+        salario = st.number_input("Salário R$ (opcional)", min_value=0, step=1, value=0)
+    with col3:
+        origem = st.text_input("Time de origem")
+        imagem_url = st.text_input("URL da imagem (opcional)")
+        link_sofifa = st.text_input("Link do SoFIFA (opcional)")
 
-    if st.button("Adicionar ao Mercado"):
-        if not nome or not posicao:
-            st.warning("⚠️ Preencha todos os campos obrigatórios.")
-        else:
-            foto = imagem_url if imagem_url else "https://cdn-icons-png.flaticon.com/512/147/147144.png"
-            salario = round(valor * 0.007)
-            novo_jogador = {
-                "nome": nome,
-                "posicao": posicao,
-                "overall": overall,
-                "valor": valor,
-                "time_origem": time_origem,
-                "nacionalidade": nacionalidade,
-                "foto": foto,
-                "link_sofifa": link_sofifa,
-                "classificacao": "sem classificacao",
-                "origem": "",
-                "idade": "",
-                "salario": salario,
-                "id_time": None
-            }
-            try:
-                supabase.table("mercado_transferencias").insert(novo_jogador).execute()
-                st.success(f"✅ Jogador {nome} adicionado com sucesso ao mercado!")
+    submitted = st.form_submit_button("➕ Adicionar jogador")
+    if submitted:
+        try:
+            if not nome or not posicao or not valor:
+                st.warning("⚠️ Preencha todos os campos obrigatórios.")
+            else:
+                supabase.table("mercado_transferencias").insert({
+                    "nome": nome,
+                    "overall": overall,
+                    "posicao": posicao,
+                    "valor": valor,
+                    "nacionalidade": nacionalidade,
+                    "salario": salario if salario > 0 else int(valor * 0.007),
+                    "time_origem": origem,
+                    "foto": imagem_url,
+                    "link_sofifa": link_sofifa
+                }).execute()
+                st.success(f"✅ Jogador {nome} adicionado com sucesso!")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao adicionar jogador: {e}")
+        except Exception as e:
+            st.error(f"Erro ao adicionar jogador: {e}")
 
 st.markdown("---")
 
-# 📊 Visualizar jogadores no mercado
-st.subheader("📋 Jogadores no Mercado")
-res = supabase.table("mercado_transferencias").select("*").execute()
-df = pd.DataFrame(res.data)
+st.markdown("### 📥 Importar Jogadores via Planilha Excel")
+arquivo = st.file_uploader("Envie o arquivo .xlsx com os jogadores", type=["xlsx"])
 
-# Remove colunas não necessárias na visualização
-colunas_ocultas = ["imagem", "imagem_url", "origem", "idade", "id_time"]
-df = df.drop(columns=[c for c in colunas_ocultas if c in df.columns], errors="ignore")
+if arquivo:
+    try:
+        df_excel = pd.read_excel(arquivo)
+        st.dataframe(df_excel)
 
-# Exibe a tabela limpa
-st.dataframe(df, use_container_width=True)
+        if st.button("📤 Enviar jogadores para o mercado"):
+            inseridos = 0
+            for _, row in df_excel.iterrows():
+                try:
+                    supabase.table("mercado_transferencias").insert({
+                        "nome": row.get("nome", "").strip(),
+                        "overall": int(row.get("overall", 0)),
+                        "posicao": row.get("posicao", "").strip(),
+                        "valor": int(row.get("valor", 0)),
+                        "nacionalidade": row.get("nacionalidade", "").strip(),
+                        "salario": int(row.get("salario", int(row.get("valor", 0) * 0.007))),
+                        "time_origem": row.get("time_origem", "").strip(),
+                        "foto": row.get("imagem_url", "").strip(),
+                        "link_sofifa": row.get("link_sofifa", "").strip()
+                    }).execute()
+                    inseridos += 1
+                except Exception as err:
+                    st.warning(f"⚠️ Erro ao adicionar {row.get('nome', '')}: {err}")
+            st.success(f"✅ {inseridos} jogadores importados com sucesso!")
+            st.rerun()
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo: {e}")
 
 st.markdown("---")
-st.info("🔧 Para remover ou editar jogadores, utilize o painel do Supabase diretamente ou solicite uma funcionalidade extra aqui.")
+
+st.markdown("### 📋 Jogadores no Mercado")
+try:
+    res = supabase.table("mercado_transferencias").select("id, nome, overall, posicao, valor, nacionalidade, time_origem, foto").execute()
+    jogadores = res.data if res.data else []
+    if jogadores:
+        df = pd.DataFrame(jogadores)
+        df = df.rename(columns={
+            "nome": "Nome",
+            "overall": "Overall",
+            "posicao": "Posição",
+            "valor": "Valor",
+            "nacionalidade": "Nacionalidade",
+            "time_origem": "Origem",
+            "foto": "Imagem"
+        })
+        st.dataframe(df)
+    else:
+        st.info("Nenhum jogador no mercado.")
+except Exception as e:
+    st.error(f"Erro ao carregar dados: {e}")
