@@ -68,7 +68,7 @@ elif classificacao_selecionada == "Todos":
 else:
     jogadores_filtrados = [j for j in jogadores if j.get("classificacao") == classificacao_selecionada.lower()]
 
-# 📋 Cards em grid
+# 📋 Exibição dos cards
 cols = st.columns(4)
 for idx, jogador in enumerate(jogadores_filtrados):
     with cols[idx % 4]:
@@ -78,12 +78,14 @@ for idx, jogador in enumerate(jogadores_filtrados):
         valor = jogador.get("valor", 0)
         imagem = jogador.get("imagem_url") or ""
         jogos = jogador.get("jogos", 0)
-        if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
-            imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
-        classificacao = jogador.get("classificacao", "Sem classificação").capitalize()
+        link_sofifa = jogador.get("link_sofifa", "")
+        classificacao = (jogador.get("classificacao") or "Sem classificação").capitalize()
         nacionalidade = jogador.get("nacionalidade", "🌍")
         origem = jogador.get("origem", "Desconhecida")
         salario = jogador.get("salario") if jogador.get("salario") is not None else int(valor * 0.007)
+
+        if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
+            imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
 
         st.markdown(f"""
         <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg, #f0e6d2, #e2d6be); box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
@@ -97,9 +99,11 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 💰 <strong>R$ {valor:,.0f}</strong><br>
                 💳 Salário: R$ {salario:,.0f}<br>
                 🏷️ {classificacao}<br>
-                🎯 Jogos: <strong>{jogos}</strong>
-            </div>
+                🎯 Jogos: <strong>{jogos}</strong><br>
         """.replace(",", "."), unsafe_allow_html=True)
+
+        if link_sofifa:
+            st.markdown(f'<a href="{link_sofifa}" target="_blank">🔗 Ver no SoFIFA</a>', unsafe_allow_html=True)
 
         nova_classificacao = st.selectbox(
             "Classificação", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
@@ -110,7 +114,6 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
-        # ✅ Verifica se pode vender
         if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             if jogos < 3:
                 st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
@@ -135,7 +138,8 @@ for idx, jogador in enumerate(jogadores_filtrados):
                         "nacionalidade": nacionalidade,
                         "origem": origem,
                         "classificacao": nova_classificacao.lower(),
-                        "salario": salario
+                        "salario": salario,
+                        "link_sofifa": link_sofifa
                     }).execute()
 
                     registrar_movimentacao(
