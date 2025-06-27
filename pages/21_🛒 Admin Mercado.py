@@ -50,7 +50,7 @@ with st.form("form_adicionar"):
                     "link_sofifa": link_sofifa
                 }).execute()
                 st.success(f"✅ Jogador {nome} adicionado com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
 
@@ -83,7 +83,7 @@ if arquivo:
                 except Exception as err:
                     st.warning(f"⚠️ Erro ao adicionar {row.get('nome', '')}: {err}")
             st.success(f"✅ {inseridos} jogadores importados com sucesso!")
-            st.rerun()
+            st.experimental_rerun()
     except Exception as e:
         st.error(f"Erro ao ler o arquivo: {e}")
 
