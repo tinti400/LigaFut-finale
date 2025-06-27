@@ -78,7 +78,6 @@ def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recente
     fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005
     fator_base += vitorias_recentes * 0.01 - derrotas_recentes * 0.005
 
-    # Penalidade realista baseada no preço
     if preco <= 20:
         fator_preco = 1.0
     elif preco <= 50:
@@ -104,11 +103,15 @@ if not estadio:
         "nivel": 1,
         "capacidade": capacidade_por_nivel[1],
         "em_melhorias": False,
-        "data_inicio_melhoria": None,
         **{f"preco_{k}": v for k, v in precos_padrao.items()}
     }
-    supabase.table("estadios").insert(estadio_novo).execute()
-    estadio = estadio_novo
+    try:
+        supabase.table("estadios").insert(estadio_novo).execute()
+        res_novo = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
+        estadio = res_novo.data[0] if res_novo.data else estadio_novo
+    except Exception as e:
+        st.error(f"Erro ao criar estádio: {e}")
+        st.stop()
 else:
     nivel_atual = estadio.get("nivel", 1)
     capacidade_correta = capacidade_por_nivel.get(nivel_atual, 25000)
@@ -116,7 +119,6 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
-# Atualiza melhoria
 data_inicio = estadio.get("data_inicio_melhoria")
 if estadio.get("em_melhorias") and data_inicio:
     try:
@@ -146,7 +148,6 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
-# Preços
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
@@ -170,7 +171,6 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
-# Melhorias
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     if em_melhorias:
