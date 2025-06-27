@@ -29,9 +29,7 @@ is_admin = len(res_admin.data) > 0
 # ❌ Verifica restrição ao mercado
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
-    restricoes = {}
-    if res_restricoes.data and isinstance(res_restricoes.data[0], dict):
-        restricoes = res_restricoes.data[0].get("restricoes", {})
+    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
     if restricoes.get("mercado", False):
         st.error("🚫 Seu time está proibido de acessar o Mercado de Transferências.")
         st.stop()
@@ -42,7 +40,7 @@ except Exception as e:
 res_status = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
 mercado_aberto = res_status.data[0]["mercado_aberto"] if res_status.data else False
 if not mercado_aberto:
-    st.warning("🚫 O mercado está fechado no momento. As compras estão temporariamente indisponíveis, mas você pode visualizar os jogadores disponíveis.")
+    st.warning("🚫 O mercado está fechado no momento. As compras estão temporariamente indisponíveis.")
 
 # 💰 Saldo do time
 res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
@@ -55,7 +53,6 @@ filtro_nome = st.text_input("Nome do jogador").strip().lower()
 filtro_posicao = st.text_input("Posição").strip().lower()
 filtro_nacionalidade = st.text_input("Nacionalidade").strip().lower()
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
-
 # 🔃 Carregar jogadores disponíveis
 res = supabase.table("mercado_transferencias").select("*").execute()
 mercado = res.data if res.data else []
@@ -117,6 +114,10 @@ for jogador in jogadores_pagina:
         st.markdown(f"📌 {jogador.get('posicao')} | ⭐ {jogador.get('overall')}")
         st.markdown(f"🌍 {jogador.get('nacionalidade', 'Não informada')}")
 
+        # 📄 Link SoFIFA
+        link_sofifa = jogador.get("link_sofifa", "")
+        if link_sofifa:
+            st.markdown(f"<a href='{link_sofifa}' target='_blank'>📄 Ficha Técnica</a>", unsafe_allow_html=True)
     with col4:
         st.markdown(f"💰 Valor: R$ {jogador.get('valor', 0):,.0f}".replace(",", "."))
         st.markdown(f"🏠 Origem: {jogador.get('time_origem', 'Desconhecido')}")
@@ -140,7 +141,6 @@ for jogador in jogadores_pagina:
             if st.button(f"Comprar {jogador['nome']}", key=jogador["id"]):
                 try:
                     saldo_atual = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
-
                     if saldo_atual < jogador.get("valor", 0):
                         st.error("❌ Saldo insuficiente.")
                         st.stop()
@@ -155,15 +155,9 @@ for jogador in jogadores_pagina:
                         st.error("❌ Este jogador já foi comprado por outro time.")
                         st.experimental_rerun()
 
-                    # ✅ Correção: proteger conversão de valor
-                    valor_raw = jogador.get("valor")
-                    if valor_raw is None:
-                        st.error(f"❌ O valor de {jogador['nome']} não está definido.")
-                        st.stop()
-                    valor = int(valor_raw)
-
+                    valor = int(jogador.get("valor", 0))
                     salario_raw = jogador.get("salario")
-                    salario = int(salario_raw) if salario_raw is not None else int(valor * 0.01)
+                    salario = int(salario_raw) if salario_raw else int(valor * 0.01)
 
                     supabase.table("elenco").insert({
                         "nome": jogador["nome"],
@@ -174,11 +168,11 @@ for jogador in jogadores_pagina:
                         "id_time": id_time,
                         "nacionalidade": jogador.get("nacionalidade"),
                         "foto": jogador.get("foto"),
-                        "origem": jogador.get("origem", jogador.get("time_origem", "Desconhecido"))
+                        "origem": jogador.get("origem", jogador.get("time_origem", "Desconhecido")),
+                        "link_sofifa": jogador.get("link_sofifa", "")
                     }).execute()
 
                     registrar_movimentacao(id_time, "saida", valor, f"Compra de {jogador['nome']} no mercado")
-
                     supabase.table("times").update({"saldo": saldo_atual - valor}).eq("id", id_time).execute()
 
                     registrar_bid(
@@ -196,6 +190,7 @@ for jogador in jogadores_pagina:
 
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
+
 # 🧹 Excluir múltiplos jogadores (admin)
 if is_admin and selecionados:
     st.markdown("---")
