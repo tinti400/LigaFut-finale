@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
-import uuid
+from PIL import Image
+import requests
+from io import BytesIO
 from supabase import create_client
 from utils import verificar_sessao
 
 st.set_page_config(page_title="🛒 Admin Mercado", layout="wide")
+verificar_sessao()
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão
-verificar_sessao()
-
 st.title("🛒 Administração do Mercado de Transferências")
 
-# 🔽 Inserção manual
 st.markdown("### 📤 Adicionar Jogadores Manualmente")
 with st.form("form_adicionar"):
     col1, col2, col3 = st.columns(3)
@@ -41,7 +40,6 @@ with st.form("form_adicionar"):
                 st.warning("⚠️ Preencha todos os campos obrigatórios.")
             else:
                 supabase.table("mercado_transferencias").insert({
-                    "id": str(uuid.uuid4()),
                     "nome": nome,
                     "overall": overall,
                     "posicao": posicao,
@@ -49,7 +47,7 @@ with st.form("form_adicionar"):
                     "nacionalidade": nacionalidade,
                     "salario": salario if salario > 0 else int(valor * 0.007),
                     "time_origem": origem,
-                    "foto": imagem_url,
+                    "imagem": imagem_url,
                     "link_sofifa": link_sofifa
                 }).execute()
                 st.success(f"✅ Jogador {nome} adicionado com sucesso!")
@@ -59,7 +57,6 @@ with st.form("form_adicionar"):
 
 st.markdown("---")
 
-# 🔽 Importação via planilha Excel
 st.markdown("### 📥 Importar Jogadores via Planilha Excel")
 arquivo = st.file_uploader("Envie o arquivo .xlsx com os jogadores", type=["xlsx"])
 
@@ -73,7 +70,6 @@ if arquivo:
             for _, row in df_excel.iterrows():
                 try:
                     supabase.table("mercado_transferencias").insert({
-                        "id": str(uuid.uuid4()),
                         "nome": row.get("nome", "").strip(),
                         "overall": int(row.get("overall", 0)),
                         "posicao": row.get("posicao", "").strip(),
@@ -81,7 +77,7 @@ if arquivo:
                         "nacionalidade": row.get("nacionalidade", "").strip(),
                         "salario": int(row.get("salario", int(row.get("valor", 0) * 0.007))),
                         "time_origem": row.get("time_origem", "").strip(),
-                        "foto": row.get("imagem_url", "").strip(),
+                        "imagem": row.get("imagem", "").strip(),
                         "link_sofifa": row.get("link_sofifa", "").strip()
                     }).execute()
                     inseridos += 1
@@ -94,34 +90,32 @@ if arquivo:
 
 st.markdown("---")
 
-# 🔽 Exibir jogadores no mercado
 st.markdown("### 📋 Jogadores no Mercado")
+
 try:
-    res = supabase.table("mercado_transferencias").select("id, nome, overall, posicao, valor, nacionalidade, time_origem, foto").execute()
+    res = supabase.table("mercado_transferencias").select("*").execute()
     jogadores = res.data if res.data else []
+
     if jogadores:
-        df = pd.DataFrame(jogadores)
+        st.markdown("#### 👥 Lista de Jogadores")
+        for jogador in jogadores:
+            with st.container():
+                cols = st.columns([1, 2, 2, 2, 2])
+                try:
+                    url_img = jogador.get("imagem", "")
+                    if not url_img:
+                        raise Exception("Sem imagem")
+                    response = requests.get(url_img, timeout=3)
+                    img = Image.open(BytesIO(response.content))
+                except:
+                    img = Image.open("default_avatar.png")  # imagem padrão no projeto
+                cols[0].image(img, width=60)
+                cols[1].markdown(f"**{jogador['nome']}**")
+                cols[2].markdown(f"🔢 Overall: {jogador['overall']}")
+                cols[3].markdown(f"📍 Posição: {jogador['posicao']}")
+                cols[4].markdown(f"💰 Valor: R$ {jogador['valor']:,}".replace(",", "."))
 
-        # Corrigir imagem com proxy se for do SoFIFA
-        def corrigir_imagem(url):
-            if url and "cdn.sofifa.net" in url:
-                return f"https://images.weserv.nl/?url={url.replace('https://', '')}"
-            return url or "https://cdn-icons-png.flaticon.com/512/147/147144.png"
-
-        df["Imagem"] = df["foto"].apply(corrigir_imagem)
-        df = df.drop(columns=["foto"])
-
-        df = df.rename(columns={
-            "nome": "Nome",
-            "overall": "Overall",
-            "posicao": "Posição",
-            "valor": "Valor",
-            "nacionalidade": "Nacionalidade",
-            "time_origem": "Origem"
-        })
-
-        st.dataframe(df, use_container_width=True)
     else:
         st.info("Nenhum jogador no mercado.")
 except Exception as e:
-    st.error(f"Erro ao carregar dados: {e}")
+    st.error(f"Erro ao carregar jogadores: {e}")
