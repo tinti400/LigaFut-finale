@@ -123,6 +123,17 @@ def atualizar_classificacao():
     if classificacao:
         supabase.table("classificacao").insert(list(classificacao.values())).execute()
 
+# ✅ Atualiza jogos no elenco após resultado salvo
+def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
+    for id_time in [id_time_mandante, id_time_visitante]:
+        res = supabase.table("elenco").select("id", "jogos").eq("id_time", id_time).execute()
+        jogadores = res.data if res.data else []
+
+        for jogador in jogadores:
+            id_jogador = jogador["id"]
+            jogos_atuais = jogador.get("jogos", 0) or 0
+            supabase.table("elenco").update({"jogos": jogos_atuais + 1}).eq("id", id_jogador).execute()
+
 # 🎯 Edição dos jogos
 for idx, jogo in enumerate(rodada["jogos"]):
     id_m, id_v = jogo["mandante"], jogo["visitante"]
@@ -181,6 +192,7 @@ for idx, jogo in enumerate(rodada["jogos"]):
                 novos_jogos.append(j)
 
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
+            atualizar_jogos_elenco_completo(id_m, id_v)
             atualizar_classificacao()
             st.success(f"✅ Resultado atualizado e classificação recalculada.")
             st.rerun()
@@ -231,4 +243,3 @@ if historico:
         st.error(f"Erro ao exibir histórico: {e}")
 else:
     st.info("❌ Nenhum jogo encontrado para este time.")
-
