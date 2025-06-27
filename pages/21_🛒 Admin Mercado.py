@@ -1,127 +1,130 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-import pandas as pd
-from PIL import Image
-import requests
-from io import BytesIO
 from supabase import create_client
-from utils import verificar_sessao
+from datetime import datetime
+import pandas as pd
 
-st.set_page_config(page_title="🛒 Admin Mercado", layout="wide")
-verificar_sessao()
+st.set_page_config(page_title="Admin - Mercado", layout="wide")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.title("🛒 Administração do Mercado de Transferências")
+# ✅ Verifica login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
 
-# 🧾 FORMULÁRIO INDIVIDUAL
-st.markdown("### 📤 Adicionar Jogadores Manualmente")
-with st.form("form_adicionar"):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        nome = st.text_input("Nome do jogador")
-        overall = st.number_input("Overall", min_value=0, max_value=99, step=1)
-        posicao = st.text_input("Posição")
-    with col2:
-        valor = st.number_input("Valor R$", min_value=1, step=1)
-        nacionalidade = st.text_input("Nacionalidade")
-        salario = st.number_input("Salário R$ (opcional)", min_value=0, step=1, value=0)
-    with col3:
-        origem = st.text_input("Time de origem")
-        imagem_url = st.text_input("URL da imagem (obrigatório)")
-        link_sofifa = st.text_input("Link do SoFIFA (opcional)")
+id_usuario = st.session_state.usuario_id
+email_usuario = st.session_state.get("usuario", "")
 
-    submitted = st.form_submit_button("➕ Adicionar jogador")
-    if submitted:
+# 👑 Verifica se é admin
+try:
+    admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+    eh_admin = admin_ref.data and len(admin_ref.data) > 0 and admin_ref.data[0]["administrador"] == True
+    if not eh_admin:
+        st.warning("🔐 Acesso permitido apenas para administradores.")
+        st.stop()
+except Exception as e:
+    st.error(f"Erro ao verificar administrador: {e}")
+    st.stop()
+
+# 🧭 Título
+st.markdown("<h1 style='text-align: center;'>⚙️ Admin - Mercado de Transferências</h1><hr>", unsafe_allow_html=True)
+
+# 🔓 Status do mercado
+try:
+    mercado_cfg_ref = supabase.table("configuracoes").select("mercado_aberto").eq("id", "estado_mercado").execute()
+    mercado_aberto = mercado_cfg_ref.data[0].get("mercado_aberto", False) if mercado_cfg_ref.data else False
+    st.markdown(f"### 🛒 Status atual do mercado: **{'Aberto' if mercado_aberto else 'Fechado'}**")
+except Exception as e:
+    st.error(f"Erro ao buscar status do mercado: {e}")
+    mercado_aberto = False
+
+# 🔘 Botões de controle
+col1, col2, col3 = st.columns([2, 2, 2])
+with col1:
+    if st.button("🟢 Abrir Mercado"):
         try:
-            if not nome or not posicao or not valor or not imagem_url:
-                st.warning("⚠️ Preencha todos os campos obrigatórios.")
-            else:
-                supabase.table("mercado_transferencias").insert({
-                    "nome": nome,
-                    "overall": overall,
-                    "posicao": posicao,
-                    "valor": valor,
-                    "nacionalidade": nacionalidade,
-                    "salario": salario if salario > 0 else int(valor * 0.007),
-                    "time_origem": origem,
-                    "imagem": imagem_url,
-                    "link_sofifa": link_sofifa
-                }).execute()
-                st.success(f"✅ Jogador {nome} adicionado com sucesso!")
-                st.experimental_rerun()
+            supabase.table("configuracoes").update({"mercado_aberto": True}).eq("id", "estado_mercado").execute()
+            st.success("✅ Mercado aberto com sucesso!")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao abrir mercado: {e}")
+
+with col2:
+    if st.button("🔴 Fechar Mercado"):
+        try:
+            supabase.table("configuracoes").update({"mercado_aberto": False}).eq("id", "estado_mercado").execute()
+            st.success("✅ Mercado fechado com sucesso!")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Erro ao fechar mercado: {e}")
+
+with col3:
+    if st.button("🧹 Limpar Mercado"):
+        try:
+            jogadores_ref = supabase.table("mercado_transferencias").select("id").execute()
+            for jogador in jogadores_ref.data:
+                supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+            st.success("🧹 Todos os jogadores foram removidos do mercado!")
+        except Exception as e:
+            st.error(f"Erro ao limpar mercado: {e}")
+
+# 📍 Cadastro de jogador no mercado
+st.markdown("---")
+st.subheader("📅 Adicionar Jogador ao Mercado")
+
+with st.form("form_mercado"):
+    nome = st.text_input("Nome do Jogador").strip()
+    posicao = st.selectbox("Posição", [
+        "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
+        "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
+        "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)",
+        "Meia (MEI)"
+    ])
+    overall = st.number_input("Overall", min_value=1, max_value=99, step=1)
+    valor = st.number_input("Valor (R$)", min_value=100_000, step=50_000)
+    time_origem = st.text_input("Time de Origem").strip()
+    nacionalidade = st.text_input("Nacionalidade").strip()
+    imagem_url = st.text_input("URL da Imagem do Jogador")
+    link_sofifa = st.text_input("🔗 Link do Jogador no SoFIFA (opcional)").strip()
+    botao = st.form_submit_button("Adicionar ao Mercado")
+
+if botao:
+    if not nome:
+        st.warning("Digite o nome do jogador.")
+    else:
+        try:
+            imagem_url = imagem_url if imagem_url else "https://cdn-icons-png.flaticon.com/512/147/147144.png"
+            jogador = {
+                "nome": nome,
+                "posicao": posicao,
+                "overall": overall,
+                "valor": valor,
+                "time_origem": time_origem if time_origem else "N/A",
+                "nacionalidade": nacionalidade if nacionalidade else "N/A",
+                "foto": imagem_url
+            }
+            if link_sofifa:
+                jogador["link_sofifa"] = link_sofifa
+            supabase.table("mercado_transferencias").insert(jogador).execute()
+            st.success(f"✅ {nome} foi adicionado ao mercado!")
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
 
-# 📁 UPLOAD DE PLANILHA
+# 📊 Jogadores no Mercado
 st.markdown("---")
-st.markdown("### 📥 Importar Jogadores via Planilha Excel")
-arquivo = st.file_uploader("Envie o arquivo .xlsx com os jogadores", type=["xlsx"])
-
-if arquivo:
-    try:
-        df_excel = pd.read_excel(arquivo)
-        st.dataframe(df_excel)  # removido use_container_width que dava erro
-
-        if st.button("📤 Enviar jogadores para o mercado"):
-            inseridos = 0
-            for _, row in df_excel.iterrows():
-                try:
-                    imagem_link = row.get("imagem", "").strip()
-                    if not imagem_link:
-                        continue  # pula se não houver imagem
-                    supabase.table("mercado_transferencias").insert({
-                        "nome": row.get("nome", "").strip(),
-                        "overall": int(row.get("overall", 0)),
-                        "posicao": row.get("posicao", "").strip(),
-                        "valor": int(row.get("valor", 0)),
-                        "nacionalidade": row.get("nacionalidade", "").strip(),
-                        "salario": int(row.get("salario", int(row.get("valor", 0) * 0.007))),
-                        "time_origem": row.get("time_origem", "").strip(),
-                        "imagem": imagem_link,
-                        "link_sofifa": row.get("link_sofifa", "").strip()
-                    }).execute()
-                    inseridos += 1
-                except Exception as err:
-                    st.warning(f"⚠️ Erro ao adicionar {row.get('nome', '')}: {err}")
-            st.success(f"✅ {inseridos} jogadores importados com sucesso!")
-            st.experimental_rerun()
-    except Exception as e:
-        st.error(f"Erro ao ler o arquivo: {e}")
-
-# 📋 JOGADORES NO MERCADO
-st.markdown("---")
-st.markdown("### 📋 Jogadores no Mercado")
+st.subheader("📋 Jogadores no Mercado")
 
 try:
-    res = supabase.table("mercado_transferencias").select("*").execute()
-    jogadores = res.data if res.data else []
-
-    if jogadores:
-        st.markdown("#### 👥 Lista de Jogadores")
-        for jogador in jogadores:
-            with st.container():
-                cols = st.columns([1, 2, 2, 2, 2])
-                try:
-                    url_img = jogador.get("imagem", "")
-                    if not url_img:
-                        raise Exception("Sem imagem")
-                    response = requests.get(url_img, timeout=3)
-                    img = Image.open(BytesIO(response.content))
-                except:
-                    url_padrao = "https://cdn-icons-png.flaticon.com/512/147/147144.png"
-                    response = requests.get(url_padrao, timeout=3)
-                    img = Image.open(BytesIO(response.content))
-                cols[0].image(img, width=60)
-                cols[1].markdown(f"**{jogador['nome']}**")
-                cols[2].markdown(f"🔢 Overall: {jogador['overall']}")
-                cols[3].markdown(f"📍 Posição: {jogador['posicao']}")
-                cols[4].markdown(f"💰 Valor: R$ {jogador['valor']:,}".replace(",", "."))
-
+    jogadores_mercado_ref = supabase.table("mercado_transferencias").select("*").execute()
+    jogadores_mercado = jogadores_mercado_ref.data
+    if jogadores_mercado:
+        jogadores_df = pd.DataFrame(jogadores_mercado)
+        st.dataframe(jogadores_df)
     else:
-        st.info("Nenhum jogador no mercado.")
+        st.info("📍 Nenhum jogador no mercado.")
 except Exception as e:
-    st.error(f"Erro ao carregar jogadores: {e}")
+    st.error(f"Erro ao carregar jogadores do mercado: {e}")
