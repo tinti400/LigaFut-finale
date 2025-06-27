@@ -81,9 +81,17 @@ for idx, jogador in enumerate(jogadores_filtrados):
         origem = jogador.get("origem", "Desconhecida")
         salario = int(valor * 0.007)
 
-        if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
-            imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
+        # 🖼️ Verificação da imagem
+        if (
+            not imagem.strip()
+            or ".svg" in imagem
+            or "player_0" in imagem
+            or imagem.startswith("data:")
+            or not imagem.startswith("http")
+        ):
+            imagem = "https://cdn-icons-png.flaticon.com/512/147/147144.png"
 
+        # 📦 Card do jogador
         st.markdown(f"""
         <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg, #f0e6d2, #e2d6be); box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
             <div style="font-size:26px; font-weight:bold;">{overall}</div>
@@ -102,6 +110,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
         if link_sofifa:
             st.markdown(f'<a href="{link_sofifa}" target="_blank">🔗 Ver no SoFIFA</a>', unsafe_allow_html=True)
 
+        # 🔄 Atualizar classificação
         nova_classificacao = st.selectbox(
             "Classificação", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
             index=["Titular", "Reserva", "Negociavel", "Sem classificação"].index(classificacao),
@@ -111,6 +120,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
+        # 💸 Vender jogador
         if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             if jogos < 3:
                 st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
