@@ -76,7 +76,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
         posicao = jogador.get("posicao", "-")
         overall = jogador.get("overall", "-")
         valor = jogador.get("valor", 0)
-        imagem = jogador.get("imagem_url") or jogador.get("foto") or ""
+        imagem = jogador.get("imagem_url") or ""
         jogos = jogador.get("jogos", 0)
         if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
             imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
@@ -84,16 +84,13 @@ for idx, jogador in enumerate(jogadores_filtrados):
         nacionalidade = jogador.get("nacionalidade", "🌍")
         origem = jogador.get("origem", "Desconhecida")
         salario = jogador.get("salario") if jogador.get("salario") is not None else int(valor * 0.007)
-        sofifa_url = jogador.get("link_sofifa", "").strip()
 
-        html_card = f"""
-        <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg,#fdf8ee,#f2e6c8);
-                    box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
+        st.markdown(f"""
+        <div style="border-radius:15px; padding:10px; background:linear-gradient(145deg, #f0e6d2, #e2d6be); box-shadow: 2px 2px 6px rgba(0,0,0,0.1); text-align:center; font-family:Arial; margin-bottom:20px;">
             <div style="font-size:26px; font-weight:bold;">{overall}</div>
             <div style="font-size:13px; margin-top:-4px;">{posicao}</div>
             <div style="font-size:20px; margin:6px 0;"><strong>{nome}</strong></div>
-            {'<a href="' + sofifa_url + '" target="_blank">📄 Ficha Técnica</a>' if sofifa_url else ''}
-            <br><img src="{imagem}" style="width:80px;height:80px;border-radius:8px;border:1px solid #999;"><br>
+            <img src="{imagem}" style="width:80px;height:80px;border-radius:8px;border:1px solid #999;"><br>
             <div style="font-size:14px;margin-top:10px;">
                 🌍 {nacionalidade}<br>
                 🏠 {origem}<br>
@@ -102,9 +99,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 🏷️ {classificacao}<br>
                 🎯 Jogos: <strong>{jogos}</strong>
             </div>
-        </div>
-        """
-        st.markdown(html_card, unsafe_allow_html=True)
+        """.replace(",", "."), unsafe_allow_html=True)
 
         nova_classificacao = st.selectbox(
             "Classificação", ["Titular", "Reserva", "Negociavel", "Sem classificação"],
@@ -115,6 +110,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
+        # ✅ Verifica se pode vender
         if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             if jogos < 3:
                 st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
@@ -139,8 +135,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
                         "nacionalidade": nacionalidade,
                         "origem": origem,
                         "classificacao": nova_classificacao.lower(),
-                        "salario": salario,
-                        "link_sofifa": sofifa_url
+                        "salario": salario
                     }).execute()
 
                     registrar_movimentacao(
@@ -164,3 +159,5 @@ for idx, jogador in enumerate(jogadores_filtrados):
 
                 except Exception as e:
                     st.error(f"Erro ao vender jogador: {e}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
