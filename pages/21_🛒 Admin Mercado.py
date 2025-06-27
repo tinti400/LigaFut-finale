@@ -17,6 +17,7 @@ supabase = create_client(url, key)
 
 st.title("🛒 Administração do Mercado de Transferências")
 
+# 🧾 FORMULÁRIO INDIVIDUAL
 st.markdown("### 📤 Adicionar Jogadores Manualmente")
 with st.form("form_adicionar"):
     col1, col2, col3 = st.columns(3)
@@ -30,13 +31,13 @@ with st.form("form_adicionar"):
         salario = st.number_input("Salário R$ (opcional)", min_value=0, step=1, value=0)
     with col3:
         origem = st.text_input("Time de origem")
-        imagem_url = st.text_input("URL da imagem (opcional)")
+        imagem_url = st.text_input("URL da imagem (obrigatório)")
         link_sofifa = st.text_input("Link do SoFIFA (opcional)")
 
     submitted = st.form_submit_button("➕ Adicionar jogador")
     if submitted:
         try:
-            if not nome or not posicao or not valor:
+            if not nome or not posicao or not valor or not imagem_url:
                 st.warning("⚠️ Preencha todos os campos obrigatórios.")
             else:
                 supabase.table("mercado_transferencias").insert({
@@ -55,20 +56,23 @@ with st.form("form_adicionar"):
         except Exception as e:
             st.error(f"Erro ao adicionar jogador: {e}")
 
+# 📁 UPLOAD DE PLANILHA
 st.markdown("---")
-
 st.markdown("### 📥 Importar Jogadores via Planilha Excel")
 arquivo = st.file_uploader("Envie o arquivo .xlsx com os jogadores", type=["xlsx"])
 
 if arquivo:
     try:
         df_excel = pd.read_excel(arquivo)
-        st.dataframe(df_excel)
+        st.dataframe(df_excel)  # removido use_container_width que dava erro
 
         if st.button("📤 Enviar jogadores para o mercado"):
             inseridos = 0
             for _, row in df_excel.iterrows():
                 try:
+                    imagem_link = row.get("imagem", "").strip()
+                    if not imagem_link:
+                        continue  # pula se não houver imagem
                     supabase.table("mercado_transferencias").insert({
                         "nome": row.get("nome", "").strip(),
                         "overall": int(row.get("overall", 0)),
@@ -77,7 +81,7 @@ if arquivo:
                         "nacionalidade": row.get("nacionalidade", "").strip(),
                         "salario": int(row.get("salario", int(row.get("valor", 0) * 0.007))),
                         "time_origem": row.get("time_origem", "").strip(),
-                        "imagem": row.get("imagem", "").strip(),
+                        "imagem": imagem_link,
                         "link_sofifa": row.get("link_sofifa", "").strip()
                     }).execute()
                     inseridos += 1
@@ -88,8 +92,8 @@ if arquivo:
     except Exception as e:
         st.error(f"Erro ao ler o arquivo: {e}")
 
+# 📋 JOGADORES NO MERCADO
 st.markdown("---")
-
 st.markdown("### 📋 Jogadores no Mercado")
 
 try:
@@ -108,7 +112,9 @@ try:
                     response = requests.get(url_img, timeout=3)
                     img = Image.open(BytesIO(response.content))
                 except:
-                    img = Image.open("default_avatar.png")  # imagem padrão no projeto
+                    url_padrao = "https://cdn-icons-png.flaticon.com/512/147/147144.png"
+                    response = requests.get(url_padrao, timeout=3)
+                    img = Image.open(BytesIO(response.content))
                 cols[0].image(img, width=60)
                 cols[1].markdown(f"**{jogador['nome']}**")
                 cols[2].markdown(f"🔢 Overall: {jogador['overall']}")
