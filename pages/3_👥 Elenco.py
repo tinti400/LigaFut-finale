@@ -77,6 +77,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
         overall = jogador.get("overall", "-")
         valor = jogador.get("valor", 0)
         imagem = jogador.get("imagem_url") or ""
+        jogos = jogador.get("jogos", 0)
         if ".svg" in imagem or "player_0" in imagem or not imagem.strip():
             imagem = "https://via.placeholder.com/80x80.png?text=Sem+Foto"
         classificacao = jogador.get("classificacao", "Sem classificação").capitalize()
@@ -95,7 +96,8 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 🏠 {origem}<br>
                 💰 <strong>R$ {valor:,.0f}</strong><br>
                 💳 Salário: R$ {salario:,.0f}<br>
-                🏷️ {classificacao}
+                🏷️ {classificacao}<br>
+                🎯 Jogos: <strong>{jogos}</strong>
             </div>
         """.replace(",", "."), unsafe_allow_html=True)
 
@@ -108,50 +110,54 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
+        # ✅ Verifica se pode vender
         if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
-            try:
-                valor_venda = round(valor * 0.7)
-                res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-                saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-                novo_saldo = saldo_atual + valor_venda
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+            if jogos < 3:
+                st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
+            else:
+                try:
+                    valor_venda = round(valor * 0.7)
+                    res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+                    saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+                    novo_saldo = saldo_atual + valor_venda
+                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
+                    supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
-                supabase.table("mercado_transferencias").insert({
-                    "nome": nome,
-                    "posicao": posicao,
-                    "overall": overall,
-                    "valor": valor,
-                    "id_time": id_time,
-                    "time_origem": nome_time,
-                    "imagem_url": imagem,
-                    "nacionalidade": nacionalidade,
-                    "origem": origem,
-                    "classificacao": nova_classificacao.lower(),
-                    "salario": salario
-                }).execute()
+                    supabase.table("mercado_transferencias").insert({
+                        "nome": nome,
+                        "posicao": posicao,
+                        "overall": overall,
+                        "valor": valor,
+                        "id_time": id_time,
+                        "time_origem": nome_time,
+                        "imagem_url": imagem,
+                        "nacionalidade": nacionalidade,
+                        "origem": origem,
+                        "classificacao": nova_classificacao.lower(),
+                        "salario": salario
+                    }).execute()
 
-                registrar_movimentacao(
-                    id_time=id_time,
-                    tipo="entrada",
-                    valor=valor_venda,
-                    descricao=f"Venda de {nome} para o mercado"
-                )
+                    registrar_movimentacao(
+                        id_time=id_time,
+                        tipo="entrada",
+                        valor=valor_venda,
+                        descricao=f"Venda de {nome} para o mercado"
+                    )
 
-                registrar_bid(
-                    id_time=id_time,
-                    tipo="venda",
-                    categoria="mercado",
-                    jogador=nome,
-                    valor=valor_venda,
-                    origem=nome_time
-                )
+                    registrar_bid(
+                        id_time=id_time,
+                        tipo="venda",
+                        categoria="mercado",
+                        jogador=nome,
+                        valor=valor_venda,
+                        origem=nome_time
+                    )
 
-                st.success(f"{nome} foi vendido com sucesso!")
-                st.experimental_rerun()
+                    st.success(f"{nome} foi vendido com sucesso!")
+                    st.experimental_rerun()
 
-            except Exception as e:
-                st.error(f"Erro ao vender jogador: {e}")
+                except Exception as e:
+                    st.error(f"Erro ao vender jogador: {e}")
 
         st.markdown("</div>", unsafe_allow_html=True)
