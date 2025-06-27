@@ -52,6 +52,9 @@ st.markdown("### 🔍 Filtros de Pesquisa")
 filtro_nome = st.text_input("Nome do jogador").strip().lower()
 filtro_posicao = st.text_input("Posição").strip().lower()
 filtro_nacionalidade = st.text_input("Nacionalidade").strip().lower()
+col_ov1, col_ov2 = st.columns(2)
+filtro_ov_min = col_ov1.number_input("Overall mínimo", min_value=0, max_value=99, value=0)
+filtro_ov_max = col_ov2.number_input("Overall máximo", min_value=0, max_value=99, value=99)
 filtro_ordenacao = st.selectbox("Ordenar por", ["Nenhum", "Maior Overall", "Menor Overall", "Nome A-Z", "Nome Z-A"])
 
 # 🔃 Carregar jogadores disponíveis
@@ -64,6 +67,7 @@ jogadores_filtrados = [
     if filtro_nome in j.get("nome", "").lower()
     and filtro_posicao in j.get("posicao", "").lower()
     and filtro_nacionalidade in str(j.get("nacionalidade", "")).lower()
+    and filtro_ov_min <= j.get("overall", 0) <= filtro_ov_max
 ]
 
 # 🔢 Ordenação
@@ -92,20 +96,12 @@ res_elenco = supabase.table("elenco").select("id", "nome", "posicao").eq("id_tim
 elenco_atual = res_elenco.data if res_elenco.data else []
 qtde_elenco = len(elenco_atual)
 
-# 📦 Lista de jogadores selecionados (somente admins)
-selecionados = set()
-
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
 for jogador in jogadores_pagina:
     col1, col2, col3, col4, col5 = st.columns([0.3, 1.8, 2, 2, 2])
-    if is_admin:
-        selecionado = col1.checkbox("", key=f"check_{jogador['id']}")
-        if selecionado:
-            selecionados.add(jogador["id"])
-    else:
-        col1.markdown("")
+    col1.markdown("")
 
     with col2:
         foto = jogador.get("foto", "")
@@ -199,4 +195,15 @@ for jogador in jogadores_pagina:
                 except Exception as e:
                     st.error(f"Erro ao comprar jogador: {e}")
 
-# Continuação permanece igual...
+        # 🗑️ Excluir com confirmação (apenas admins)
+        if is_admin:
+            with st.expander(f"🗑️ Excluir {jogador['nome']}?"):
+                confirmar = st.checkbox(f"Confirmar exclusão de {jogador['nome']}", key=f"conf_{jogador['id']}")
+                if confirmar:
+                    if st.button(f"❌ Excluir agora", key=f"btn_del_{jogador['id']}"):
+                        try:
+                            supabase.table("mercado_transferencias").delete().eq("id", jogador["id"]).execute()
+                            st.success(f"{jogador['nome']} removido do mercado com sucesso!")
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao excluir jogador: {e}")
