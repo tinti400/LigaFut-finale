@@ -41,7 +41,6 @@ res_status = supabase.table("configuracoes").select("mercado_aberto").eq("id", "
 mercado_aberto = res_status.data[0]["mercado_aberto"] if res_status.data else False
 if not mercado_aberto:
     st.warning("🚫 O mercado está fechado no momento. As compras estão temporariamente indisponíveis.")
-
 # 💰 Saldo do time
 res_saldo = supabase.table("times").select("saldo").eq("id", str(id_time)).execute()
 saldo_time = res_saldo.data[0]["saldo"] if res_saldo.data else 0
@@ -79,7 +78,6 @@ elif filtro_ordenacao == "Nome A-Z":
     jogadores_filtrados.sort(key=lambda x: x.get("nome", "").lower())
 elif filtro_ordenacao == "Nome Z-A":
     jogadores_filtrados.sort(key=lambda x: x.get("nome", "").lower(), reverse=True)
-
 # 📃 Paginação
 jogadores_por_pagina = 15
 total_jogadores = len(jogadores_filtrados)
@@ -99,6 +97,28 @@ qtde_elenco = len(elenco_atual)
 st.title("📈 Mercado de Transferências")
 st.markdown(f"**Página {pagina_atual} de {total_paginas}**")
 
+# ✅ Exclusão em lote por faixa de Overall
+if is_admin:
+    with st.expander("🧹 Exclusão em Lote (Faixa de Overall)"):
+        col_a, col_b = st.columns(2)
+        faixa_min = col_a.number_input("Excluir Overall de:", 0, 99, 0, key="faixa_min")
+        faixa_max = col_b.number_input("...até:", 0, 99, 99, key="faixa_max")
+        confirmar_faixa = st.checkbox("Confirmar exclusão da faixa", key="conf_faixa")
+        if st.button("❌ Excluir jogadores dessa faixa") and confirmar_faixa:
+            para_excluir = [j for j in jogadores_filtrados if faixa_min <= j.get("overall", 0) <= faixa_max]
+            for j in para_excluir:
+                supabase.table("mercado_transferencias").delete().eq("id", j["id"]).execute()
+            st.success(f"{len(para_excluir)} jogadores removidos do mercado.")
+            st.experimental_rerun()
+
+# Botões de navegação
+col_nav1, col_nav2 = st.columns(2)
+if col_nav1.button("⬅️ Página Anterior") and pagina_atual > 1:
+    st.session_state["pagina_mercado"] -= 1
+    st.experimental_rerun()
+if col_nav2.button("Próxima Página ➡️") and pagina_atual < total_paginas:
+    st.session_state["pagina_mercado"] += 1
+    st.experimental_rerun()
 for jogador in jogadores_pagina:
     col1, col2, col3, col4, col5 = st.columns([0.3, 1.8, 2, 2, 2])
     col1.markdown("")
