@@ -4,13 +4,13 @@ from supabase import create_client
 from datetime import datetime
 import itertools
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🎯 Gerar Grupos da Copa", layout="wide")
-st.title("🎯 Definir Grupos da Copa LigaFut Manualmente")
+st.set_page_config(page_title="🎯 Gerar Grupos da Copa", layout="centered")
+st.title("🎯 Gerar Grupos Fixos da Copa LigaFut")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -24,20 +24,16 @@ if not admin_check.data:
     st.warning("🔒 Acesso permitido apenas para administradores.")
     st.stop()
 
-# 🔄 Buscar times disponíveis
+# 🔄 Buscar todos os times disponíveis
 try:
     res = supabase.table("times").select("id, nome").execute()
-    times_disponiveis = sorted(res.data, key=lambda x: x["nome"])
+    todos_times = {t["nome"]: t["id"] for t in res.data}
 except Exception as e:
     st.error(f"Erro ao buscar times: {e}")
     st.stop()
 
-# 🔄 Criar dicionário nome -> id
-nome_para_id = {t["nome"]: t["id"] for t in times_disponiveis}
-nomes_times = list(nome_para_id.keys())
-
-# 🧩 Grupos fixos conforme imagens
-estrutura_grupos = {
+# 📋 Grupos fixos conforme as imagens (ordem exata)
+grupos_fixos = {
     "Grupo A": ["Bayern", "Borussia", "PSG", "Atletico de Madrid"],
     "Grupo B": ["Belgrano", "Ajax", "Liverpool", "Manchester United"],
     "Grupo C": ["venezia", "Milan", "Charleroi", "Boca Jrs"],
@@ -48,46 +44,62 @@ estrutura_grupos = {
     "Grupo H": ["Barcelona", "Wrexham", "Atlanta", "Real Madrid"]
 }
 
-# 🧠 Interface para selecionar os times corretamente
-st.subheader("📝 Selecione os times corretos para cada grupo:")
+# 🎯 Interface para selecionar os times participantes (todos marcados)
+st.subheader("📌 Selecione os times participantes da Copa")
+nomes_disponiveis = list(todos_times.keys())
+selecionados = st.multiselect(
+    "Desmarque os times que NÃO irão participar:",
+    nomes_disponiveis,
+    default=nomes_disponiveis
+)
 
-grupos_selecionados = {}
-colunas = st.columns(4)
-for i, (grupo, sugestoes) in enumerate(estrutura_grupos.items()):
-    with colunas[i % 4]:
-        st.markdown(f"**{grupo}**")
-        selecionados = []
-        for j, sugestao in enumerate(sugestoes):
-            escolha = st.selectbox(f"{grupo} - Posição {j+1} ({sugestao})", nomes_times, key=f"{grupo}_{j}")
-            selecionados.append(nome_para_id[escolha])
-        grupos_selecionados[grupo] = selecionados
+# ▶️ Botão para gerar grupos fixos com os selecionados
+if st.button("✅ Gerar Grupos Fixos da Copa"):
+    if len(selecionados) != 32:
+        st.warning("🚨 Você precisa deixar exatamente 32 times selecionados.")
+        st.stop()
 
-# ▶️ Botão para salvar os grupos e gerar confrontos
-if st.button("✅ Salvar Grupos e Gerar Confrontos"):
+    # 🔁 Valida se todos os times dos grupos fixos estão entre os selecionados
+    nomes_necessarios = [nome for grupo in grupos_fixos.values() for nome in grupo]
+    faltando = [nome for nome in nomes_necessarios if nome not in selecionados]
+    if faltando:
+        st.error(f"❌ Os seguintes times dos grupos fixos não estão entre os selecionados: {', '.join(faltando)}")
+        st.stop()
+
     try:
-        # Limpa dados antigos
+        # 🧹 Limpa dados antigos
         supabase.table("grupos_copa").delete().neq("grupo", "").execute()
         supabase.table("copa_ligafut").delete().neq("fase", "").execute()
+    except Exception as e:
+        st.error(f"Erro ao limpar dados antigos: {e}")
+        st.stop()
 
-        data_copa = datetime.now().strftime("%Y-%m-%d")
+    data_copa = datetime.now().strftime("%Y-%m-%d")
 
-        # Salvar grupos e jogos
-        for grupo, id_times in grupos_selecionados.items():
-            for id_time in id_times:
+    try:
+        # 💾 Salva os grupos fixos e gera os jogos
+        for grupo_nome, nomes_times in grupos_fixos.items():
+            ids = []
+            for nome in nomes_times:
+                id_time = todos_times.get(nome)
+                if not id_time:
+                    st.warning(f"⚠️ Time '{nome}' não encontrado.")
+                    continue
+                ids.append(id_time)
                 supabase.table("grupos_copa").insert({
-                    "grupo": grupo,
+                    "grupo": grupo_nome,
                     "id_time": id_time,
                     "data_criacao": data_copa
                 }).execute()
 
-            # Gera jogos do grupo (turno e returno)
+            # ⚽ Jogos (ida e volta)
             jogos = []
-            for mandante, visitante in itertools.combinations(id_times, 2):
+            for mandante, visitante in itertools.combinations(ids, 2):
                 jogos.append({"mandante": mandante, "visitante": visitante, "gols_mandante": None, "gols_visitante": None})
                 jogos.append({"mandante": visitante, "visitante": mandante, "gols_mandante": None, "gols_visitante": None})
 
             supabase.table("copa_ligafut").insert({
-                "grupo": grupo,
+                "grupo": grupo_nome,
                 "fase": "grupos",
                 "data_criacao": data_copa,
                 "jogos": jogos
@@ -95,9 +107,8 @@ if st.button("✅ Salvar Grupos e Gerar Confrontos"):
 
         st.success("✅ Grupos e confrontos gerados com sucesso!")
         st.subheader("📊 Grupos Gerados")
-        for grupo, id_times in grupos_selecionados.items():
-            nomes = [nome for nome, id_ in nome_para_id.items() if id_ in id_times]
+        for grupo, nomes in grupos_fixos.items():
             st.markdown(f"**{grupo}**: {', '.join(nomes)}")
 
     except Exception as e:
-        st.error(f"❌ Erro ao gerar grupos: {e}")
+        st.error(f"Erro ao salvar grupos: {e}")
