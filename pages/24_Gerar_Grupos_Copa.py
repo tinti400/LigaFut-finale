@@ -33,14 +33,13 @@ except Exception as e:
     st.error(f"Erro ao buscar times: {e}")
     st.stop()
 
-# 📌 Grupos fixos com nomes corrigidos conforme Supabase
 grupos_fixos = {
-    "Grupo A": ["Bayern", "Borussia", "PSG", "Atletico de Madrid"],
-    "Grupo B": ["Belgrano", "Ajax", "Liverpool", "Manchester United"],
+    "Grupo A": ["Bayern", "Borussia Dortmund", "PSG", "Atletico de Madrid"],
+    "Grupo B": ["Belgrano", "Ajax", "Liverpool FC", "Manchester United"],
     "Grupo C": ["venezia", "Milan", "Charleroi", "Boca Jrs"],
     "Grupo D": ["Tottenham", "Estudiantes", "Casa Pia", "Lyon"],
-    "Grupo E": ["Olympique Marselhe", "Newells", "Real Betis", "Stuttgart"],
-    "Grupo F": ["River", "Arsenal", "Inter Miami", "Chelsea"],
+    "Grupo E": ["Olympique Marselhe", "Newells", "Real Betis", "VfB Stuttgart"],
+    "Grupo F": ["River", "Arsenal", "Inter Miami", "Chelsea FC"],
     "Grupo G": ["Rio Ave", "Napoli", "Leicester", "Wolverhampton"],
     "Grupo H": ["Barcelona", "Wrexham", "Atlanta", "Real Madrid"]
 }
