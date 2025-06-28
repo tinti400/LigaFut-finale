@@ -39,7 +39,7 @@ grupos_fixos = {
     "Grupo C": ["venezia", "Milan", "Charleroi", "Boca Jrs"],
     "Grupo D": ["Tottenham", "Estudiantes", "Casa Pia", "Lyon"],
     "Grupo E": ["Olympique Marselhe", "Newells", "Real Betis", "VfB Stuttgart"],
-    "Grupo F": ["River", "Arsenal", "Inter Miami", "Chelsea FC"],
+    "Grupo F": ["River", "Arsenal", "Inter Miami", Chelsea FC],
     "Grupo G": ["Rio Ave", "Napoli", "Leicester", "Wolverhampton"],
     "Grupo H": ["Barcelona", "Wrexham", "Atlanta", "Real Madrid"]
 }
