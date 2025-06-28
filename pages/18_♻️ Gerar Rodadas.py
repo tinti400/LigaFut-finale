@@ -8,12 +8,12 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🏆 Gerar Grupos Fixos - Copa LigaFut", layout="centered")
-st.title("🏆 Gerar Grupos da Copa LigaFut")
+st.set_page_config(page_title="🏆 Definir Grupos Manualmente - LigaFut", layout="wide")
+st.title("🏆 Definir Grupos da Copa LigaFut")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
-    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
+    st.warning("⚠️ Você precisa estar logado.")
     st.stop()
 
 # ⚙️ Verifica se é admin
@@ -23,31 +23,39 @@ if not res_admin.data:
     st.error("🔒 Acesso restrito apenas para administradores.")
     st.stop()
 
-# 📦 Grupos fixos 100% iguais aos da imagem
-grupos_fixos = {
-    "Grupo A": ["Bayern", "Borussia", "PSG", "Atletico de Madrid"],
-    "Grupo B": ["Belgrano", "Ajax", "Liverpool", "Manchester United"],
-    "Grupo C": ["venezia", "Milan", "Charleroi", "Boca Jrs"],
-    "Grupo D": ["tottenham", "Estudiantes", "Casa Pia", "Lyon"],
-    "Grupo E": ["Olympique Marselhe", "Newells", "Real Betis", "Stuttgart"],
-    "Grupo F": ["River", "Arsenal", "Inter Miami", "Chelsea"],
-    "Grupo G": ["Rio Ave", "Napoli", "Leicester", "Wolverhampton"],
-    "Grupo H": ["Barcelona", "Wrexham", "Atlanta", "Real Madrid"]
-}
+# 🔄 Buscar todos os times disponíveis no sistema
+res = supabase.table("times").select("nome").execute()
+todos_times = sorted([t["nome"] for t in res.data])
 
-# 🔘 Botão para gerar os grupos
-if st.button("✅ Gerar Grupos Fixos"):
+# 🧠 Armazena escolhas dos grupos
+grupos = {}
+colunas = st.columns(4)
+nomes_grupos = ["Grupo A", "Grupo B", "Grupo C", "Grupo D", "Grupo E", "Grupo F", "Grupo G", "Grupo H"]
+
+for i, grupo in enumerate(nomes_grupos):
+    with colunas[i % 4]:
+        times_escolhidos = st.multiselect(f"{grupo}", todos_times, key=grupo)
+        grupos[grupo] = times_escolhidos
+
+# 🔘 Botão para salvar os grupos manualmente
+if st.button("✅ Salvar Grupos"):
+    # Validação: todos os grupos devem ter 4 times
+    erros = [g for g in grupos if len(grupos[g]) != 4]
+    if erros:
+        st.warning(f"⛔ Cada grupo precisa ter exatamente 4 times. Verifique: {', '.join(erros)}")
+        st.stop()
+
     try:
-        # 🧹 Apagar grupos anteriores
+        # 🧹 Apagar dados antigos
         supabase.table("grupos_copa").delete().neq("grupo", "").execute()
 
-        # 💾 Inserir os grupos no Supabase
-        for grupo, times in grupos_fixos.items():
+        # 💾 Salvar grupos conforme escolhido
+        for grupo, times in grupos.items():
             for ordem, nome_time in enumerate(times):
                 supabase.table("grupos_copa").insert({
                     "grupo": grupo,
                     "nome_time": nome_time,
-                    "ordem": ordem,  # Mantém a ordem exata da imagem
+                    "ordem": ordem,
                     "pontos": 0,
                     "jogos": 0,
                     "vitorias": 0,
@@ -58,7 +66,6 @@ if st.button("✅ Gerar Grupos Fixos"):
                     "saldo_gols": 0,
                     "data_criacao": datetime.now().isoformat()
                 }).execute()
-
-        st.success("✅ Grupos fixos criados exatamente como na imagem!")
+        st.success("✅ Grupos salvos com sucesso!")
     except Exception as e:
-        st.error(f"❌ Erro ao criar os grupos: {e}")
+        st.error(f"❌ Erro ao salvar grupos: {e}")
