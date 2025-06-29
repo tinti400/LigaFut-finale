@@ -38,7 +38,7 @@ if not jogadores_filtrados:
 
 # 🧩 Exibição
 for jogador in jogadores_filtrados:
-    with st.container(border=True):
+    with st.container():
         cols = st.columns([1, 3, 2, 2, 2, 2])
 
         cols[0].image(jogador["imagem_url"], width=80)
