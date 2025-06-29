@@ -27,13 +27,15 @@ mapa_times = {t['nome']: t['id'] for t in times}
 
 # 🎯 Filtros no topo
 st.subheader("🎯 Filtros")
-col_f1, col_f2, col_f3 = st.columns(3)
+col_f1, col_f2, col_f3, col_f4 = st.columns(4)
 with col_f1:
     filtro_nome = st.text_input("🔎 Nome do jogador")
 with col_f2:
     filtro_nacionalidade = st.text_input("🌍 Nacionalidade")
 with col_f3:
     filtro_overall = st.slider("⭐ Overall mínimo", min_value=0, max_value=99, value=0)
+with col_f4:
+    filtro_destino = st.selectbox("🎯 Status", ["Todos", "Disponível", "Leilão", "Mercado", "Atribuído"])
 
 # Aplicar filtros
 jogadores_filtrados = []
@@ -44,6 +46,17 @@ for j in jogadores:
         continue
     if int(j["overall"]) < filtro_overall:
         continue
+
+    destino = j.get("destino", "nenhum")
+    if filtro_destino == "Disponível" and destino not in ["nenhum", "livre", ""]:
+        continue
+    elif filtro_destino == "Leilão" and destino != "leilao":
+        continue
+    elif filtro_destino == "Mercado" and destino != "mercado":
+        continue
+    elif filtro_destino == "Atribuído" and destino not in mapa_times:
+        continue
+
     jogadores_filtrados.append(j)
 
 # Mostrar jogadores
@@ -116,7 +129,7 @@ for jogador in jogadores_filtrados:
                     "valor": novo_valor,
                     "foto": jogador.get("imagem_url", ""),
                     "nacionalidade": jogador.get("nacionalidade", ""),
-                    "time_origem": jogador["destino"] if jogador["destino"] not in ["nenhum", "livre", ""] else "Livre",
+                    "time_origem": "Livre",
                     "link_sofifa": jogador.get("link_sofifa", ""),
                     "salario": salario
                 }
