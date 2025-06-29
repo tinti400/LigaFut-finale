@@ -41,36 +41,42 @@ if fila:
     for jogador in fila:
         with st.container():
             cols = st.columns([1, 3, 2, 2, 2])
-            cols[0].image(jogador["imagem_url"], width=80)
-            cols[1].markdown(f"**{jogador['nome']}**")
-            cols[1].markdown(f"`{jogador['posicao']}` | Overall: {jogador.get('overall', '-')}")
-            cols[2].markdown(f"💰 R$ {int(jogador['valor']):,}".replace(",", "."))
+            cols[0].image(jogador.get("imagem_url", ""), width=80)
+            cols[1].markdown(f"**{jogador.get('nome', 'Sem Nome')}**")
+            cols[1].markdown(f"`{jogador.get('posicao', 'ND')}` | Overall: {jogador.get('overall', '-')}")
+            cols[2].markdown(f"💰 R$ {int(jogador.get('valor', 0)):,}".replace(",", "."))
 
             if cols[3].button("📢 Criar Leilão", key=f"criar_{jogador['id']}"):
-                supabase.table("leiloes").insert({
-                    "nome_jogador": jogador["nome"],
-                    "posicao_jogador": jogador["posicao"],
-                    "overall_jogador": jogador.get("overall", 0),
-                    "valor_inicial": jogador["valor"],
-                    "valor_atual": jogador["valor"],
-                    "incremento_minimo": 3_000_000,
-                    "inicio": None,
-                    "fim": None,
-                    "ativo": False,
-                    "finalizado": False,
-                    "origem": "Base",
-                    "nacionalidade": "Desconhecida",
-                    "imagem_url": jogador.get("imagem_url", ""),
-                    "link_sofifa": "",
-                    "enviado_bid": False,
-                    "validado": False,
-                    "aguardando_validacao": False,
-                    "tempo_minutos": 2
-                }).execute()
+                try:
+                    agora = datetime.utcnow()
+                    fim = agora + timedelta(minutes=2)
 
-                supabase.table("fila_leilao").update({"status": "enviado"}).eq("id", jogador["id"]).execute()
-                st.success(f"✅ {jogador['nome']} movido para a fila oficial de leilões.")
-                st.experimental_rerun()
+                    supabase.table("leiloes").insert({
+                        "nome_jogador": jogador.get("nome", "Sem Nome"),
+                        "posicao_jogador": jogador.get("posicao", "ND"),
+                        "overall_jogador": jogador.get("overall", 0),
+                        "valor_inicial": int(jogador.get("valor", 0)),
+                        "valor_atual": int(jogador.get("valor", 0)),
+                        "incremento_minimo": 3_000_000,
+                        "inicio": agora.isoformat(),
+                        "fim": fim.isoformat(),
+                        "ativo": False,
+                        "finalizado": False,
+                        "origem": "Base",
+                        "nacionalidade": "Desconhecida",
+                        "imagem_url": jogador.get("imagem_url", ""),
+                        "link_sofifa": "",
+                        "enviado_bid": False,
+                        "validado": False,
+                        "aguardando_validacao": False,
+                        "tempo_minutos": 2
+                    }).execute()
+
+                    supabase.table("fila_leilao").update({"status": "enviado"}).eq("id", jogador["id"]).execute()
+                    st.success(f"✅ {jogador['nome']} movido para a fila oficial de leilões.")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao criar leilão: {e}")
 else:
     st.info("✅ Nenhum jogador aguardando na fila de leilão.")
 
