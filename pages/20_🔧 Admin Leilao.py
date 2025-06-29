@@ -1,3 +1,4 @@
+# 20_🔧 Admin Leilao.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from datetime import datetime, timedelta
@@ -31,50 +32,47 @@ if usuario_atual not in emails_admin:
 
 st.title("🧑‍⚖️ Administração de Leilões (Fila)")
 
-# 📋 Adicionar novo leilão manualmente
-with st.form("novo_leilao"):
-    nome = st.text_input("Nome do Jogador").strip()
-    posicao = st.selectbox("Posição", [
-        "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
-        "Volante (VOL)", "Meio campo (MC)", "Meia (MEI)", "Meia direita (MD)", "Meia esquerda (ME)",
-        "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
-    ])
-    overall = st.number_input("Overall", min_value=1, max_value=99)
-    valor_inicial = st.number_input("Valor Inicial (R$)", min_value=100_000, step=50_000)
-    incremento = st.number_input("Incremento mínimo (R$)", min_value=100_000, step=50_000, value=3_000_000)
-    tempo_minutos = st.number_input("⏱️ Duração do Leilão (min)", min_value=1, max_value=30, value=2)
-    origem = st.text_input("Origem do Jogador (ex: Real Madrid)")
-    nacionalidade = st.text_input("Nacionalidade (ex: Brasil)")
-    imagem_url = st.text_input("URL da Imagem do Jogador (opcional)")
-    link_sofifa = st.text_input("📄 Link da Ficha Técnica (SoFIFA)", placeholder="https://sofifa.com/player/...")
-    botao = st.form_submit_button("Adicionar à Fila")
+# 📂 Fila de jogadores aguardando leilão (vindo do painel destino)
+st.subheader("📥 Jogadores na Fila de Leilão (Aguardando Inclusão)")
 
-    if botao and nome:
-        novo = {
-            "nome_jogador": nome,
-            "posicao_jogador": posicao,
-            "overall_jogador": overall,
-            "valor_inicial": valor_inicial,
-            "valor_atual": valor_inicial,
-            "incremento_minimo": incremento,
-            "inicio": None,
-            "fim": None,
-            "ativo": False,
-            "finalizado": False,
-            "origem": origem,
-            "nacionalidade": nacionalidade,
-            "imagem_url": imagem_url,
-            "link_sofifa": link_sofifa,
-            "enviado_bid": False,
-            "validado": False,
-            "aguardando_validacao": False,
-            "tempo_minutos": tempo_minutos
-        }
-        try:
-            supabase.table("leiloes").insert(novo).execute()
-            st.success("✅ Jogador adicionado à fila.")
-        except Exception as e:
-            st.error(f"Erro ao inserir leilão: {e}")
+fila = supabase.table("fila_leilao").select("*").eq("status", "aguardando").execute().data
+
+if fila:
+    for jogador in fila:
+        with st.container():
+            cols = st.columns([1, 3, 2, 2, 2])
+            cols[0].image(jogador["imagem_url"], width=80)
+            cols[1].markdown(f"**{jogador['nome']}**")
+            cols[1].markdown(f"`{jogador['posicao']}` | Overall: {jogador.get('overall', '-')}")
+            cols[2].markdown(f"💰 R$ {int(jogador['valor']):,}".replace(",", "."))
+
+            if cols[3].button("📢 Criar Leilão", key=f"criar_{jogador['id']}"):
+                supabase.table("leiloes").insert({
+                    "nome_jogador": jogador["nome"],
+                    "posicao_jogador": jogador["posicao"],
+                    "overall_jogador": jogador.get("overall", 0),
+                    "valor_inicial": jogador["valor"],
+                    "valor_atual": jogador["valor"],
+                    "incremento_minimo": 3_000_000,
+                    "inicio": None,
+                    "fim": None,
+                    "ativo": False,
+                    "finalizado": False,
+                    "origem": "Base",
+                    "nacionalidade": "Desconhecida",
+                    "imagem_url": jogador.get("imagem_url", ""),
+                    "link_sofifa": "",
+                    "enviado_bid": False,
+                    "validado": False,
+                    "aguardando_validacao": False,
+                    "tempo_minutos": 2
+                }).execute()
+
+                supabase.table("fila_leilao").update({"status": "enviado"}).eq("id", jogador["id"]).execute()
+                st.success(f"✅ {jogador['nome']} movido para a fila oficial de leilões.")
+                st.experimental_rerun()
+else:
+    st.info("✅ Nenhum jogador aguardando na fila de leilão.")
 
 # 🔄 Verificar e ativar até 3 leilões simultâneos
 ativos = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute().data
