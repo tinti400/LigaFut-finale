@@ -60,9 +60,10 @@ for leilao in leiloes:
     overall = leilao.get("overall_jogador", "N/A")
     nacionalidade = leilao.get("nacionalidade", "-")
     imagem_url = leilao.get("imagem_url", "")
+    link_sofifa = leilao.get("link_sofifa", "")
     id_time_vencedor = leilao.get("id_time_atual", "")
 
-    # 🖼️ Exibir
+    # 🖼️ Exibir informações
     col1, col2 = st.columns([1, 3])
     with col1:
         if imagem_url:
@@ -74,12 +75,15 @@ for leilao in leiloes:
         **💰 Preço Atual:** R$ {valor_atual:,.0f}  
         **⏳ Tempo Restante:** {minutos:02d}:{segundos:02d}
         """)
+        if link_sofifa:
+            st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({link_sofifa})", unsafe_allow_html=True)
+
         if id_time_vencedor:
             time_res = supabase.table("times").select("nome").eq("id", id_time_vencedor).execute()
             if time_res.data:
                 st.info(f"🏷️ Último Lance: {time_res.data[0]['nome']}")
 
-    # ⏹️ Finalização automática DESATIVADA — vai para validação manual
+    # ⏹️ Finalização automática
     if tempo_restante == 0:
         leilao_ref = supabase.table("leiloes").select("finalizado", "validado").eq("id", leilao["id"]).execute()
         dados = leilao_ref.data[0] if leilao_ref.data else {}
@@ -119,9 +123,7 @@ for leilao in leiloes:
                     st.success("✅ Lance enviado com sucesso!")
                     st.experimental_rerun()
 
-# 🔁 Botão manual
+# 🔁 Botão manual para atualizar
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
-
-
