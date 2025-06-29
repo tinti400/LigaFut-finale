@@ -36,7 +36,7 @@ with st.form("novo_leilao"):
     nome = st.text_input("Nome do Jogador").strip()
     posicao = st.selectbox("Posição", [
         "Goleiro (GL)", "Lateral direito (LD)", "Zagueiro (ZAG)", "Lateral esquerdo (LE)",
-        "Volante (VOL)", "Meio campo (MC)", "Meia direita (MD)", "Meia esquerda (ME)",
+        "Volante (VOL)", "Meio campo (MC)", "Meia (MEI)", "Meia direita (MD)", "Meia esquerda (ME)",
         "Ponta direita (PD)", "Ponta esquerda (PE)", "Segundo atacante (SA)", "Centroavante (CA)"
     ])
     overall = st.number_input("Overall", min_value=1, max_value=99)
@@ -46,6 +46,7 @@ with st.form("novo_leilao"):
     origem = st.text_input("Origem do Jogador (ex: Real Madrid)")
     nacionalidade = st.text_input("Nacionalidade (ex: Brasil)")
     imagem_url = st.text_input("URL da Imagem do Jogador (opcional)")
+    link_sofifa = st.text_input("📄 Link da Ficha Técnica (SoFIFA)", placeholder="https://sofifa.com/player/...")
     botao = st.form_submit_button("Adicionar à Fila")
 
     if botao and nome:
@@ -63,6 +64,7 @@ with st.form("novo_leilao"):
             "origem": origem,
             "nacionalidade": nacionalidade,
             "imagem_url": imagem_url,
+            "link_sofifa": link_sofifa,
             "enviado_bid": False,
             "validado": False,
             "aguardando_validacao": False,
@@ -85,6 +87,9 @@ if ativos:
         st.markdown(f"**Valor Atual:** R$ {ativo['valor_atual']:,.0f}".replace(",", "."))
         st.markdown(f"**Origem:** {ativo.get('origem', 'Desconhecida')}")
         st.markdown(f"**Nacionalidade:** {ativo.get('nacionalidade', 'Desconhecida')}")
+
+        if ativo.get("link_sofifa"):
+            st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({ativo['link_sofifa']})", unsafe_allow_html=True)
 
         if ativo.get("imagem_url"):
             st.image(ativo["imagem_url"], width=200)
@@ -141,9 +146,12 @@ if pendentes.data:
         id_time = item.get("id_time_atual")
 
         st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
+
+        if item.get("link_sofifa"):
+            st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({item['link_sofifa']})", unsafe_allow_html=True)
+
         if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
             try:
-                # 1. Inserir jogador no elenco
                 supabase.table("elenco").insert({
                     "id_time": id_time,
                     "nome": nome,
@@ -152,10 +160,10 @@ if pendentes.data:
                     "valor": valor,
                     "origem": item.get("origem", ""),
                     "nacionalidade": item.get("nacionalidade", ""),
-                    "imagem_url": item.get("imagem_url", "")
+                    "imagem_url": item.get("imagem_url", ""),
+                    "link_sofifa": item.get("link_sofifa", "")
                 }).execute()
 
-                # 2. Descontar valor do saldo
                 saldo_res = supabase.table("times").select("saldo, nome").eq("id", id_time).execute()
                 if saldo_res.data:
                     saldo = saldo_res.data[0]["saldo"]
@@ -163,7 +171,6 @@ if pendentes.data:
                     novo_saldo = saldo - valor
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                    # 3. Registrar no BID
                     registrar_movimentacao(
                         id_time=id_time,
                         tipo="saida",
@@ -175,7 +182,6 @@ if pendentes.data:
                         destino=nome_time
                     )
 
-                # 4. Atualizar leilão
                 supabase.table("leiloes").update({
                     "validado": True,
                     "finalizado": True,
@@ -203,5 +209,3 @@ if st.button("🪩 Apagar Histórico de Leilões Enviados"):
         st.experimental_rerun()
     except Exception as e:
         st.error(f"Erro ao apagar histórico: {e}")
-
-
