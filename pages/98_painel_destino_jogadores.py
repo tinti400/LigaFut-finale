@@ -25,7 +25,7 @@ res_times = supabase.table("times").select("id", "nome").execute()
 times = res_times.data if res_times.data else []
 mapa_times = {t['nome']: t['id'] for t in times}
 
-# 🎯 Filtros
+# 🎯 Filtros no topo
 st.subheader("🎯 Filtros")
 col_f1, col_f2, col_f3 = st.columns(3)
 with col_f1:
@@ -86,7 +86,6 @@ for jogador in jogadores_filtrados:
     st.markdown("**Ações:**")
     col_a1, col_a2, col_a3 = st.columns(3)
 
-    # 👔 Atribuir ao time
     with col_a1:
         time_escolhido = st.selectbox("👔 Time", list(mapa_times.keys()), key=f"time_{jogador['id']}")
         if st.button("✅ Atribuir", key=f"atr_{jogador['id']}"):
@@ -104,31 +103,33 @@ for jogador in jogadores_filtrados:
                 "valor": novo_valor
             }).eq("id", jogador["id"]).execute()
             st.success(f"{jogador['nome']} atribuído ao {time_escolhido}.")
-            st.rerun()
+            st.experimental_rerun()
 
-    # 🛒 Enviar para Mercado
     with col_a2:
         if st.button("🛒 Mercado", key=f"mercado_{jogador['id']}"):
-            dados_mercado = {
-                "id_jogador_base": jogador["id"],
-                "nome": jogador["nome"],
-                "posicao": jogador["posicao"],
-                "overall": jogador["overall"],
-                "valor": novo_valor,
-                "imagem_url": jogador.get("imagem_url", ""),
-                "nacionalidade": jogador.get("nacionalidade", ""),
-                "clube_original": jogador.get("clube_original") or None
-            }
+            try:
+                salario = int(novo_valor * 0.007)
+                dados_mercado = {
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "overall": jogador["overall"],
+                    "valor": novo_valor,
+                    "foto": jogador.get("imagem_url", ""),
+                    "nacionalidade": jogador.get("nacionalidade", ""),
+                    "time_origem": "Livre",
+                    "link_sofifa": jogador.get("link_sofifa", ""),
+                    "salario": salario
+                }
+                supabase.table("mercado_transferencias").insert(dados_mercado).execute()
+                supabase.table("jogadores_base").update({
+                    "destino": "mercado",
+                    "valor": novo_valor
+                }).eq("id", jogador["id"]).execute()
+                st.success(f"{jogador['nome']} enviado ao mercado.")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao enviar jogador ao mercado: {e}")
 
-            supabase.table("mercado_transferencias").insert(dados_mercado).execute()
-            supabase.table("jogadores_base").update({
-                "destino": "mercado",
-                "valor": novo_valor
-            }).eq("id", jogador["id"]).execute()
-            st.success(f"{jogador['nome']} enviado ao mercado.")
-            st.rerun()
-
-    # 📢 Enviar para Leilão
     with col_a3:
         if st.button("📢 Leilão", key=f"leilao_{jogador['id']}"):
             supabase.table("fila_leilao").insert({
@@ -145,4 +146,4 @@ for jogador in jogadores_filtrados:
                 "valor": novo_valor
             }).eq("id", jogador["id"]).execute()
             st.success(f"{jogador['nome']} enviado para o leilão.")
-            st.rerun()
+            st.experimental_rerun()
