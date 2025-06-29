@@ -115,9 +115,8 @@ for jogador in jogadores:
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
-from utils import registrar_movimentacao
 
-# ✅ Primeira linha do script
+# ⚙️ Configuração da Página (deve ser a primeira coisa do Streamlit)
 st.set_page_config(page_title="🔧 Admin - Leilão e Mercado", layout="wide")
 
 # 🔐 Conexão Supabase
@@ -125,89 +124,135 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.title("🔧 Painel de Administração - Leilão e Mercado")
+st.title("🔧 Painel de Administração - Jogadores Base")
 
 # ✅ Verifica login
 if "usuario_id" not in st.session_state:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 🧾 Lista jogadores com destino mercado ou leilao
+# 📦 Buscar jogadores base
 res = supabase.table("jogadores_base").select("*").execute()
-jogadores = res.data
+jogadores = res.data if res.data else []
 
-# 📌 Lista times
+# 📦 Buscar times
 res_times = supabase.table("times").select("id", "nome").execute()
-times = res_times.data
+times = res_times.data if res_times.data else []
 mapa_times = {t['nome']: t['id'] for t in times}
 
 # 🔍 Filtros
-st.sidebar.markdown("### 🎯 Filtros")
-filtro_nome = st.sidebar.text_input("🔎 Nome contém:")
-filtro_nac = st.sidebar.text_input("🌍 Nacionalidade contém:")
-filtro_ovr = st.sidebar.slider("📊 Overall mínimo:", min_value=1, max_value=99, value=1)
+with st.sidebar:
+    st.header("🎯 Filtros")
+    filtro_nome = st.text_input("🔎 Nome do jogador")
+    filtro_nacionalidade = st.text_input("🌍 Nacionalidade")
+    filtro_overall = st.slider("⭐ Overall mínimo", min_value=0, max_value=99, value=0)
 
-jogadores_filtrados = [j for j in jogadores if
-    filtro_nome.lower() in j["nome"].lower() and
-    filtro_nac.lower() in j.get("nacionalidade", "").lower() and
-    int(j["overall"]) >= filtro_ovr
-]
+# Aplicar filtros
+jogadores_filtrados = []
+for j in jogadores:
+    if filtro_nome.lower() not in j["nome"].lower():
+        continue
+    if filtro_nacionalidade and filtro_nacionalidade.lower() not in j.get("nacionalidade", "").lower():
+        continue
+    if int(j["overall"]) < filtro_overall:
+        continue
+    jogadores_filtrados.append(j)
 
+# 🔃 Mostrar jogadores filtrados
 if not jogadores_filtrados:
     st.info("Nenhum jogador encontrado com os filtros aplicados.")
     st.stop()
 
-# 🧩 Exibição
 for jogador in jogadores_filtrados:
     with st.container():
-        st.markdown("---")
         col1, col2 = st.columns([1, 5])
+
+        # 📷 Imagem do jogador
         with col1:
-            st.image(jogador["imagem_url"], width=100)
+            st.image(jogador.get("imagem_url", ""), width=80)
+
+            # 🟢🔴🟡🔵 Status visual
             destino = jogador.get("destino", "disponivel")
-            cor = {
-                "disponivel": "🟢",
-                "leilao": "🟡",
-                "mercado": "🔵"
-            }.get(destino, "🔴")
-            st.markdown(f"{cor} **Status:** `{destino}`")
+            if destino == "leilao":
+                st.markdown("🟡 **Leilão**")
+            elif destino == "mercado":
+                st.markdown("🔵 **Mercado**")
+            elif destino in mapa_times:
+                st.markdown("🔴 **Atribuído**")
+            else:
+                st.markdown("🟢 **Disponível**")
 
         with col2:
-            st.markdown(f"### {jogador['nome']} ({jogador['posicao']})")
-            st.markdown(f"**Overall:** `{jogador['overall']}`")
-            st.markdown(f"**Nacionalidade:** {jogador.get('nacionalidade', 'Desconhecida')}")
-            st.markdown(f"💰 **Valor Atual:** R$ {int(jogador['valor']):,}".replace(",", "."))
+            st.markdown(f"### {jogador['nome']}")
+            st.markdown(f"- 📌 Posição: `{jogador.get('posicao', 'N/A')}`")
+            st.markdown(f"- 🇧🇷 Nacionalidade: `{jogador.get('nacionalidade', 'Desconhecida')}`")
+            st.markdown(f"- ⭐ Overall: `{jogador.get('overall', '-')}`")
+
+            # 🔗 Link SoFIFA
             if jogador.get("sofifa_id"):
-                st.markdown(f"[📎 Ficha Técnica](https://sofifa.com/player/{jogador['sofifa_id']})")
+                st.markdown(f"[📄 Ficha Técnica (SoFIFA)](https://sofifa.com/player/{jogador['sofifa_id']}/)", unsafe_allow_html=True)
 
-            novo_valor = st.number_input("Editar Valor (R$)", value=int(jogador["valor"]), step=500_000, key=f"val_{jogador['id']}")
-            if st.button("💾 Salvar Valor", key=f"save_val_{jogador['id']}"):
-                supabase.table("jogadores_base").update({"valor": novo_valor}).eq("id", jogador["id"]).execute()
-                st.success("Valor atualizado com sucesso!")
-                st.experimental_rerun()
+            # 💰 Valor editável
+            novo_valor = st.number_input(
+                f"💰 Valor - {jogador['nome']}",
+                value=int(jogador["valor"]),
+                step=500_000,
+                key=f"valor_{jogador['uuid']}"
+            )
 
-            col_a, col_b, col_c = st.columns(3)
-            if col_a.button("📤 Mandar pro Mercado", key=f"merc_{jogador['id']}"):
-                supabase.table("jogadores_base").update({"destino": "mercado"}).eq("id", jogador["id"]).execute()
-                st.success("Jogador enviado ao mercado.")
-                st.experimental_rerun()
-
-            if col_b.button("📢 Mandar pro Leilão", key=f"leilao_{jogador['id']}"):
-                supabase.table("jogadores_base").update({"destino": "leilao"}).eq("id", jogador["id"]).execute()
-                st.success("Jogador enviado à fila do leilão.")
-                st.experimental_rerun()
-
-            nome_time = col_c.selectbox("👔 Atribuir a: ", list(mapa_times.keys()), key=f"sb_{jogador['id']}")
-            if st.button("✅ Atribuir ao Time", key=f"atr_{jogador['id']}"):
-                id_time = mapa_times[nome_time]
+            # 👔 Atribuir a time
+            col_a, col_b, col_c = st.columns([3, 3, 2])
+            time_escolhido = col_a.selectbox("👔 Atribuir a um time:", list(mapa_times.keys()), key=f"time_{jogador['uuid']}")
+            if col_b.button("✅ Atribuir", key=f"atr_{jogador['uuid']}"):
+                id_time = mapa_times[time_escolhido]
                 supabase.table("elenco").insert({
                     "id_time": id_time,
                     "nome": jogador["nome"],
                     "posicao": jogador["posicao"],
                     "overall": jogador["overall"],
-                    "valor": jogador["valor"],
+                    "valor": novo_valor,
                     "imagem_url": jogador["imagem_url"]
                 }).execute()
-                supabase.table("jogadores_base").update({"destino": nome_time}).eq("id", jogador["id"]).execute()
-                st.success(f"{jogador['nome']} atribuído ao {nome_time} com sucesso!")
+                supabase.table("jogadores_base").update({"destino": time_escolhido, "valor": novo_valor}).eq("uuid", jogador["uuid"]).execute()
+                st.success(f"{jogador['nome']} atribuído ao {time_escolhido}.")
+                st.experimental_rerun()
+
+            # 🛒 Enviar para o mercado
+            if col_c.button("🛒 Mercado", key=f"mercado_{jogador['uuid']}"):
+                supabase.table("mercado_transferencias").insert({
+                    "uuid": jogador["uuid"],
+                    "nome": jogador["nome"],
+                    "posicao": jogador["posicao"],
+                    "overall": jogador["overall"],
+                    "valor": novo_valor,
+                    "imagem_url": jogador["imagem_url"]
+                }).execute()
+                supabase.table("jogadores_base").update({"destino": "mercado", "valor": novo_valor}).eq("uuid", jogador["uuid"]).execute()
+                st.success(f"{jogador['nome']} enviado ao mercado.")
+                st.experimental_rerun()
+
+            # 📢 Enviar para o leilão
+            if st.button("📢 Leilão", key=f"leilao_{jogador['uuid']}"):
+                supabase.table("leiloes").insert({
+                    "nome_jogador": jogador["nome"],
+                    "posicao_jogador": jogador["posicao"],
+                    "overall_jogador": jogador["overall"],
+                    "valor_inicial": novo_valor,
+                    "valor_atual": novo_valor,
+                    "imagem_url": jogador.get("imagem_url", ""),
+                    "link_sofifa": f"https://sofifa.com/player/{jogador.get('sofifa_id')}" if jogador.get("sofifa_id") else "",
+                    "nacionalidade": jogador.get("nacionalidade", ""),
+                    "origem": "Jogadores Base",
+                    "incremento_minimo": 3_000_000,
+                    "inicio": None,
+                    "fim": None,
+                    "ativo": False,
+                    "finalizado": False,
+                    "enviado_bid": False,
+                    "aguardando_validacao": False,
+                    "validado": False,
+                    "tempo_minutos": 2
+                }).execute()
+                supabase.table("jogadores_base").update({"destino": "leilao", "valor": novo_valor}).eq("uuid", jogador["uuid"]).execute()
+                st.success(f"{jogador['nome']} enviado para o leilão.")
                 st.experimental_rerun()
