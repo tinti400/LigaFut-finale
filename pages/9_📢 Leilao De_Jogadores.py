@@ -113,17 +113,26 @@ for leilao in leiloes:
                     if (fim_dt - agora).total_seconds() <= 15:
                         fim_dt = agora + timedelta(seconds=15)
 
-                    supabase.table("leiloes").update({
-                        "valor_atual": novo_lance,
-                        "id_time_atual": id_time_usuario,
-                        "time_vencedor": nome_time_usuario,
-                        "fim": fim_dt.isoformat()
-                    }).eq("id", leilao["id"]).execute()
+                    try:
+                        update_payload = {
+                            "valor_atual": novo_lance,
+                            "id_time_atual": id_time_usuario,
+                            "fim": fim_dt.isoformat()
+                        }
 
-                    st.success("✅ Lance enviado com sucesso!")
-                    st.experimental_rerun()
+                        if nome_time_usuario:
+                            update_payload["time_vencedor"] = nome_time_usuario
+
+                        supabase.table("leiloes").update(update_payload).eq("id", leilao["id"]).execute()
+
+                        st.success("✅ Lance enviado com sucesso!")
+                        st.experimental_rerun()
+
+                    except Exception as e:
+                        st.error(f"❌ Erro ao atualizar o leilão: {e}")
 
 # 🔁 Botão manual para atualizar
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
+
