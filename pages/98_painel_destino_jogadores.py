@@ -1,90 +1,93 @@
+# 98_painel_destino_jogadores.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-import pandas as pd
+from PIL import Image
 
-# 🔐 Conexão com Supabase
+st.set_page_config(page_title="🎯 Painel de Destino dos Jogadores", layout="wide")
+
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🎯 Definir Destino dos Jogadores", layout="wide")
 st.title("🎯 Painel de Destino dos Jogadores")
 
-# 🔎 Buscar todos jogadores da base
+# ✅ Verifica login
+if "usuario_id" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+# 🔍 Buscar jogadores da base
 res = supabase.table("jogadores_base").select("*").execute()
 jogadores = res.data
 
-if not jogadores:
-    st.info("Nenhum jogador encontrado.")
-    st.stop()
+# 📌 Cores por destino
+cores_destino = {
+    "disponivel": "🟢",
+    "mercado": "🔵",
+    "leilao": "🟡",
+    "atribuido": "🔴"
+}
 
-df = pd.DataFrame(jogadores)
+# 🧩 Exibição
+for jogador in jogadores:
+    destino = jogador.get("destino", "disponivel")
+    cor = cores_destino.get(destino, "⚪")
+    st.markdown("---")
+    cols = st.columns([0.5, 3, 2, 2, 2, 2])
 
-# 🔁 Mostrar jogadores
-for row in df.itertuples():
-    col1, col2, col3, col4, col5 = st.columns([2, 1.2, 1.2, 2, 1.5])
-
-    # 🔘 Status por bolinha
-    if row.destino == "nenhum":
-        status = "🟢"
-    elif row.destino == "leilao":
-        status = "🟡"
-    elif row.destino == "mercado":
-        status = "🔵"
-    else:
-        status = "🔴"
-
-    with col1:
-        st.markdown(f"**{status} {row.nome}**")
-        st.caption(f"{row.posicao} | Overall: {row.overall} | R$ {row.valor:,.0f}".replace(",", "."))
-        if getattr(row, "sofifa_id", None):
-            st.markdown(f"[📎 Ficha Técnica](https://sofifa.com/player/{row.sofifa_id}/)", unsafe_allow_html=True)
+    # 📷 Imagem do jogador
+    try:
+        if jogador.get("imagem_url"):
+            cols[0].image(jogador["imagem_url"], width=80)
         else:
-            st.markdown("📎 Ficha Técnica não disponível")
+            cols[0].markdown("❌")
+    except:
+        cols[0].markdown("❌")
 
-    with col2:
-        if st.button("📤 Mandar Mercado", key=f"mercado_{row.id}"):
-            ja_no_mercado = supabase.table("mercado_transferencias").select("id").eq("id_jogador_base", row.id).execute()
-            if ja_no_mercado.data:
-                st.warning("⚠️ Já está no mercado.")
-            else:
-                supabase.table("mercado_transferencias").insert({
-                    "id_jogador_base": row.id,
-                    "nome": row.nome,
-                    "posicao": row.posicao,
-                    "overall": row.overall,
-                    "valor": row.valor,
-                    "imagem_url": row.imagem_url,
-                    "nacionalidade": row.nacionalidade,
-                    "clube_original": row.clube_original
-                }).execute()
-                supabase.table("jogadores_base").update({"destino": "mercado"}).eq("id", row.id).execute()
-                st.success(f"{row.nome} enviado para o mercado.")
-                st.experimental_rerun()
+    # 📛 Nome e posição
+    nome = jogador["nome"]
+    posicao = jogador.get("posicao", "")
+    overall = jogador.get("overall", "")
+    valor = jogador.get("valor", 0)
+    cols[1].markdown(f"{cor} **{nome}**")
+    cols[1].markdown(f"`{posicao}` | Overall: {overall} | R$ {valor:,.0f}".replace(",", "."))
 
-    with col3:
-        if st.button("🔨 Mandar Leilão", key=f"leilao_{row.id}"):
-            ja_na_fila = supabase.table("fila_leilao").select("id").eq("id_jogador_base", row.id).execute()
-            if ja_na_fila.data:
-                st.warning("⚠️ Já está na fila do leilão.")
-            else:
-                supabase.table("fila_leilao").insert({
-                    "id_jogador_base": row.id,
-                    "nome": row.nome,
-                    "posicao": row.posicao,
-                    "overall": row.overall,
-                    "valor": row.valor,
-                    "imagem_url": row.imagem_url,
-                    "status": "aguardando"
-                }).execute()
-                supabase.table("jogadores_base").update({"destino": "leilao"}).eq("id", row.id).execute()
-                st.success(f"{row.nome} enviado à fila de leilão.")
-                st.experimental_rerun()
+    # 📎 Link SoFIFA
+    if jogador.get("sofifa_id"):
+        cols[2].markdown(f"[📎 Ficha Técnica](https://sofifa.com/player/{jogador['sofifa_id']})")
+    else:
+        cols[2].markdown("Ficha Técnica não disponível")
 
-    with col4:
-        st.markdown("---")
+    # 🛒 Botão Mercado
+    if cols[3].button("🛒 Mandar Mercado", key=f"mercado_{jogador['id']}"):
+        supabase.table("mercado_transferencias").insert({
+            "nome": nome,
+            "posicao": posicao,
+            "overall": overall,
+            "valor": valor,
+            "imagem_url": jogador.get("imagem_url", "")
+        }).execute()
+        supabase.table("jogadores_base").update({"destino": "mercado"}).eq("id", jogador["id"]).execute()
+        st.success(f"{nome} enviado ao mercado com sucesso!")
+        st.experimental_rerun()
 
-    with col5:
-        if row.imagem_url:
-            st.image(row.imagem_url, width=70)
+    # 📢 Botão Leilão
+    if cols[4].button("📢 Mandar Leilão", key=f"leilao_{jogador['id']}"):
+        supabase.table("fila_leilao").insert({
+            "nome": nome,
+            "posicao": posicao,
+            "overall": overall,
+            "valor": valor,
+            "imagem_url": jogador.get("imagem_url", ""),
+            "status": "aguardando",
+            "id_jogador_base": jogador["id"]
+        }).execute()
+        supabase.table("jogadores_base").update({"destino": "leilao"}).eq("id", jogador["id"]).execute()
+        st.success(f"{nome} enviado à fila do leilão para validação do admin.")
+        st.experimental_rerun()
+
+    # ✅ Histórico visual
+    cols[5].markdown(f"Status: {cor}")
+
