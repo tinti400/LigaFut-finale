@@ -45,7 +45,11 @@ for jogador in jogadores_filtrados:
         cols[1].markdown(f"**{jogador['nome']}**\n`{jogador['posicao']}` — {jogador['nacionalidade']}")
         cols[2].markdown(f"💰 Valor: R$ {int(jogador['valor']):,}".replace(",", "."))
         cols[3].markdown(f"🎯 Destino: `{jogador['destino']}`")
-        cols[4].markdown(f"📎 [Ficha Técnica](https://sofifa.com/player/{jogador['sofifa_id']}/) ")
+
+        if "sofifa_id" in jogador and jogador["sofifa_id"]:
+            cols[4].markdown(f"📎 [Ficha Técnica](https://sofifa.com/player/{jogador['sofifa_id']}/)")
+        else:
+            cols[4].markdown("📎 Ficha Técnica não disponível")
 
         if jogador["destino"] == "mercado":
             if cols[5].button("🛒 Confirmar Mercado", key=f"mercado_{jogador['uuid']}"):
