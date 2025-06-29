@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+import pandas as pd
+import uuid
 
 # ⚙️ Configuração da Página
 st.set_page_config(page_title="🔧 Admin - Leilão e Mercado", layout="wide")
@@ -15,6 +17,38 @@ supabase = create_client(url, key)
 if "usuario_id" not in st.session_state:
     st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
+
+# 📥 Upload de Planilha
+st.subheader("📥 Importar Jogadores via Planilha XLSX")
+uploaded_file = st.file_uploader("Envie um arquivo .xlsx com os jogadores (colunas: nome, posicao, overall, valor, nacionalidade, imagem_url, link_sofifa)", type=["xlsx"])
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file)
+
+        if not {"nome", "posicao", "overall", "valor", "nacionalidade", "imagem_url", "link_sofifa"}.issubset(df.columns):
+            st.error("❌ A planilha deve conter as colunas corretas.")
+        else:
+            jogadores_para_inserir = []
+            for _, row in df.iterrows():
+                jogador = {
+                    "id": str(uuid.uuid4()),
+                    "nome": row["nome"],
+                    "posicao": row["posicao"],
+                    "overall": int(row["overall"]),
+                    "valor": int(row["valor"]),
+                    "nacionalidade": row["nacionalidade"],
+                    "imagem_url": row["imagem_url"],
+                    "link_sofifa": row["link_sofifa"],
+                    "destino": "nenhum"
+                }
+                jogadores_para_inserir.append(jogador)
+
+            if jogadores_para_inserir:
+                supabase.table("jogadores_base").insert(jogadores_para_inserir).execute()
+                st.success(f"✅ {len(jogadores_para_inserir)} jogadores importados com sucesso.")
+                st.experimental_rerun()
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo: {e}")
 
 # 📦 Buscar jogadores base
 res = supabase.table("jogadores_base").select("*").execute()
@@ -68,7 +102,6 @@ for jogador in jogadores_filtrados:
     st.markdown("---")
     col1, col2 = st.columns([1, 4])
 
-    # 📸 Imagem e Status
     with col1:
         st.image(jogador.get("imagem_url", ""), width=80)
         destino = jogador.get("destino", "nenhum")
@@ -81,7 +114,6 @@ for jogador in jogadores_filtrados:
         else:
             st.markdown("🟢 **Disponível**")
 
-    # 🧾 Dados e Valor
     with col2:
         st.markdown(f"### {jogador['nome']}")
         st.markdown(f"- 📌 Posição: `{jogador.get('posicao', '-')}`")
@@ -95,7 +127,6 @@ for jogador in jogadores_filtrados:
             key=f"valor_{jogador['id']}"
         )
 
-    # 🔘 Ações
     st.markdown("**Ações:**")
     col_a1, col_a2, col_a3 = st.columns(3)
 
