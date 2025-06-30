@@ -1,31 +1,36 @@
 # app.py
+# -*- coding: utf-8 -*-
 import streamlit as st
 from PIL import Image
 import os
 
 st.set_page_config(page_title="LigaFut 2025", page_icon="⚽", layout="wide")
 
-# 🛡️ Bloqueio: só permite acesso se estiver logado
+# 🛡️ Verifica se o usuário está logado
 if "usuario_id" not in st.session_state:
     st.switch_page("pages/1_🔐 Login.py")
 
-# 🎨 Layout topo
+# 🎨 Layout de boas-vindas no topo
 col1, col2 = st.columns([1, 3])
 with col1:
-    logo = Image.open("logo_ligafut.png") if os.path.exists("logo_ligafut.png") else None
-    if logo:
-        st.image(logo, width=150)
+    if os.path.exists("logo_ligafut.png"):
+        st.image("logo_ligafut.png", width=150)
 with col2:
     st.markdown("<h1 style='color: #1E90FF;'>🏆 Bem-vindo à LigaFut 2025</h1>", unsafe_allow_html=True)
     st.markdown("Gerencie sua equipe, participe dos leilões, negocie com outros clubes e dispute títulos!")
 
 st.markdown("---")
 
-# 📂 Novo menu lateral com seções organizadas
-st.sidebar.image("logo_ligafut.png", width=160)
+# 📂 Menu lateral completo
+try:
+    if os.path.exists("logo_ligafut.png"):
+        st.sidebar.image("logo_ligafut.png", width=160)
+except:
+    st.sidebar.markdown("## LigaFut")
+
 st.sidebar.markdown(f"### 👋 {st.session_state.get('nome_time', 'Técnico')}")
 
-# Seções principais
+# 🎮 Menu organizado por seções
 st.sidebar.markdown("## ⚙️ Meu Time")
 st.sidebar.page_link("pages/4_Elenco.py", label="👥 Elenco")
 st.sidebar.page_link("pages/5_Estadio.py", label="🏟️ Estádio")
@@ -52,7 +57,7 @@ st.sidebar.markdown("## 📄 Histórico")
 st.sidebar.page_link("pages/18_Leiloes_Finalizados.py", label="✅ Leilões Finalizados")
 st.sidebar.page_link("pages/16_Movimentacoes_Financeiras.py", label="📊 Painel Financeiro")
 
-# Seção Admin (se for admin)
+# 🔐 Admin (somente se for admin)
 if st.session_state.get("administrador", False):
     st.sidebar.markdown("## 🛠️ Administração")
     st.sidebar.page_link("pages/14_Admin_Times.py", label="📋 Admin Times")
@@ -61,7 +66,7 @@ if st.session_state.get("administrador", False):
     st.sidebar.page_link("pages/23_Gerar_Rodadas.py", label="🗓️ Gerar Rodadas")
     st.sidebar.page_link("pages/9_Admin_Leilao.py", label="🛠️ Admin Leilões")
 
-# Logout
+# 🚪 Logout
 st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Logout"):
     for key in ["usuario", "usuario_id", "id_time", "nome_time", "divisao", "session_id", "administrador"]:
