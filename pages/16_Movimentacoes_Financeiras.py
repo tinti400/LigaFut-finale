@@ -68,16 +68,28 @@ if "tipo" not in df.columns:
 if "descricao" not in df.columns:
     df["descricao"] = "Sem descrição"
 
-# 💰 Calcular total de salários pagos
-salario_mask = df["tipo"].astype(str).str.lower().str.contains("salario") | \
-               df["descricao"].astype(str).str.lower().str.contains("salario")
+# 🔍 Filtrar os três tipos e somar
+df["descricao"] = df["descricao"].astype(str).str.lower()
+
+salario_mask = df["descricao"].str.contains("salário")
+bonus_mask = df["descricao"].str.contains("bônus de gol") | df["descricao"].str.contains("bônus por gol")
+premiacao_mask = df["descricao"].str.contains("premiação por resultado")
 
 total_salarios = df[salario_mask]["valor"].astype(float).sum()
+total_bonus = df[bonus_mask]["valor"].astype(float).sum()
+total_premiacao = df[premiacao_mask]["valor"].astype(float).sum()
+total_geral = total_salarios + total_bonus + total_premiacao
 
+# 💡 Exibir destaques
 st.markdown(f"""
-<div style='background-color:#f0f2f6;padding:20px;border-radius:10px;border-left:5px solid #FFB000'>
-    <h4>💰 Total de Salários Pagos por <strong>{nome_time}</strong>:</h4>
-    <h2 style='color:#d62728'>R$ {total_salarios:,.0f}</h2>
+<div style='background-color:#f0f2f6;padding:20px;border-radius:10px;border-left:5px solid #ff6f00'>
+    <h4>💰 Gastos Totais com Jogadores por <strong>{nome_time}</strong>:</h4>
+    <ul>
+        <li><strong>💸 Salários:</strong> R$ {total_salarios:,.0f}</li>
+        <li><strong>🥅 Bônus por Gol:</strong> R$ {total_bonus:,.0f}</li>
+        <li><strong>🏆 Premiações por Resultado:</strong> R$ {total_premiacao:,.0f}</li>
+    </ul>
+    <h3 style='color:#d62728'>Total Geral: R$ {total_geral:,.0f}</h3>
 </div>
 """, unsafe_allow_html=True)
 
