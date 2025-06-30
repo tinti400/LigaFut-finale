@@ -68,6 +68,19 @@ if "tipo" not in df.columns:
 if "descricao" not in df.columns:
     df["descricao"] = "Sem descrição"
 
+# 💰 Calcular total de salários pagos
+salario_mask = df["tipo"].astype(str).str.lower().str.contains("salario") | \
+               df["descricao"].astype(str).str.lower().str.contains("salario")
+
+total_salarios = df[salario_mask]["valor"].astype(float).sum()
+
+st.markdown(f"""
+<div style='background-color:#f0f2f6;padding:20px;border-radius:10px;border-left:5px solid #FFB000'>
+    <h4>💰 Total de Salários Pagos por <strong>{nome_time}</strong>:</h4>
+    <h2 style='color:#d62728'>R$ {total_salarios:,.0f}</h2>
+</div>
+""", unsafe_allow_html=True)
+
 # 🔁 Calcular caixa anterior e atual
 saldos_atuais = []
 saldos_anteriores = []
@@ -105,15 +118,13 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 # Seleção final de colunas
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
 df_exibir = df[colunas].copy()
-
-# ✅ Garante que todas as colunas sejam strings
 df_exibir = df_exibir.astype(str)
 
-# 📋 Exibir com fallback seguro
+# 📋 Exibir extrato
 st.subheader(f"💼 Extrato do time **{nome_time}**")
 
 try:
-    st.dataframe(df_exibir)
-except Exception as e:
+    st.dataframe(df_exibir, use_container_width=True)
+except Exception:
     st.warning("⚠️ Erro ao exibir com `st.dataframe`. Exibindo com `st.table()`.")
     st.table(df_exibir)
