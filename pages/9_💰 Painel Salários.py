@@ -7,49 +7,55 @@ from utils import verificar_sessao
 st.set_page_config(page_title="💰 Gastos com Salários", layout="wide")
 st.title("💰 Gastos com Salários dos Times")
 
-# 🔐 Conexão Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão
+# ✅ Verifica login
 verificar_sessao()
 
-# 📥 Buscar movimentações de salários
-res_mov = supabase.table("movimentacoes")\
-    .select("*")\
-    .ilike("descricao", "%Pagamento de salários%")\
+# 📥 Carrega movimentações de pagamento de salários
+res_mov = supabase.table("movimentacoes") \
+    .select("id_time, valor") \
+    .ilike("descricao", "%salário%") \
     .execute()
 
-movimentacoes = res_mov.data if res_mov.data else []
+dados_mov = res_mov.data
+if not dados_mov:
+    st.info("Nenhum pagamento de salário registrado ainda.")
+    st.stop()
 
-# 💼 Agrupar gastos por time
+# 💰 Soma os gastos por time
 gastos_por_time = {}
-for mov in movimentacoes:
-    id_time = mov.get("id_time")
-    valor = abs(mov.get("valor", 0))
-    if id_time:
-        gastos_por_time[id_time] = gastos_por_time.get(id_time, 0) + valor
+for mov in dados_mov:
+    id_time = mov["id_time"]
+    valor = abs(float(mov["valor"]))  # transforma em valor positivo
+    gastos_por_time[id_time] = gastos_por_time.get(id_time, 0) + valor
 
-# 📥 Buscar nomes e escudos dos times
-res_times = supabase.table("times").select("id", "nome", "escudo_url").execute()
-times_data = {t["id"]: {"nome": t["nome"], "escudo": t.get("escudo_url", "")} for t in res_times.data}
+# 📥 Busca nomes e logos dos times
+res_times = supabase.table("times").select("id", "nome", "logo").execute()
+times_dict = {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in res_times.data}
 
-# 🧾 Montar DataFrame
-dados = []
-for id_time, valor in gastos_por_time.items():
-    time_info = times_data.get(id_time, {"nome": "Desconhecido", "escudo": ""})
-    nome = time_info["nome"]
-    escudo = time_info["escudo"]
-    dado_formatado = {
-        "Time": f"<img src='{escudo}' width='20'> {nome}",
-        "Gasto com Salários": f"R$ {valor:,.0f}".replace(",", ".")
+# 🧾 Monta DataFrame para exibição
+df_gastos = pd.DataFrame([
+    {
+        "Time": times_dict.get(tid, {}).get("nome", "Desconhecido"),
+        "Gasto Total (R$)": gastos_por_time[tid],
+        "Escudo": times_dict.get(tid, {}).get("logo", "")
     }
-    dados.append(dado_formatado)
+    for tid in gastos_por_time
+])
 
-df = pd.DataFrame(dados)
-df = df.sort_values(by="Gasto com Salários", ascending=False)
+df_gastos = df_gastos.sort_values(by="Gasto Total (R$)", ascending=False)
 
-# 📊 Exibir tabela com HTML ativado
-st.markdown("### 📊 Ranking de Gastos com Salários")
-st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+# 🖼️ Exibir escudos junto ao nome
+def formatar_linha(row):
+    return f'<img src="{row["Escudo"]}" width="25"> {row["Time"]}'
+
+df_gastos["Time"] = df_gastos.apply(formatar_linha, axis=1)
+df_gastos["Gasto Total (R$)"] = df_gastos["Gasto Total (R$)"].apply(lambda x: f'R$ {x:,.2f}'.replace(",", "X").replace(".", ",").replace("X", "."))
+
+# 📊 Exibir como tabela formatada
+st.markdown("### 📋 Tabela de Gastos com Salários")
+st.markdown(df_gastos[["Time", "Gasto Total (R$)"]].to_html(escape=False, index=False), unsafe_allow_html=True)
