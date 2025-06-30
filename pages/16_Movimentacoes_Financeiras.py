@@ -68,32 +68,7 @@ if "tipo" not in df.columns:
 if "descricao" not in df.columns:
     df["descricao"] = "Sem descrição"
 
-# 🔍 Filtrar os três tipos e somar
-df["descricao"] = df["descricao"].astype(str).str.lower()
-
-salario_mask = df["descricao"].str.contains("salário")
-bonus_mask = df["descricao"].str.contains("bônus de gol") | df["descricao"].str.contains("bônus por gol")
-premiacao_mask = df["descricao"].str.contains("premiação por resultado")
-
-total_salarios = df[salario_mask]["valor"].astype(float).sum()
-total_bonus = df[bonus_mask]["valor"].astype(float).sum()
-total_premiacao = df[premiacao_mask]["valor"].astype(float).sum()
-total_geral = total_salarios + total_bonus + total_premiacao
-
-# 💡 Exibir destaques
-st.markdown(f"""
-<div style='background-color:#f0f2f6;padding:20px;border-radius:10px;border-left:5px solid #ff6f00'>
-    <h4>💰 Gastos Totais com Jogadores por <strong>{nome_time}</strong>:</h4>
-    <ul>
-        <li><strong>💸 Salários:</strong> R$ {total_salarios:,.0f}</li>
-        <li><strong>🥅 Bônus por Gol:</strong> R$ {total_bonus:,.0f}</li>
-        <li><strong>🏆 Premiações por Resultado:</strong> R$ {total_premiacao:,.0f}</li>
-    </ul>
-    <h3 style='color:#d62728'>Total Geral: R$ {total_geral:,.0f}</h3>
-</div>
-""", unsafe_allow_html=True)
-
-# 🔁 Calcular caixa anterior e atual
+# 💰 Calcular caixa anterior e atual
 saldos_atuais = []
 saldos_anteriores = []
 saldo = saldo_atual
@@ -105,7 +80,6 @@ for _, row in df.iterrows():
         saldo_anterior = saldo - valor
     else:
         saldo_anterior = saldo + valor
-
     saldos_anteriores.append(saldo_anterior)
     saldos_atuais.append(saldo)
     saldo = saldo_anterior
@@ -113,10 +87,21 @@ for _, row in df.iterrows():
 df["caixa_atual"] = saldos_atuais
 df["caixa_anterior"] = saldos_anteriores
 
-# 🎨 Formatação
+# 🎯 Calcular total de salários pagos
+df_salarios = df[
+    (df["descricao"].str.lower().str.contains("pagamento de salário")) |
+    (df["descricao"].str.lower().str.contains("bônus de gols")) |
+    (df["descricao"].str.lower().str.contains("premiação por resultado"))
+]
+
+# Força como valor negativo, pois são saídas
+total_salarios = -df_salarios["valor"].astype(float).sum()
+
+# 🎨 Formatação de valores
 def formatar_valor(v):
     try:
-        return f"R${float(v):,.0f}".replace(",", ".")
+        v = float(v)
+        return f"-R${abs(v):,.0f}".replace(",", ".") if v < 0 else f"R${v:,.0f}".replace(",", ".")
     except:
         return "-"
 
@@ -130,10 +115,19 @@ df["📝 Descrição"] = df["descricao"].astype(str)
 # Seleção final de colunas
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
 df_exibir = df[colunas].copy()
-df_exibir = df_exibir.astype(str)
 
-# 📋 Exibir extrato
-st.subheader(f"💼 Extrato do time **{nome_time}**")
+# ✅ Garante que todas as colunas sejam strings e sem nulos
+df_exibir = df_exibir.fillna("").astype(str)
+
+# 🧾 Exibição
+st.markdown(f"""
+<div style='background-color:#f9f9f9;padding:15px;border-radius:10px;margin-bottom:15px'>
+<h3>💰 <strong>Total de Salários Pagos por {nome_time}:</strong></h3>
+<p style='font-size:24px;color:red'><strong>{formatar_valor(total_salarios)}</strong></p>
+</div>
+""", unsafe_allow_html=True)
+
+st.subheader(f"📁 Extrato do time {nome_time}")
 
 try:
     st.dataframe(df_exibir, use_container_width=True)
