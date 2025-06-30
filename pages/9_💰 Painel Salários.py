@@ -1,60 +1,55 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-from supabase import create_client
 import pandas as pd
+from supabase import create_client
+from utils import verificar_sessao
 
-# 🔐 Conexão com Supabase
+st.set_page_config(page_title="💰 Gastos com Salários", layout="wide")
+st.title("💰 Gastos com Salários dos Times")
+
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="💰 Painel de Salários", page_icon="💰", layout="centered")
-st.markdown("## 💰 Total de Salários Pagos")
-st.markdown("Veja abaixo quanto cada time já pagou de salários na temporada.")
+# ✅ Verifica sessão
+verificar_sessao()
 
-# 🔄 Buscar movimentações de salários
-try:
-    res = supabase.table("movimentacoes").select("*").eq("descricao", "Pagamento de salários").execute()
-    movimentacoes = res.data
-    if not movimentacoes:
-        st.info("Ainda não houve pagamento de salários registrado.")
-        st.stop()
+# 📥 Buscar movimentações de salários
+res_mov = supabase.table("movimentacoes")\
+    .select("*")\
+    .ilike("descricao", "%Pagamento de salários%")\
+    .execute()
 
-    # Organizar em DataFrame
-    df = pd.DataFrame(movimentacoes)
-    df["valor"] = df["valor"].astype(float)
-    df["valor"] = df["valor"].abs()  # Mostrar valor positivo
-    df_grouped = df.groupby("id_time")["valor"].sum().reset_index()
-except Exception as e:
-    st.error(f"Erro ao carregar dados de salários: {e}")
-    st.stop()
+movimentacoes = res_mov.data if res_mov.data else []
 
-# 🔎 Buscar nomes dos times
-try:
-    res_times = supabase.table("times").select("id", "nome", "logo").execute()
-    times = {t["id"]: {"nome": t["nome"], "logo": t.get("logo", "")} for t in res_times.data}
-except Exception as e:
-    st.error(f"Erro ao buscar nomes dos times: {e}")
-    st.stop()
+# 💼 Agrupar gastos por time
+gastos_por_time = {}
+for mov in movimentacoes:
+    id_time = mov.get("id_time")
+    valor = abs(mov.get("valor", 0))
+    if id_time:
+        gastos_por_time[id_time] = gastos_por_time.get(id_time, 0) + valor
 
-# 📊 Montar exibição
+# 📥 Buscar nomes e escudos dos times
+res_times = supabase.table("times").select("id", "nome", "escudo_url").execute()
+times_data = {t["id"]: {"nome": t["nome"], "escudo": t.get("escudo_url", "")} for t in res_times.data}
+
+# 🧾 Montar DataFrame
 dados = []
-for _, row in df_grouped.iterrows():
-    time_id = row["id_time"]
-    if time_id in times:
-        nome = times[time_id]["nome"]
-        logo = times[time_id]["logo"]
-        valor = row["valor"]
-        dados.append((logo, nome, valor))
+for id_time, valor in gastos_por_time.items():
+    time_info = times_data.get(id_time, {"nome": "Desconhecido", "escudo": ""})
+    nome = time_info["nome"]
+    escudo = time_info["escudo"]
+    dado_formatado = {
+        "Time": f"<img src='{escudo}' width='20'> {nome}",
+        "Gasto com Salários": f"R$ {valor:,.0f}".replace(",", ".")
+    }
+    dados.append(dado_formatado)
 
-# 🔢 Ordenar e exibir
-dados = sorted(dados, key=lambda x: x[2], reverse=True)
-for logo, nome, valor in dados:
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        st.image(logo or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=40)
-    with col2:
-        st.markdown(f"**{nome}** — `R$ {valor:,.0f}`".replace(",", "."))
+df = pd.DataFrame(dados)
+df = df.sort_values(by="Gasto com Salários", ascending=False)
 
-st.markdown("---")
-st.caption("💡 Os salários são descontados automaticamente após cada jogo confirmado.")
+# 📊 Exibir tabela com HTML ativado
+st.markdown("### 📊 Ranking de Gastos com Salários")
+st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
