@@ -24,10 +24,17 @@ email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
 is_admin = len(res_admin.data) > 0
 
-# 🧾 Título e separador
+# 🔰 Logo do time
+res_logo = supabase.table("times").select("logo_url").eq("id", id_time).execute()
+logo_url = res_logo.data[0]["logo_url"] if res_logo.data else ""
+
+# 🧾 Título com logo
 st.markdown(f"""
-    <h1 style='text-align:center;'>👥 Elenco do {nome_time}</h1>
-    <hr style='border:1px solid #444;'>
+    <div style='text-align:center;'>
+        <img src="{logo_url}" style="width:80px;height:80px;border-radius:10px;margin-bottom:10px;"><br>
+        <h1>👥 Elenco do {nome_time}</h1>
+        <hr style='border:1px solid #444;'>
+    </div>
 """, unsafe_allow_html=True)
 
 # 💰 Saldo do time
