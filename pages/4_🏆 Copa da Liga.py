@@ -1,17 +1,22 @@
-## -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 import pandas as pd
 from datetime import datetime
 import random
 
+st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
+st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut</h1><hr>", unsafe_allow_html=True)
+
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
-st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut</h1><hr>", unsafe_allow_html=True)
+# ✅ Verifica admin
+email_usuario = st.session_state.get("usuario", "")
+res_admin = supabase.table("admins").select("email").eq("email", email_usuario).execute()
+is_admin = len(res_admin.data) > 0
 
 # 🔄 Buscar times
 def buscar_times():
@@ -28,12 +33,12 @@ def buscar_data_mais_recente():
         return res.data[0]["data_criacao"]
     return None
 
-# 🔄 Buscar jogos por fase
+# 🔄 Buscar fase
 def buscar_fase(fase, data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", fase).eq("data_criacao", data).execute()
     return res.data if res.data else []
 
-# 🔄 Buscar fase de grupos (por data)
+# 🔄 Buscar fase de grupos
 def buscar_grupos_todos(data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data).execute()
     return res.data if res.data else []
@@ -63,7 +68,6 @@ def exibir_card(jogo):
     </div>
     """
     st.markdown(card, unsafe_allow_html=True)
-
 # 📊 Classificação
 def calcular_classificacao(jogos):
     tabela = {}
@@ -129,12 +133,19 @@ for g in grupos:
     grupos_por_nome[nome].extend(g.get("jogos", []))
 
 # 📈 Classificação no topo
-st.subheader("📈 Classificação dos Grupos")
+if not oitavas:
+    st.subheader("📈 Classificação dos Grupos")
+else:
+    st.subheader("📜 Histórico da Fase de Grupos")
+
 for grupo, jogos in sorted(grupos_por_nome.items()):
     st.markdown(f"#### {grupo}")
     df = calcular_classificacao(jogos)
-    def estilo(row): return ['background-color: #d4edda'] * len(row) if row.name < 2 else [''] * len(row)
-    st.markdown(df.style.apply(estilo, axis=1).to_html(escape=False, index=False), unsafe_allow_html=True)
+    if not oitavas:
+        def estilo(row): return ['background-color: #d4edda'] * len(row) if row.name < 2 else [''] * len(row)
+        st.markdown(df.style.apply(estilo, axis=1).to_html(escape=False, index=False), unsafe_allow_html=True)
+    else:
+        st.dataframe(df, use_container_width=True)
 
 # 🏁 Fase Mata-Mata
 st.markdown("<hr>", unsafe_allow_html=True)
@@ -145,56 +156,51 @@ exibir_fase_mata("Quartas", quartas, col2)
 exibir_fase_mata("Semifinal", semis, col3)
 exibir_fase_mata("Final", final, col4)
 
-# ⚔️ Sorteio das Oitavas (chaveamento fixo estilo Copa do Mundo)
-st.markdown("---")
-st.subheader("⚔️ Sorteio das Oitavas")
+# ⚔️ Sorteio das Oitavas
+if is_admin:
+    st.markdown("---")
+    st.subheader("⚔️ Sorteio das Oitavas")
 
-if st.button("🔄 Avançar para o Mata-Mata (Sorteio)"):
-    classificados = {}
-    grupos_ordenados = sorted(grupos_por_nome.items())
+    if oitavas:
+        st.info("✅ As oitavas já foram sorteadas.")
+    elif st.button("🔄 Avançar para o Mata-Mata (Sorteio)"):
+        classificados = {}
+        grupos_ordenados = sorted(grupos_por_nome.items())
 
-    for grupo, jogos in grupos_ordenados:
-        df = calcular_classificacao(jogos)
-        top2 = df.iloc[:2]
-        ids = []
-        for i in top2.index:
-            nome = df.loc[i, "Time"]
-            id_time = next((k for k, v in times.items() if v["nome"] == nome), None)
-            if id_time:
-                ids.append(id_time)
-        classificados[grupo] = ids
+        for grupo, jogos in grupos_ordenados:
+            df = calcular_classificacao(jogos)
+            top2 = df.iloc[:2]
+            ids = []
+            for i in top2.index:
+                nome = df.loc[i, "Time"]
+                id_time = next((k for k, v in times.items() if v["nome"] == nome), None)
+                if id_time:
+                    ids.append(id_time)
+            classificados[grupo] = ids
 
-    if len(classificados) != 8 or any(len(v) != 2 for v in classificados.values()):
-        st.error("Erro: algum grupo não possui os dois classificados.")
-        st.stop()
+        if len(classificados) != 8 or any(len(v) != 2 for v in classificados.values()):
+            st.error("Erro: algum grupo não possui os dois classificados.")
+            st.stop()
 
-    ordem_grupos = sorted(classificados.keys())
-    confrontos = []
+        ordem_grupos = sorted(classificados.keys())
+        confrontos = []
 
-    for i in range(0, 8, 2):
-        grupo1 = ordem_grupos[i]
-        grupo2 = ordem_grupos[i+1]
-        primeiro1 = classificados[grupo1][0]
-        segundo2 = classificados[grupo2][1]
-        primeiro2 = classificados[grupo2][0]
-        segundo1 = classificados[grupo1][1]
+        for i in range(0, 8, 2):
+            g1, g2 = ordem_grupos[i], ordem_grupos[i+1]
+            confrontos.extend([
+                {"mandante": classificados[g1][0], "visitante": classificados[g2][1], "gols_mandante": None, "gols_visitante": None},
+                {"mandante": classificados[g2][0], "visitante": classificados[g1][1], "gols_mandante": None, "gols_visitante": None}
+            ])
 
-        confrontos.extend([
-            {"mandante": primeiro1, "visitante": segundo2, "gols_mandante": None, "gols_visitante": None},
-            {"mandante": primeiro2, "visitante": segundo1, "gols_mandante": None, "gols_visitante": None}
-        ])
-
-    supabase.table("copa_ligafut").insert({
-        "fase": "oitavas",
-        "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "jogos": confrontos
-    }).execute()
-
-    st.success("✅ Confrontos das oitavas definidos com cruzamento fixo e salvos com sucesso!")
-    st.experimental_rerun()
+        supabase.table("copa_ligafut").insert({
+            "fase": "oitavas",
+            "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "jogos": confrontos
+        }).execute()
+        st.success("✅ Confrontos das oitavas definidos com sucesso!")
+        st.experimental_rerun()
 
 # 🚀 Avançar fases mantendo chaveamento
-
 def avancar_fase(fase_atual, proxima_fase):
     dados_fase = buscar_fase(fase_atual, data_atual)
     if not dados_fase:
@@ -218,10 +224,6 @@ def avancar_fase(fase_atual, proxima_fase):
         else:
             classificados.append(random.choice([ida["mandante"], ida["visitante"]]))
 
-    if len(classificados) < 2:
-        st.error("Erro ao identificar classificados.")
-        return
-
     jogos_novos = []
     for i in range(0, len(classificados), 2):
         a, b = classificados[i], classificados[i + 1]
@@ -238,10 +240,12 @@ def avancar_fase(fase_atual, proxima_fase):
     st.success(f"✅ Avançou de {fase_atual} para {proxima_fase}!")
     st.experimental_rerun()
 
-st.subheader("🚀 Avançar Fases")
-if st.button("➡️ Avançar para Quartas"):
-    avancar_fase("oitavas", "quartas")
-if st.button("➡️ Avançar para Semifinal"):
-    avancar_fase("quartas", "semifinal")
-if st.button("➡️ Avançar para Final"):
-    avancar_fase("semifinal", "final")
+# 🔘 Botões de avanço (somente admin)
+if is_admin:
+    st.subheader("🚀 Avançar Fases")
+    if st.button("➡️ Avançar para Quartas"):
+        avancar_fase("oitavas", "quartas")
+    if st.button("➡️ Avançar para Semifinal"):
+        avancar_fase("quartas", "semifinal")
+    if st.button("➡️ Avançar para Final"):
+        avancar_fase("semifinal", "final")
