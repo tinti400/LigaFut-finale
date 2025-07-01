@@ -24,21 +24,23 @@ is_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
 # 🔽 Se admin, seleciona time
 if is_admin:
-    res_times = supabase.table("times").select("id, nome, saldo").order("nome", desc=False).execute()
+    res_times = supabase.table("times").select("id, nome").order("nome", desc=False).execute()
     times = res_times.data or []
     if not times:
         st.warning("Nenhum time encontrado.")
         st.stop()
 
-    nome_para_dados = {t["nome"]: (t["id"], t["saldo"]) for t in times}
-    nome_selecionado = st.selectbox("👑 Selecione um time para visualizar o extrato:", list(nome_para_dados.keys()))
-    id_time, saldo_atual = nome_para_dados[nome_selecionado]
+    nome_para_id = {t["nome"]: t["id"] for t in times}
+    nome_selecionado = st.selectbox("👑 Selecione um time para visualizar o extrato:", list(nome_para_id.keys()))
+    id_time = nome_para_id[nome_selecionado]
     nome_time = nome_selecionado
 else:
     id_time = st.session_state["id_time"]
     nome_time = st.session_state.get("nome_time", "Seu Time")
-    res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
-    saldo_atual = res_saldo.data.get("saldo", 0)
+
+# 📥 Buscar saldo atual
+res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
+saldo_atual = res_saldo.data.get("saldo", 0)
 
 # 📥 Buscar movimentações
 res_mov = supabase.table("movimentacoes_financeiras")\
@@ -59,52 +61,71 @@ df = df.dropna(subset=["data"])
 df = df.sort_values("data", ascending=False)
 
 # 🛡️ Garante colunas básicas
-df["valor"] = df.get("valor", 0)
-df["tipo"] = df.get("tipo", "saida")
-df["descricao"] = df.get("descricao", "Sem descrição")
+if "valor" not in df.columns:
+    df["valor"] = 0
+if "tipo" not in df.columns:
+    df["tipo"] = "saida"
+if "descricao" not in df.columns:
+    df["descricao"] = "Sem descrição"
 
-# 💰 Calcular caixa anterior e atual (somente visual, saldo_atual não entra no cálculo)
+# 💰 Calcular caixa anterior e atual
 saldos_atuais = []
 saldos_anteriores = []
-saldo_temp = 0
+saldo = saldo_atual
 
 for _, row in df.iterrows():
     valor = float(row.get("valor", 0))
     tipo = row.get("tipo", "saida")
     if tipo == "entrada":
-        saldo_anterior = saldo_temp
-        saldo_temp += valor
+        saldo_anterior = saldo - valor
     else:
-        saldo_anterior = saldo_temp
-        saldo_temp -= valor
+        saldo_anterior = saldo + valor
     saldos_anteriores.append(saldo_anterior)
-    saldos_atuais.append(saldo_temp)
+    saldos_atuais.append(saldo)
+    saldo = saldo_anterior
 
-df["caixa_anterior"] = saldos_anteriores
 df["caixa_atual"] = saldos_atuais
+df["caixa_anterior"] = saldos_anteriores
 
-# 🔍 Totais
+# 🎯 Calcular totais separados
 df["descricao_lower"] = df["descricao"].str.lower()
 
 total_salario = df[df["descricao_lower"].str.contains("pagamento de salário")]["valor"].astype(float).sum()
-total_compras = df[df["descricao_lower"].str.contains("compra de jogador")]["valor"].astype(float).sum()
 total_bonus = df[df["descricao_lower"].str.contains("bônus de gols")]["valor"].astype(float).sum()
 total_premiacao = df[df["descricao_lower"].str.contains("premiação por resultado")]["valor"].astype(float).sum()
-total_vendas = df[df["descricao_lower"].str.contains("venda de jogador")]["valor"].astype(float).sum()
+total_compras = df[df["descricao_lower"].str.contains("compra de")]["valor"].astype(float).sum()
+total_vendas = df[df["descricao_lower"].str.contains("venda de")]["valor"].astype(float).sum()
 
 # 🧾 Cálculo total geral
 total_geral = total_bonus + total_premiacao + total_vendas - total_salario - total_compras
 
-# 🎨 Função formatar valor
+# 🎨 Função de formatação
 def formatar_valor(v, negativo=False):
     try:
         v = float(v)
-        prefix = "-" if negativo or v < 0 else ""
-        return f"{prefix}R${abs(v):,.0f}".replace(",", ".")
+        if negativo:
+            return f"-R${abs(v):,.0f}".replace(",", ".")
+        else:
+            return f"R${v:,.0f}".replace(",", ".")
     except:
         return "-"
 
-# 🔎 Monta colunas formatadas
+# 🧾 Exibir totais detalhados
+st.markdown(f"""
+<div style='background-color:#f9f9f9;padding:20px;border-radius:10px;margin-bottom:15px'>
+<ul style='font-size:17px'>
+<li>🛒 Compras de Jogadores: <strong style='color:red'>{formatar_valor(total_compras, negativo=True)}</strong></li>
+<li>📤 Vendas de Jogadores: <strong style='color:green'>{formatar_valor(total_vendas)}</strong></li>
+<li>🥅 Bônus por Gol: <strong style='color:green'>{formatar_valor(total_bonus)}</strong></li>
+<li>🏆 Premiação por Resultado: <strong style='color:green'>{formatar_valor(total_premiacao)}</strong></li>
+<li>💼 Pagamento de Salário: <strong style='color:red'>{formatar_valor(total_salario, negativo=True)}</strong></li>
+</ul>
+<p style='font-size:20px;margin-top:10px'><strong>💰 Total Geral: <span style='color:{"green" if total_geral >= 0 else "red"}'>{formatar_valor(total_geral, negativo=(total_geral < 0))}</span></strong></p>
+<p style='font-size:16px;margin-top:10px'>📦 <strong>Saldo Atual do Time:</strong> {formatar_valor(saldo_atual)}</p>
+</div>
+""", unsafe_allow_html=True)
+
+# 🧾 Exibir extrato
 df["💰 Caixa Atual"] = df["caixa_atual"].apply(formatar_valor)
 df["📦 Caixa Anterior"] = df["caixa_anterior"].apply(formatar_valor)
 df["💸 Valor"] = df["valor"].apply(formatar_valor)
@@ -112,24 +133,8 @@ df["📅 Data"] = df["data"].dt.strftime("%d/%m/%Y %H:%M")
 df["📌 Tipo"] = df["tipo"].astype(str).str.capitalize()
 df["📝 Descrição"] = df["descricao"].astype(str)
 
-# 🧾 Exibir Resumo com destaque
-st.markdown(f"""
-<div style='background-color:#f0f9ff;padding:25px;border-radius:10px;margin-bottom:20px;border-left:5px solid #2c91e2'>
-    <h2>📋 <strong>Resumo Financeiro - {nome_time}</strong></h2>
-    <ul style='font-size:18px;margin-left:10px'>
-        <li>💼 <strong>Salários Pagos:</strong> <span style='color:red'>{formatar_valor(total_salario, negativo=True)}</span></li>
-        <li>🛒 <strong>Compras de Jogadores:</strong> <span style='color:red'>{formatar_valor(total_compras, negativo=True)}</span></li>
-        <li>📤 <strong>Vendas de Jogadores:</strong> <span style='color:green'>{formatar_valor(total_vendas)}</span></li>
-        <li>🥅 <strong>Bônus por Gol:</strong> <span style='color:green'>{formatar_valor(total_bonus)}</span></li>
-        <li>🏆 <strong>Premiação por Resultado:</strong> <span style='color:green'>{formatar_valor(total_premiacao)}</span></li>
-    </ul>
-    <p style='font-size:20px;margin-top:10px'><strong>💰 Total Geral: <span style='color:{"green" if total_geral >= 0 else "red"}'>{formatar_valor(total_geral)}</span></strong></p>
-    <p style='font-size:18px'>📦 <strong>Saldo Atual do Time:</strong> <span style='color:#000'>{formatar_valor(saldo_atual)}</span></p>
-</div>
-""", unsafe_allow_html=True)
-
-# Exibir tabela
-df_exibir = df[["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]].copy()
+colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
+df_exibir = df[colunas].copy()
 df_exibir = df_exibir.fillna("").astype(str)
 
 st.subheader(f"📁 Extrato do time {nome_time}")
