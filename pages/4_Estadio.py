@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
 
@@ -47,6 +47,7 @@ precos_padrao = {
     "camarote": 100.0
 }
 
+# 📊 Funções auxiliares
 def buscar_posicao_time(id_time):
     try:
         res = supabase.table("classificacao").select("id_time").order("pontos", desc=True).execute()
@@ -93,6 +94,7 @@ def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recente
 
     return int(min(lugares, lugares * fator_base * fator_preco))
 
+# 🏗️ Busca ou cria estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
@@ -107,8 +109,7 @@ if not estadio:
     }
     try:
         supabase.table("estadios").insert(estadio_novo).execute()
-        res_novo = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
-        estadio = res_novo.data[0] if res_novo.data else estadio_novo
+        estadio = estadio_novo
     except Exception as e:
         st.error(f"Erro ao criar estádio: {e}")
         st.stop()
@@ -119,16 +120,7 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
-data_inicio = estadio.get("data_inicio_melhoria")
-if estadio.get("em_melhorias") and data_inicio:
-    try:
-        inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
-        if datetime.now() >= inicio + timedelta(days=3):
-            supabase.table("estadios").update({"em_melhorias": False, "data_inicio_melhoria": None}).eq("id_time", id_time).execute()
-            estadio["em_melhorias"] = False
-    except:
-        pass
-
+# 🧠 Dados do time
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
@@ -139,6 +131,7 @@ nivel = estadio["nivel"]
 capacidade = estadio["capacidade"]
 em_melhorias = estadio.get("em_melhorias", False)
 
+# 📝 Nome e info
 st.markdown(f"## 🏟️ {nome}")
 novo_nome = st.text_input("✏️ Renomear Estádio", value=nome)
 if novo_nome and novo_nome != nome:
@@ -148,6 +141,7 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
+# 🎫 Preços
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
@@ -171,31 +165,29 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
+# ⬆️ Evolução do estádio
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
-    if em_melhorias:
-        st.info("⌛ O estádio já está em obras. Conclusão prevista para 3 dias.")
-    else:
-        st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
-        st.markdown(f"💸 **Custo:** R${custo:,.2f}")
-        res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-        saldo = res_saldo.data[0].get("saldo", 0) if res_saldo.data else 0
+    st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
+    st.markdown(f"💸 **Custo:** R${custo:,.2f}")
+    res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+    saldo = res_saldo.data[0].get("saldo", 0) if res_saldo.data else 0
 
-        if saldo < custo:
-            st.error("💰 Saldo insuficiente.")
-        else:
-            if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
-                nova_capacidade = capacidade_por_nivel[nivel + 1]
-                supabase.table("estadios").update({
-                    "nivel": nivel + 1,
-                    "capacidade": nova_capacidade,
-                    "em_melhorias": True,
-                    "data_inicio_melhoria": datetime.now().strftime("%Y-%m-%d")
-                }).eq("id_time", id_time).execute()
-                novo_saldo = saldo - custo
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-                registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
-                st.success("🏗️ Estádio em obras! Conclusão em 3 dias.")
-                st.experimental_rerun()
+    if saldo < custo:
+        st.error("💰 Saldo insuficiente.")
+    else:
+        if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
+            nova_capacidade = capacidade_por_nivel[nivel + 1]
+            supabase.table("estadios").update({
+                "nivel": nivel + 1,
+                "capacidade": nova_capacidade,
+                "em_melhorias": False,
+                "data_inicio_melhoria": None
+            }).eq("id_time", id_time).execute()
+            novo_saldo = saldo - custo
+            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+            registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
+            st.success("✅ Estádio evoluído com sucesso!")
+            st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
