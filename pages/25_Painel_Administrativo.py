@@ -6,7 +6,7 @@ from datetime import datetime
 st.set_page_config(page_title="🛠️ Painel Administrativo", layout="centered")
 st.title("🛠️ Painel Administrativo - LigaFut")
 
-# 🔐 Supabase
+# 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -61,12 +61,13 @@ if st.button("✅ Aplicar Punição"):
                 "data": datetime.now().isoformat(),
                 "aplicado_por": usuario_logado
             }).execute()
-            if res.status == 201:
+            if res.data is not None:
                 st.success(f"✅ {valor} ponto(s) retirado(s) do time {nome_escolhido}.")
             else:
-                st.error(f"Erro ao aplicar punição: {res.data}")
+                st.error(f"❌ Erro ao aplicar punição: {res}")
         else:
             novo_saldo = max(0, saldo_atual - valor)
+
             res1 = supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
             res2 = supabase.table("movimentacoes").insert({
                 "id_time": id_time,
@@ -86,12 +87,13 @@ if st.button("✅ Aplicar Punição"):
                 "data": datetime.now().isoformat(),
                 "aplicado_por": usuario_logado
             }).execute()
-            if res1.status == 204 and res2.status == 201 and res3.status == 201:
+
+            if res1.data is not None and res2.data is not None and res3.data is not None:
                 st.success(f"💰 Multa de R$ {valor:,.0f} aplicada ao time {nome_escolhido}.".replace(",", "."))
             else:
-                st.error(f"Erro ao aplicar multa: {res1.data} | {res2.data} | {res3.data}")
+                st.error(f"❌ Erro ao aplicar multa: {res1.data} | {res2.data} | {res3.data}")
     except Exception as e:
-        st.error(f"Erro ao aplicar punição: {e}")
+        st.error(f"❌ Erro inesperado ao aplicar punição: {e}")
 
 # 🧱 Seção de restrições
 st.markdown("---")
@@ -113,12 +115,12 @@ if st.button("🔒 Atualizar Restrições do Time"):
     }
     try:
         res = supabase.table("times").update({"restricoes": nova_restricao}).eq("id", id_time).execute()
-        if res.status == 204:
+        if res.data is not None:
             st.success("🔒 Restrições atualizadas com sucesso.")
         else:
-            st.error(f"Erro ao atualizar restrições: {res.data}")
+            st.error(f"❌ Erro ao atualizar restrições: {res}")
     except Exception as e:
-        st.error(f"Erro ao salvar restrições: {e}")
+        st.error(f"❌ Erro ao salvar restrições: {e}")
 
 # 🗑️ Remover todas as punições
 st.markdown("---")
@@ -127,12 +129,12 @@ st.subheader("🗑️ Excluir todas as punições do time")
 if st.button("🧼 Remover Punições do Time"):
     try:
         res = supabase.table("punicoes").delete().eq("id_time", id_time).execute()
-        if res.status == 204:
+        if res.data is not None:
             st.success("🧼 Todas as punições foram removidas com sucesso.")
         else:
-            st.error(f"Erro ao excluir: {res.data}")
+            st.error(f"❌ Erro ao excluir punições: {res}")
     except Exception as e:
-        st.error(f"Erro ao excluir punições: {e}")
+        st.error(f"❌ Erro ao excluir punições: {e}")
 
 # ❌ Remover apenas punições de pontos
 st.subheader("🧽 Remover punições de pontos do time")
@@ -140,9 +142,9 @@ st.subheader("🧽 Remover punições de pontos do time")
 if st.button("❌ Remover Punições de Pontos"):
     try:
         res = supabase.table("punicoes").delete().eq("id_time", id_time).eq("tipo", "pontos").execute()
-        if res.status == 204:
+        if res.data is not None:
             st.success("❌ Punições de pontos removidas com sucesso.")
         else:
-            st.error(f"Erro ao excluir punições de pontos: {res.data}")
+            st.error(f"❌ Erro ao excluir punições de pontos: {res}")
     except Exception as e:
-        st.error(f"Erro ao remover punições de pontos: {e}")
+        st.error(f"❌ Erro ao remover punições de pontos: {e}")
