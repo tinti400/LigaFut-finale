@@ -28,7 +28,7 @@ except Exception as e:
 # 🔄 Carrega todas movimentações
 try:
     mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).execute()
-    todas_movs = mov_ref.data
+    todas_movs = mov_ref.data if mov_ref.data else []
 except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
     todas_movs = []
@@ -40,18 +40,22 @@ filtro_categoria = st.selectbox("Filtrar por categoria", ["Todos", "mercado", "l
 
 # Aplica filtros
 movimentacoes = []
-for mov in todas_movs:
-    nome_time = times_map.get(mov.get("id_time", ""), "Desconhecido")
 
-    if filtro_time != "Todos" and nome_time != filtro_time:
-        continue
-    if filtro_tipo != "Todos" and mov.get("tipo") != filtro_tipo:
-        continue
-    if filtro_categoria != "Todos" and mov.get("categoria") != filtro_categoria:
-        continue
+if todas_movs:
+    for mov in todas_movs:
+        nome_time = times_map.get(mov.get("id_time", ""), "Desconhecido")
 
-    mov["nome_time"] = nome_time
-    movimentacoes.append(mov)
+        if filtro_time != "Todos" and nome_time != filtro_time:
+            continue
+        if filtro_tipo != "Todos" and mov.get("tipo") != filtro_tipo:
+            continue
+        if filtro_categoria != "Todos" and mov.get("categoria") != filtro_categoria:
+            continue
+
+        mov["nome_time"] = nome_time
+        movimentacoes.append(mov)
+else:
+    movimentacoes = []
 
 # 📄 Paginação
 por_pagina = 50
@@ -83,29 +87,41 @@ else:
 
         valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
-        # Ícones e estilo por categoria
+        # Ícones e cores
         if categoria.lower() == "leilao":
             icone = "📢"
-            cor_fundo = "#fff3cd"  # amarelo claro
+            destaque = True
         elif categoria.lower() == "proposta":
             icone = "📤"
-            cor_fundo = "#f8f9fa"
+            destaque = False
         elif valor >= 0:
             icone = "🟢"
-            cor_fundo = "#f8f9fa"
+            destaque = False
         else:
             icone = "🔴"
-            cor_fundo = "#f8f9fa"
+            destaque = False
 
         cor_valor = "green" if valor >= 0 else "red"
 
-        st.markdown(f"""
-            <div style='background-color:{cor_fundo}; padding:15px; border-radius:10px; margin-bottom:20px'>
-                <h5 style='margin-bottom:10px'>{icone} {data_formatada} — <strong>{nome_time}</strong></h5>
-                <p><strong>👤 Jogador:</strong> {jogador}</p>
-                <p><strong>💬 Tipo:</strong> {tipo} — <strong>📂 Categoria:</strong> {categoria}</p>
-                <p><strong>💰 Valor:</strong> <span style='color:{cor_valor}'>{valor_str}</span></p>
-                {"<p><strong>↩️ Origem:</strong> " + origem + "</p>" if origem else ""}
-                {"<p><strong>➡️ Destino:</strong> " + destino + "</p>" if destino else ""}
-            </div>
-        """, unsafe_allow_html=True)
+        with st.container():
+            st.markdown("---")
+            col1, col2 = st.columns([1, 6])
+            with col1:
+                st.markdown(f"<span style='font-size:28px'>{icone}</span>", unsafe_allow_html=True)
+            with col2:
+                if destaque:
+                    st.markdown(
+                        f"<span style='background-color:#ffeaa7; padding:4px 8px; border-radius:4px;'>🔥 <b>LEILÃO</b> 🔥</span>",
+                        unsafe_allow_html=True
+                    )
+                st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
+                st.markdown(f"**👤 Jogador:** {jogador}")
+                st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
+                st.markdown(f"**💰 Valor:** <span style='color:{cor_valor}'>{valor_str}</span>", unsafe_allow_html=True)
+                if origem:
+                    st.markdown(f"**↩️ Origem:** {origem}")
+                if destino:
+                    st.markdown(f"**➡️ Destino:** {destino}")
+
+                if jogador == "Desconhecido":
+                    st.warning("⚠️ Jogador com nome ausente no BID. Verifique a origem da transação.")
