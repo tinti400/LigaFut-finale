@@ -83,32 +83,29 @@ else:
 
         valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
-        # Ícones
+        # Ícones e estilo por categoria
         if categoria.lower() == "leilao":
             icone = "📢"
+            cor_fundo = "#fff3cd"  # amarelo claro
         elif categoria.lower() == "proposta":
             icone = "📤"
+            cor_fundo = "#f8f9fa"
         elif valor >= 0:
             icone = "🟢"
+            cor_fundo = "#f8f9fa"
         else:
             icone = "🔴"
+            cor_fundo = "#f8f9fa"
 
         cor_valor = "green" if valor >= 0 else "red"
 
-        with st.container():
-            st.markdown("---")
-            col1, col2 = st.columns([1, 6])
-            with col1:
-                st.markdown(f"<span style='font-size:28px'>{icone}</span>", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"**🕒 {data_formatada}** — **{nome_time}**")
-                st.markdown(f"**👤 Jogador:** {jogador}")
-                st.markdown(f"**💬 Tipo:** {tipo} — **📂 Categoria:** {categoria}")
-                st.markdown(f"**💰 Valor:** <span style='color:{cor_valor}'>{valor_str}</span>", unsafe_allow_html=True)
-                if origem:
-                    st.markdown(f"**↩️ Origem:** {origem}")
-                if destino:
-                    st.markdown(f"**➡️ Destino:** {destino}")
-
-                if jogador == "Desconhecido":
-                    st.warning("⚠️ Jogador com nome ausente no BID. Verifique a origem da transação.")
+        st.markdown(f"""
+            <div style='background-color:{cor_fundo}; padding:15px; border-radius:10px; margin-bottom:20px'>
+                <h5 style='margin-bottom:10px'>{icone} {data_formatada} — <strong>{nome_time}</strong></h5>
+                <p><strong>👤 Jogador:</strong> {jogador}</p>
+                <p><strong>💬 Tipo:</strong> {tipo} — <strong>📂 Categoria:</strong> {categoria}</p>
+                <p><strong>💰 Valor:</strong> <span style='color:{cor_valor}'>{valor_str}</span></p>
+                {"<p><strong>↩️ Origem:</strong> " + origem + "</p>" if origem else ""}
+                {"<p><strong>➡️ Destino:</strong> " + destino + "</p>" if destino else ""}
+            </div>
+        """, unsafe_allow_html=True)
