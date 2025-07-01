@@ -8,7 +8,7 @@ from utils import verificar_sessao
 st.set_page_config(page_title="📊 Movimentações Financeiras", layout="wide")
 st.title("📊 Extrato Financeiro")
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -54,7 +54,6 @@ if not movs:
     st.info("Nenhuma movimentação encontrada.")
     st.stop()
 
-# 📊 Criar DataFrame
 df = pd.DataFrame(movs)
 df["data"] = pd.to_datetime(df["data"], errors="coerce")
 df = df.dropna(subset=["data"])
@@ -67,9 +66,6 @@ if "tipo" not in df.columns:
     df["tipo"] = "saida"
 if "descricao" not in df.columns:
     df["descricao"] = "Sem descrição"
-
-# 🎯 Normaliza descrições
-df["descricao_lower"] = df["descricao"].str.lower()
 
 # 💰 Calcular caixa anterior e atual
 saldos_atuais = []
@@ -90,57 +86,79 @@ for _, row in df.iterrows():
 df["caixa_atual"] = saldos_atuais
 df["caixa_anterior"] = saldos_anteriores
 
-# 🎯 Calcular totais detalhados
+# 🎯 Calcular totais
+df["descricao_lower"] = df["descricao"].str.lower()
+
 total_salario = df[df["descricao_lower"].str.contains("pagamento de salário")]["valor"].astype(float).sum()
 total_bonus = df[df["descricao_lower"].str.contains("bônus de gols")]["valor"].astype(float).sum()
 total_premiacao = df[df["descricao_lower"].str.contains("premiação por resultado")]["valor"].astype(float).sum()
-total_compras = df[df["descricao_lower"].str.contains("compra de jogador")]["valor"].astype(float).sum()
-total_vendas = df[df["descricao_lower"].str.contains("venda de jogador")]["valor"].astype(float).sum()
-total_leilao = df[df["descricao_lower"].str.contains("leilão|leilao")]["valor"].astype(float).sum()
+total_compras_registro = df[df["descricao_lower"].str.contains("compra de")]["valor"].astype(float).sum()
+total_vendas_registro = df[df["descricao_lower"].str.contains("venda de")]["valor"].astype(float).sum()
 
-# 🧾 Cálculo total geral
-total_geral = total_bonus + total_premiacao + total_vendas - total_salario - total_compras - total_leilao
+# 🔍 Buscar lances no BID (leilão)
+res_bid = supabase.table("bid").select("valor_final, vencedor_id, origem_id").or_(
+    f"vencedor_id.eq.{id_time},origem_id.eq.{id_time}"
+).execute()
 
-# 🎨 Formatação de valores
+lances = res_bid.data or []
+total_compras_leilao = 0
+total_vendas_leilao = 0
+
+for lance in lances:
+    valor = float(lance.get("valor_final", 0))
+    if lance.get("vencedor_id") == id_time:
+        total_compras_leilao += valor
+    elif lance.get("origem_id") == id_time:
+        total_vendas_leilao += valor
+
+# 🎯 Totais finais
+total_compras = total_compras_registro + total_compras_leilao
+total_vendas = total_vendas_registro + total_vendas_leilao
+total_geral = total_bonus + total_premiacao + total_vendas - total_salario - total_compras
+
+# 🎨 Função de formatação
 def formatar_valor(v, negativo=False):
     try:
         v = float(v)
-        if negativo:
-            return f"-R${abs(v):,.0f}".replace(",", ".")
-        else:
-            return f"R${v:,.0f}".replace(",", ".")
+        return f"{'-' if negativo else ''}R${abs(v):,.0f}".replace(",", ".")
     except:
         return "-"
 
-# ➕ Exibir resumo no topo
+# 🧾 Bloco de Totais
 st.markdown(f"""
-<div style='background-color:#eef9f1;padding:20px;border-radius:10px;margin-bottom:15px;border: 1px solid #CCC'>
-<ul style='font-size:17px;list-style:none;padding-left:10px'>
-<li>🛒 Compras de Jogadores: <strong style='color:red'>{formatar_valor(total_compras, negativo=True)}</strong></li>
-<li>📤 Vendas de Jogadores: <strong style='color:green'>{formatar_valor(total_vendas)}</strong></li>
+<div style='background-color:#f9f9f9;padding:20px;border-radius:10px;margin-bottom:15px'>
+<h4>💰 <strong>Resumo Financeiro</strong></h4>
+<ul style='font-size:17px'>
+<li>🛒 Compras de Jogadores (Total): <strong style='color:red'>{formatar_valor(total_compras, negativo=True)}</strong></li>
+<ul style='margin-left:20px'>
+<li>↳ Registro: {formatar_valor(total_compras_registro, negativo=True)}</li>
+<li>↳ Leilão (BID): {formatar_valor(total_compras_leilao, negativo=True)}</li>
+</ul>
+<li>📤 Vendas de Jogadores (Total): <strong style='color:green'>{formatar_valor(total_vendas)}</strong></li>
+<ul style='margin-left:20px'>
+<li>↳ Registro: {formatar_valor(total_vendas_registro)}</li>
+<li>↳ Leilão (BID): {formatar_valor(total_vendas_leilao)}</li>
+</ul>
 <li>🥅 Bônus por Gol: <strong style='color:green'>{formatar_valor(total_bonus)}</strong></li>
 <li>🏆 Premiação por Resultado: <strong style='color:green'>{formatar_valor(total_premiacao)}</strong></li>
 <li>💼 Pagamento de Salário: <strong style='color:red'>{formatar_valor(total_salario, negativo=True)}</strong></li>
-<li>🔨 Gastos com Leilões: <strong style='color:red'>{formatar_valor(total_leilao, negativo=True)}</strong></li>
 </ul>
-<p style='font-size:20px;margin-top:10px'><strong>💰 Total Geral: <span style='color:{"green" if total_geral >= 0 else "red"}'>{formatar_valor(total_geral, negativo=(total_geral < 0))}</span></strong></p>
+<p style='font-size:20px;margin-top:10px'><strong>📊 Total Geral: <span style='color:{"green" if total_geral >= 0 else "red"}'>{formatar_valor(total_geral, negativo=(total_geral < 0))}</span></strong></p>
 <p style='font-size:16px;margin-top:10px'>📦 <strong>Saldo Atual do Time:</strong> {formatar_valor(saldo_atual)}</p>
 </div>
 """, unsafe_allow_html=True)
 
-# 🧾 Tabela final formatada
+# 🧾 Exibir extrato
 df["💰 Caixa Atual"] = df["caixa_atual"].apply(formatar_valor)
 df["📦 Caixa Anterior"] = df["caixa_anterior"].apply(formatar_valor)
-df["💸 Valor"] = df.apply(lambda row: formatar_valor(row["valor"], negativo=("compra de jogador" in row["descricao_lower"] or "pagamento de salário" in row["descricao_lower"] or "leilão" in row["descricao_lower"])), axis=1)
+df["💸 Valor"] = df["valor"].apply(formatar_valor)
 df["📅 Data"] = df["data"].dt.strftime("%d/%m/%Y %H:%M")
 df["📌 Tipo"] = df["tipo"].astype(str).str.capitalize()
 df["📝 Descrição"] = df["descricao"].astype(str)
 
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
-df_exibir = df[colunas].copy()
-df_exibir = df_exibir.fillna("").astype(str)
+df_exibir = df[colunas].copy().fillna("").astype(str)
 
-# 🧾 Exibir extrato
 st.subheader(f"📁 Extrato do time {nome_time}")
 try:
     st.dataframe(df_exibir, use_container_width=True)
