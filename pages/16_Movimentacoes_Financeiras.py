@@ -42,17 +42,29 @@ else:
 res_saldo = supabase.table("times").select("saldo").eq("id", id_time).single().execute()
 saldo_atual = res_saldo.data.get("saldo", 0)
 
-# 📥 Buscar movimentações
+# 📥 Buscar movimentações financeiras
 res_mov = supabase.table("movimentacoes_financeiras")\
     .select("*")\
     .eq("id_time", id_time)\
     .order("data", desc=True)\
     .execute()
-
 movs = res_mov.data
 if not movs:
     st.info("Nenhuma movimentação encontrada.")
     st.stop()
+
+# 📥 Buscar valor gasto em leilões no BID
+try:
+    res_leiloes = supabase.table("movimentacoes")\
+        .select("valor")\
+        .eq("id_time", id_time)\
+        .eq("categoria", "leilao")\
+        .eq("tipo", "compra")\
+        .execute()
+    total_leilao = sum([abs(m["valor"]) for m in res_leiloes.data])
+except Exception as e:
+    total_leilao = 0
+    st.error(f"Erro ao buscar gastos em leilões: {e}")
 
 # 📊 Criar DataFrame
 df = pd.DataFrame(movs)
@@ -61,25 +73,18 @@ df = df.dropna(subset=["data"])
 df = df.sort_values("data", ascending=False)
 
 # 🛡️ Garante colunas básicas
-if "valor" not in df.columns:
-    df["valor"] = 0
-if "tipo" not in df.columns:
-    df["tipo"] = "saida"
-if "descricao" not in df.columns:
-    df["descricao"] = "Sem descrição"
+for col in ["valor", "tipo", "descricao"]:
+    if col not in df.columns:
+        df[col] = "" if col == "descricao" else 0
 
 # 💰 Calcular caixa anterior e atual
-saldos_atuais = []
-saldos_anteriores = []
+saldos_atuais, saldos_anteriores = [], []
 saldo = saldo_atual
 
 for _, row in df.iterrows():
     valor = float(row.get("valor", 0))
     tipo = row.get("tipo", "saida")
-    if tipo == "entrada":
-        saldo_anterior = saldo - valor
-    else:
-        saldo_anterior = saldo + valor
+    saldo_anterior = saldo - valor if tipo == "entrada" else saldo + valor
     saldos_anteriores.append(saldo_anterior)
     saldos_atuais.append(saldo)
     saldo = saldo_anterior
@@ -96,31 +101,15 @@ total_premiacao = df[df["descricao_lower"].str.contains("premiação por resulta
 total_compras = df[df["descricao_lower"].str.contains("compra de")]["valor"].astype(float).sum()
 total_vendas = df[df["descricao_lower"].str.contains("venda de")]["valor"].astype(float).sum()
 
-# 🧲 Buscar dados do leilão (bid)
-res_bid_compras = supabase.table("bid").select("valor_final").eq("vencedor_id", id_time).execute()
-res_bid_vendas = supabase.table("bid").select("valor_final").eq("origem_id", id_time).execute()
-total_compras_leilao = sum(float(b["valor_final"]) for b in res_bid_compras.data or [])
-total_vendas_leilao = sum(float(b["valor_final"]) for b in res_bid_vendas.data or [])
-
 # 🧾 Cálculo total geral
-total_geral = (
-    total_bonus
-    + total_premiacao
-    + total_vendas
-    + total_vendas_leilao
-    - total_salario
-    - total_compras
-    - total_compras_leilao
-)
+total_geral = total_bonus + total_premiacao + total_vendas - total_salario - total_compras - total_leilao
 
 # 🎨 Função de formatação
 def formatar_valor(v, negativo=False):
     try:
         v = float(v)
-        if negativo:
-            return f"-R${abs(v):,.0f}".replace(",", ".")
-        else:
-            return f"R${v:,.0f}".replace(",", ".")
+        prefixo = "-R$" if negativo else "R$"
+        return f"{prefixo}{abs(v):,.0f}".replace(",", ".")
     except:
         return "-"
 
@@ -129,9 +118,8 @@ st.markdown(f"""
 <div style='background-color:#f9f9f9;padding:20px;border-radius:10px;margin-bottom:15px'>
 <ul style='font-size:17px'>
 <li>🛒 Compras de Jogadores: <strong style='color:red'>{formatar_valor(total_compras, negativo=True)}</strong></li>
-<li>🧨 Compras em Leilão: <strong style='color:red'>{formatar_valor(total_compras_leilao, negativo=True)}</strong></li>
 <li>📤 Vendas de Jogadores: <strong style='color:green'>{formatar_valor(total_vendas)}</strong></li>
-<li>💰 Vendas em Leilão: <strong style='color:green'>{formatar_valor(total_vendas_leilao)}</strong></li>
+<li>📣 Gastos em Leilões: <strong style='color:red'>{formatar_valor(total_leilao, negativo=True)}</strong></li>
 <li>🥅 Bônus por Gol: <strong style='color:green'>{formatar_valor(total_bonus)}</strong></li>
 <li>🏆 Premiação por Resultado: <strong style='color:green'>{formatar_valor(total_premiacao)}</strong></li>
 <li>💼 Pagamento de Salário: <strong style='color:red'>{formatar_valor(total_salario, negativo=True)}</strong></li>
@@ -141,7 +129,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 🧾 Exibir extrato
+# 🧾 Exibir extrato detalhado
 df["💰 Caixa Atual"] = df["caixa_atual"].apply(formatar_valor)
 df["📦 Caixa Anterior"] = df["caixa_anterior"].apply(formatar_valor)
 df["💸 Valor"] = df["valor"].apply(formatar_valor)
@@ -150,11 +138,9 @@ df["📌 Tipo"] = df["tipo"].astype(str).str.capitalize()
 df["📝 Descrição"] = df["descricao"].astype(str)
 
 colunas = ["📅 Data", "📌 Tipo", "📝 Descrição", "💸 Valor", "📦 Caixa Anterior", "💰 Caixa Atual"]
-df_exibir = df[colunas].copy()
-df_exibir = df_exibir.fillna("").astype(str)
+df_exibir = df[colunas].copy().fillna("").astype(str)
 
 st.subheader(f"📁 Extrato do time {nome_time}")
-
 try:
     st.dataframe(df_exibir, use_container_width=True)
 except Exception:
