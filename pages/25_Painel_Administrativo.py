@@ -61,7 +61,7 @@ if st.button("✅ Aplicar Punição"):
                 "data": datetime.now().isoformat(),
                 "aplicado_por": usuario_logado
             }).execute()
-            if res.status_code == 201:
+            if res.status == 201:
                 st.success(f"✅ {valor} ponto(s) retirado(s) do time {nome_escolhido}.")
             else:
                 st.error(f"Erro ao aplicar punição: {res.data}")
@@ -86,10 +86,10 @@ if st.button("✅ Aplicar Punição"):
                 "data": datetime.now().isoformat(),
                 "aplicado_por": usuario_logado
             }).execute()
-            if res1.status_code == 204 and res2.status_code == 201 and res3.status_code == 201:
+            if res1.status == 204 and res2.status == 201 and res3.status == 201:
                 st.success(f"💰 Multa de R$ {valor:,.0f} aplicada ao time {nome_escolhido}.".replace(",", "."))
             else:
-                st.error("Erro ao aplicar multa financeira.")
+                st.error(f"Erro ao aplicar multa: {res1.data} | {res2.data} | {res3.data}")
     except Exception as e:
         st.error(f"Erro ao aplicar punição: {e}")
 
@@ -113,10 +113,10 @@ if st.button("🔒 Atualizar Restrições do Time"):
     }
     try:
         res = supabase.table("times").update({"restricoes": nova_restricao}).eq("id", id_time).execute()
-        if res.status_code == 204:
+        if res.status == 204:
             st.success("🔒 Restrições atualizadas com sucesso.")
         else:
-            st.error(f"Erro ao atualizar: {res.data}")
+            st.error(f"Erro ao atualizar restrições: {res.data}")
     except Exception as e:
         st.error(f"Erro ao salvar restrições: {e}")
 
@@ -127,7 +127,7 @@ st.subheader("🗑️ Excluir todas as punições do time")
 if st.button("🧼 Remover Punições do Time"):
     try:
         res = supabase.table("punicoes").delete().eq("id_time", id_time).execute()
-        if res.status_code == 204:
+        if res.status == 204:
             st.success("🧼 Todas as punições foram removidas com sucesso.")
         else:
             st.error(f"Erro ao excluir: {res.data}")
@@ -140,9 +140,9 @@ st.subheader("🧽 Remover punições de pontos do time")
 if st.button("❌ Remover Punições de Pontos"):
     try:
         res = supabase.table("punicoes").delete().eq("id_time", id_time).eq("tipo", "pontos").execute()
-        if res.status_code == 204:
+        if res.status == 204:
             st.success("❌ Punições de pontos removidas com sucesso.")
         else:
-            st.error(f"Erro ao excluir: {res.data}")
+            st.error(f"Erro ao excluir punições de pontos: {res.data}")
     except Exception as e:
         st.error(f"Erro ao remover punições de pontos: {e}")
