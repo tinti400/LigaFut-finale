@@ -28,7 +28,7 @@ except Exception as e:
 # 🔄 Carrega todas movimentações
 try:
     mov_ref = supabase.table("movimentacoes").select("*").order("data", desc=True).execute()
-    todas_movs = mov_ref.data if mov_ref.data else []
+    todas_movs = mov_ref.data or []
 except Exception as e:
     st.error(f"Erro ao buscar movimentações: {e}")
     todas_movs = []
@@ -40,7 +40,6 @@ filtro_categoria = st.selectbox("Filtrar por categoria", ["Todos", "mercado", "l
 
 # Aplica filtros
 movimentacoes = []
-
 if todas_movs:
     for mov in todas_movs:
         nome_time = times_map.get(mov.get("id_time", ""), "Desconhecido")
@@ -54,22 +53,18 @@ if todas_movs:
 
         mov["nome_time"] = nome_time
         movimentacoes.append(mov)
-else:
-    movimentacoes = []
 
-# 📄 Paginação
-por_pagina = 50
-total_paginas = math.ceil(len(movimentacoes) / por_pagina)
-pagina = st.number_input("Página", min_value=1, max_value=max(1, total_paginas), value=1, step=1)
-
-inicio = (pagina - 1) * por_pagina
-fim = inicio + por_pagina
-movs_paginados = movimentacoes[inicio:fim]
-
-# 📋 Exibição
-if not movs_paginados:
+# 📄 Paginação segura
+if not movimentacoes:
     st.info("Nenhuma movimentação encontrada.")
 else:
+    por_pagina = 50
+    total_paginas = math.ceil(len(movimentacoes) / por_pagina)
+    pagina = st.number_input("Página", min_value=1, max_value=total_paginas, value=1, step=1)
+    inicio = (pagina - 1) * por_pagina
+    fim = inicio + por_pagina
+    movs_paginados = movimentacoes[inicio:fim]
+
     for mov in movs_paginados:
         jogador = mov.get("jogador", "Desconhecido")
         tipo = mov.get("tipo", "N/A").capitalize()
@@ -87,7 +82,6 @@ else:
 
         valor_str = f"R$ {abs(valor):,.0f}".replace(",", ".")
 
-        # Ícones e cores
         if categoria.lower() == "leilao":
             icone = "📢"
             destaque = True
