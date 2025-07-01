@@ -14,24 +14,20 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# 👤 Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
-# 🔹 Seleção de divisão e temporada
 col1, col2 = st.columns(2)
 divisao = col1.selectbox("Selecione a divisão", ["Divisão 1", "Divisão 2", "Divisão 3"])
 temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2", "Temporada 3"])
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-# 💰 Função para renda de jogo
 def calcular_renda_jogo(estadio):
     try:
         preco = float(estadio.get("preco_ingresso") or 20.0)
@@ -73,7 +69,6 @@ def obter_nomes_times(divisao):
     except:
         return {}
 
-# 🧮 Classificação com punições
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
     punicoes_por_time = {}
@@ -119,16 +114,15 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
         penalidade = punicoes_por_time.get(str(tid), 0)
-        tabela[tid]["pontos"] = max(0, tabela[tid]["pontos"] - penalidade)
+        tabela[tid]["pontos"] = tabela[tid]["pontos"] - penalidade  # <- Pontuação negativa permitida
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# 🚀 Executa
+# Execução
 times_map = obter_nomes_times(numero_divisao)
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# 📊 Tabela
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
