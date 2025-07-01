@@ -19,7 +19,7 @@ if "nome_time" not in st.session_state:
     st.warning("Você precisa estar logado com um time válido para acessar esta página.")
     st.stop()
 
-id_time = str(st.session_state["id_time"])  # 🔒 Converte para string segura
+id_time = str(st.session_state["id_time"])
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
@@ -50,7 +50,7 @@ precos_padrao = {
 def buscar_posicao_time(id_time):
     try:
         res = supabase.table("classificacao").select("id_time").order("pontos", desc=True).execute()
-        lista_ids = [str(t["id_time"]) for t in res.data]
+        lista_ids = [t["id_time"] for t in res.data]
         return lista_ids.index(id_time) + 1 if id_time in lista_ids else 20
     except:
         return 20
@@ -93,9 +93,11 @@ def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recente
 
     return int(min(lugares, lugares * fator_base * fator_preco))
 
+# 🏟️ Buscar estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
+# 🆕 Criar novo estádio se não existir
 if not estadio:
     estadio_novo = {
         "id_time": id_time,
@@ -119,6 +121,7 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
+# 🛠️ Verificar melhoria finalizada
 data_inicio = estadio.get("data_inicio_melhoria")
 if estadio.get("em_melhorias") and data_inicio:
     try:
@@ -147,8 +150,8 @@ if novo_nome and novo_nome != nome:
     st.experimental_rerun()
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
-
 st.markdown("### 🎛 Preços por Setor")
+
 publico_total = 0
 renda_total = 0
 
@@ -171,6 +174,7 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
+# 🔧 Melhorar estádio
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     if em_melhorias:
