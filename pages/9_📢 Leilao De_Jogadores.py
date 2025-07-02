@@ -177,3 +177,4 @@ for leilao in leiloes:
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
+
