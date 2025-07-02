@@ -61,17 +61,24 @@ for leilao in leiloes:
     if tempo_restante == 0 and not leilao.get("finalizado", False):
         if id_time_vencedor:
             try:
-                # ✅ Inserir jogador no elenco do time vencedor
-                supabase.table("elenco").insert({
-                    "id_time": id_time_vencedor,
-                    "nome": nome_jogador,
-                    "posicao": posicao,
-                    "overall": overall,
-                    "valor": valor_atual,
-                    "imagem_url": imagem_url,
-                    "link_sofifa": link_sofifa,
-                    "nacionalidade": nacionalidade
-                }).execute()
+                # ✅ Verifica se jogador já está no elenco para evitar duplicação
+                existe = supabase.table("elenco") \
+                    .select("id") \
+                    .eq("id_time", id_time_vencedor) \
+                    .eq("nome", nome_jogador) \
+                    .execute()
+
+                if not existe.data:
+                    supabase.table("elenco").insert({
+                        "id_time": id_time_vencedor,
+                        "nome": nome_jogador,
+                        "posicao": posicao,
+                        "overall": overall,
+                        "valor": valor_atual,
+                        "imagem_url": imagem_url,
+                        "link_sofifa": link_sofifa,
+                        "nacionalidade": nacionalidade
+                    }).execute()
 
                 # 💰 Atualizar saldo
                 saldo_res = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
@@ -114,66 +121,27 @@ for leilao in leiloes:
             }).eq("id", leilao["id"]).execute()
             st.warning(f"⛔ Leilão de {nome_jogador} expirado sem lances.")
             st.experimental_rerun()
+                agora = datetime.utcnow()
+                if (fim_dt - agora).total_seconds() <= 15:
+                    fim_dt = agora + timedelta(seconds=15)
 
-    # ⏳ Tempo restante
-    minutos, segundos = divmod(tempo_restante, 60)
+                try:
+                    update_payload = {
+                        "valor_atual": novo_lance,
+                        "id_time_atual": id_time_usuario,
+                        "fim": fim_dt.isoformat(),
+                        "time_vencedor": nome_time_usuario
+                    }
 
-    st.markdown("---")
-    st.subheader(f"🧤 {nome_jogador} ({posicao})")
+                    supabase.table("leiloes").update(update_payload).eq("id", leilao["id"]).execute()
 
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if imagem_url:
-            st.image(imagem_url, width=180)
-    with col2:
-        st.markdown(f"""
-        **Overall:** {overall}  
-        **Nacionalidade:** {nacionalidade}  
-        **💰 Preço Atual:** R$ {valor_atual:,.0f}  
-        **⏳ Tempo Restante:** {minutos:02d}:{segundos:02d}
-        """)
-        if link_sofifa:
-            st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({link_sofifa})", unsafe_allow_html=True)
-
-        if id_time_vencedor:
-            time_res = supabase.table("times").select("nome").eq("id", id_time_vencedor).execute()
-            if time_res.data:
-                st.info(f"🏷️ Último Lance: {time_res.data[0]['nome']}")
-
-    # 💸 Dar um lance
-    st.markdown("#### 💥 Dar um Lance")
-    botoes = [incremento * i for i in range(1, 11)]
-    colunas = st.columns(5)
-
-    for i, aumento in enumerate(botoes):
-        novo_lance = valor_atual + aumento
-        with colunas[i % 5]:
-            if st.button(f"➕ R$ {novo_lance:,.0f}".replace(",", "."), key=f"lance_{leilao['id']}_{i}"):
-                saldo_res = supabase.table("times").select("saldo").eq("id", id_time_usuario).execute()
-                saldo = saldo_res.data[0]["saldo"]
-                if novo_lance > saldo:
-                    st.error("❌ Saldo insuficiente.")
-                else:
-                    agora = datetime.utcnow()
-                    if (fim_dt - agora).total_seconds() <= 15:
-                        fim_dt = agora + timedelta(seconds=15)
-
-                    try:
-                        update_payload = {
-                            "valor_atual": novo_lance,
-                            "id_time_atual": id_time_usuario,
-                            "fim": fim_dt.isoformat(),
-                            "time_vencedor": nome_time_usuario
-                        }
-
-                        supabase.table("leiloes").update(update_payload).eq("id", leilao["id"]).execute()
-
-                        st.success("✅ Lance enviado com sucesso!")
-                        st.experimental_rerun()
-                    except Exception as e:
-                        st.error(f"❌ Erro ao atualizar o leilão: {e}")
+                    st.success("✅ Lance enviado com sucesso!")
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao atualizar o leilão: {e}")
 
 # 🔁 Atualizar página manualmente
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
+
