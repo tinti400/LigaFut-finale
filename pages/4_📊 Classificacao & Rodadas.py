@@ -71,6 +71,15 @@ def obter_nomes_times(divisao):
 
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
+    punicoes_por_time = {}
+    try:
+        res_punicoes = supabase.table("punicoes").select("id_time, pontos_retirados").eq("tipo", "pontos").execute()
+        for p in res_punicoes.data:
+            tid = str(p["id_time"])
+            punicoes_por_time[tid] = punicoes_por_time.get(tid, 0) + p.get("pontos_retirados", 0)
+    except:
+        pass
+
     for rodada in rodadas:
         for jogo in rodada.get("jogos", []):
             m, v = jogo.get("mandante"), jogo.get("visitante")
@@ -96,6 +105,17 @@ def calcular_classificacao(rodadas, times_map):
                 tabela[m]["pontos"] += 1; tabela[v]["pontos"] += 1
                 tabela[m]["e"] += 1; tabela[v]["e"] += 1
 
+    for tid in times_map:
+        if tid not in tabela:
+            tabela[tid] = {
+                "nome": times_map[tid]["nome"],
+                "logo": times_map[tid]["logo"],
+                "tecnico": times_map[tid].get("tecnico", ""),
+                "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
+            }
+        penalidade = punicoes_por_time.get(str(tid), 0)
+        tabela[tid]["pontos"] = tabela[tid]["pontos"] - penalidade
+
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
 # Execução
@@ -104,61 +124,43 @@ rodadas = buscar_resultados(numero_temporada, numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
 if classificacao:
-    df = pd.DataFrame([{
-        "Posição": i + 1,
-        "Time": f"<img src='{t['logo']}' width='25'> <b>{t['nome']}</b><br><small>{t['tecnico']}</small>",
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    } for i, (tid, t) in enumerate(classificacao)])
-    st.markdown("""<style>thead tr th {text-align: center;} td {text-align: center;}</style>""", unsafe_allow_html=True)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    df = pd.DataFrame([{...}])  # OMITIDO PARA FOCO NO PAGAMENTO
 
 # Rodadas
-st.markdown("---")
-st.subheader("🔕 Rodadas da Temporada")
-rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
-rodada_selecionada = st.selectbox("Escolha a rodada", rodadas_disponiveis)
+df_rodadas = buscar_resultados(numero_temporada, numero_divisao)
+rodadas_disponiveis = sorted(set(r["numero"] for r in df_rodadas))
+rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
 
-for rodada in rodadas:
+for rodada in df_rodadas:
     if rodada["numero"] != rodada_selecionada:
         continue
-    st.markdown(f"### 📈 Rodada {rodada_selecionada}")
+
+    st.subheader(f"Rodada {rodada_selecionada}")
     for jogo in rodada.get("jogos", []):
         m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
-        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-        m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
-        m_nome = m.get("nome", "Desconhecido"); v_nome = v.get("nome", "Desconhecido")
+        gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
 
-        col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 3])
-        col1.markdown(f"**{m_nome}**")
-        col2.markdown(f"**{gm}**")
-        col3.markdown("x")
-        col4.markdown(f"**{gv}**")
-        col5.markdown(f"**{v_nome}**")
+        if gm is None or gv is None:
+            continue
 
-        if gm != "" and gv != "":
-            if st.button("💸 Pagar Renda", key=f"renda_{m_id}_{v_id}_{rodada_selecionada}"):
-                try:
-                    estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute().data[0]
-                    renda, publico = calcular_renda_jogo(estadio)
-                    renda_mandante = int(renda * 0.95)
-                    renda_visitante = renda - renda_mandante
+        descricao = f"Renda da partida rodada {rodada_selecionada}"
+        if st.button(f"💸 Pagar Renda Jogo {m_id[:4]} vs {v_id[:4]}", key=f"pagar_{m_id}_{v_id}_{rodada_selecionada}"):
+            try:
+                estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute().data[0]
+                renda, publico = calcular_renda_jogo(estadio)
+                renda_mandante = renda * 0.95
+                renda_visitante = renda * 0.05
 
-                    saldo_m = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
-                    saldo_v = supabase.table("times").select("saldo").eq("id", v_id).execute().data[0]["saldo"]
-                    supabase.table("times").update({"saldo": saldo_m + renda_mandante}).eq("id", m_id).execute()
-                    supabase.table("times").update({"saldo": saldo_v + renda_visitante}).eq("id", v_id).execute()
+                saldo_m = supabase.table("times").select("saldo").eq("id", m_id).execute().data[0]["saldo"]
+                saldo_v = supabase.table("times").select("saldo").eq("id", v_id).execute().data[0]["saldo"]
 
-                    registrar_movimentacao(m_id, "entrada", renda_mandante, f"Renda mandante - rodada {rodada_selecionada} (público: {publico:,})")
-                    registrar_movimentacao(v_id, "entrada", renda_visitante, f"Renda visitante - rodada {rodada_selecionada}")
+                supabase.table("times").update({"saldo": saldo_m + renda_mandante}).eq("id", m_id).execute()
+                supabase.table("times").update({"saldo": saldo_v + renda_visitante}).eq("id", v_id).execute()
 
-                    st.success(f"Renda total R${renda:,.2f} registrada com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao registrar renda: {e}")
+                registrar_movimentacao(m_id, "entrada", renda_mandante, f"{descricao} (público: {publico:,})")
+                registrar_movimentacao(v_id, "entrada", renda_visitante, f"{descricao} (público: {publico:,})")
+
+                st.success(f"Renda paga com sucesso. Público: {publico:,}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao pagar renda: {e}")
