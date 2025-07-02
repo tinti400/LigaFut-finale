@@ -23,6 +23,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state.get("usuario", "")
 
+# 📌 Tabelas auxiliares
 capacidade_por_nivel = {
     1: 25000,
     2: 47500,
@@ -47,6 +48,7 @@ precos_padrao = {
     "camarote": 100.0
 }
 
+# 🔍 Funções utilitárias
 def buscar_posicao_time(id_time):
     try:
         res = supabase.table("classificacao").select("id_time").order("pontos", desc=True).execute()
@@ -75,31 +77,30 @@ def buscar_resultados_recentes(id_time, limite=5):
         return 0, 0
 
 def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias, derrotas):
-    fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005
-    fator_base += vitorias * 0.01 - derrotas * 0.005
+    fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005 + vitorias * 0.01 - derrotas * 0.005
 
     if preco <= 20:
-        fator_preco = 1.1
+        fator_preco = 1.0
     elif preco <= 50:
-        fator_preco = 0.9
+        fator_preco = 0.85
     elif preco <= 100:
-        fator_preco = 0.75
+        fator_preco = 0.65
     elif preco <= 200:
-        fator_preco = 0.6
-    elif preco <= 500:
         fator_preco = 0.4
+    elif preco <= 500:
+        fator_preco = 0.2
     else:
-        fator_preco = 0.1
+        fator_preco = 0.05
 
     publico_estimado = int(min(lugares, lugares * fator_base * fator_preco))
-    bonus = (21 - posicao) * 10_000  # Bônus por posição
-    renda = publico_estimado * preco + bonus
-
+    renda = publico_estimado * preco
     return publico_estimado, renda
 
+# 🎯 Buscar dados do estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
+# 📌 Criar estádio caso não exista
 if not estadio:
     estadio_novo = {
         "id_time": id_time,
@@ -123,16 +124,19 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
+# 📊 Dados de desempenho
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
 vitorias_recentes, derrotas_recentes = buscar_resultados_recentes(id_time)
 
+# 🎯 Dados do estádio
 nome = estadio["nome"]
 nivel = estadio["nivel"]
 capacidade = estadio["capacidade"]
 em_melhorias = estadio.get("em_melhorias", False)
 
+# 📝 Interface
 st.markdown(f"## 🏟️ {nome}")
 novo_nome = st.text_input("✏️ Renomear Estádio", value=nome)
 if novo_nome and novo_nome != nome:
@@ -142,6 +146,7 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
+# 💸 Preços e projeções por setor
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
@@ -151,6 +156,7 @@ for setor, proporcao in setores.items():
     lugares = int(capacidade * proporcao)
     preco_atual = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
     novo_preco = col1.number_input(f"Preço - {setor.upper()}", min_value=1.0, max_value=2000.0, value=preco_atual, step=1.0, key=f"preco_{setor}")
+    
     if novo_preco != preco_atual:
         supabase.table("estadios").update({f"preco_{setor}": novo_preco}).eq("id_time", id_time).execute()
         st.experimental_rerun()
@@ -164,6 +170,7 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
+# 🔧 Melhorias no estádio
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
