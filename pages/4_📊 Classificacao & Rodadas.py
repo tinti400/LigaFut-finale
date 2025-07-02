@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
-import random
 from supabase import create_client
 from datetime import datetime
 from utils import registrar_movimentacao
@@ -15,12 +14,10 @@ st.set_page_config(page_title="Classificação", page_icon="📊", layout="cente
 st.markdown("## 🏆 Tabela de Classificação")
 st.markdown(f"🗓️ Atualizada em: `{datetime.now().strftime('%d/%m/%Y %H:%M')}`")
 
-# 🔒 Verifica login
 if "usuario" not in st.session_state:
     st.warning("Você precisa estar logado.")
     st.stop()
 
-# ⚙️ Verifica admin
 email_usuario = st.session_state.get("usuario", "")
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
@@ -40,16 +37,11 @@ def calcular_renda_jogo(estadio):
         preco = 20.0
         nivel = 1
         capacidade = 10000
-
     demanda_base = capacidade * (0.9 + nivel * 0.02)
     fator_preco = max(0.3, 1 - (preco - 20) * 0.03)
     publico = int(min(capacidade, demanda_base * fator_preco))
-
-    variacao = random.uniform(0.90, 1.10)
-    publico_final = int(publico * variacao)
-
-    renda = publico_final * preco
-    return renda, publico_final
+    renda = publico * preco
+    return renda, publico
 
 @st.cache_data(ttl=60)
 def buscar_resultados(temporada, divisao):
@@ -122,16 +114,15 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
         penalidade = punicoes_por_time.get(str(tid), 0)
-        tabela[tid]["pontos"] = tabela[tid]["pontos"] - penalidade
+        tabela[tid]["pontos"] -= penalidade
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# Execução principal
+# Execução
 times_map = obter_nomes_times(numero_divisao)
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
 classificacao = calcular_classificacao(rodadas, times_map)
 
-# Exibição classificação
 if classificacao:
     df = pd.DataFrame([{
         "Posição": i + 1,
@@ -162,7 +153,7 @@ if classificacao:
 else:
     st.info("Nenhum dado de classificação disponível.")
 
-# Exibir rodadas
+# Rodadas
 st.markdown("---")
 st.subheader("🗕️ Rodadas da Temporada")
 rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
