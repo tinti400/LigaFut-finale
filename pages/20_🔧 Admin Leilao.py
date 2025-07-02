@@ -1,6 +1,8 @@
 # 20_🔧 Admin Leilao.py
 # -*- coding: utf-8 -*-
 import streamlit as st
+import pandas as pd
+import uuid
 from datetime import datetime, timedelta
 from supabase import create_client
 from utils import registrar_movimentacao
@@ -32,7 +34,35 @@ if usuario_atual not in emails_admin:
 
 st.title("🧑‍⚖️ Administração de Leilões (Fila)")
 
-# 📂 Fila de jogadores aguardando leilão (vindo do painel destino)
+# 📥 Importar jogadores via Excel
+st.markdown("### 📊 Importar Jogadores em Lote via Excel")
+
+uploaded_file = st.file_uploader("Selecione um arquivo Excel (.xlsx) com os jogadores para a Fila de Leilão", type=["xlsx"])
+
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file)
+        st.dataframe(df)
+
+        if st.button("📥 Enviar jogadores para a fila"):
+            for _, row in df.iterrows():
+                supabase.table("fila_leilao").insert({
+                    "id": str(uuid.uuid4()),
+                    "nome": row["nome"],
+                    "posicao": row["posicao"],
+                    "overall": int(row["overall"]),
+                    "valor": int(row["valor"]),
+                    "imagem_url": row.get("imagem_url", ""),
+                    "link_sofifa": row.get("link_sofifa", ""),
+                    "status": "aguardando"
+                }).execute()
+            st.success("✅ Jogadores importados para a fila de leilão com sucesso!")
+            st.experimental_rerun()
+
+    except Exception as e:
+        st.error(f"❌ Erro ao processar o arquivo: {e}")
+
+# 📂 Fila de jogadores aguardando leilão
 st.subheader("📥 Jogadores na Fila de Leilão (Aguardando Inclusão)")
 
 fila = supabase.table("fila_leilao").select("*").eq("status", "aguardando").execute().data
@@ -45,8 +75,10 @@ if fila:
             cols[1].markdown(f"**{jogador.get('nome', 'Sem Nome')}**")
             cols[1].markdown(f"`{jogador.get('posicao', 'ND')}` | Overall: {jogador.get('overall', '-')}")
             cols[2].markdown(f"💰 R$ {int(jogador.get('valor', 0)):,}".replace(",", "."))
+            if jogador.get("link_sofifa"):
+                cols[3].markdown(f"[📄 Ficha Técnica](https://{jogador['link_sofifa'].lstrip('https://')})")
 
-            if cols[3].button("📢 Criar Leilão", key=f"criar_{jogador['id']}"):
+            if cols[4].button("📢 Criar Leilão", key=f"criar_{jogador['id']}"):
                 try:
                     agora = datetime.utcnow()
                     fim = agora + timedelta(minutes=2)
@@ -65,7 +97,7 @@ if fila:
                         "origem": "Base",
                         "nacionalidade": "Desconhecida",
                         "imagem_url": jogador.get("imagem_url", ""),
-                        "link_sofifa": "",
+                        "link_sofifa": jogador.get("link_sofifa", ""),
                         "enviado_bid": False,
                         "validado": False,
                         "aguardando_validacao": False,
@@ -80,7 +112,7 @@ if fila:
 else:
     st.info("✅ Nenhum jogador aguardando na fila de leilão.")
 
-# 🔄 Verificar e ativar até 3 leilões simultâneos
+# 🔄 Ativar até 3 leilões simultâneos
 ativos = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute().data
 
 if ativos:
@@ -132,7 +164,7 @@ else:
     else:
         st.info("✅ Nenhum leilão ativo. Fila vazia.")
 
-# 📄 Leilões aguardando validação do administrador
+# 📄 Leilões aguardando validação
 pendentes = supabase.table("leiloes") \
     .select("*") \
     .eq("aguardando_validacao", True) \
@@ -198,7 +230,7 @@ if pendentes.data:
             except Exception as e:
                 st.error(f"Erro ao validar o leilão: {e}")
 
-# 🪨 Botão para limpar histórico de leilões já enviados ao BID
+# 🪨 Botão para limpar histórico de leilões
 st.markdown("---")
 st.subheader("🪨 Limpar Histórico de Leilões Enviados ao BID")
 
