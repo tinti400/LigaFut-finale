@@ -73,6 +73,7 @@ fila = supabase.table("fila_leilao").select("*").eq("status", "aguardando").exec
 if fila:
     for jogador in fila:
         with st.container():
+            c
             cols = st.columns([1, 3, 2, 2, 2])
             cols[0].image(jogador.get("imagem_url", ""), width=80)
             cols[1].markdown(f"**{jogador.get('nome')}**")
@@ -80,6 +81,7 @@ if fila:
             cols[1].markdown(f"🏷️ Origem: `{jogador.get('origem', '-')}`")
             cols[1].markdown(f"🌎 Nacionalidade: `{jogador.get('nacionalidade', '-')}`")
             cols[2].markdown(f"💰 R$ {int(jogador['valor']):,}".replace(",", "."))
+
             if jogador.get("link_sofifa"):
                 cols[3].markdown(f"[📄 Ficha Técnica](https://{jogador['link_sofifa'].lstrip('https://')})")
 
@@ -115,6 +117,17 @@ if fila:
 else:
     st.info("Nenhum jogador aguardando.")
 
+# ✅ Excluir jogadores da fila com seleção múltipla
+st.markdown("### ❌ Excluir jogadores da fila")
+ids_para_excluir = st.multiselect("Selecione os jogadores para excluir da fila", [f"{j['nome']} ({j['posicao']}) - {j['id']}" for j in fila])
+if ids_para_excluir:
+    if st.button("🗑️ Confirmar Exclusão"):
+        for identificador in ids_para_excluir:
+            id_jogador = identificador.split(" - ")[-1]
+            supabase.table("fila_leilao").delete().eq("id", id_jogador).execute()
+        st.success("Jogadores excluídos com sucesso.")
+        st.experimental_rerun()
+
 # 🔄 Ativação automática de leilões
 ativos = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute().data
 if not ativos:
@@ -126,6 +139,7 @@ if not ativos:
             supabase.table("leiloes").update({"ativo": True, "inicio": agora.isoformat(), "fim": fim.isoformat()}).eq("id", leilao["id"]).execute()
         st.success("Novos leilões ativados.")
         st.experimental_rerun()
+
 # 📄 Leilões aguardando validação
 st.subheader("📄 Leilões Aguardando Validação")
 pendentes = supabase.table("leiloes").select("*").eq("aguardando_validacao", True).eq("validado", False).order("fim", desc=True).limit(5).execute().data
