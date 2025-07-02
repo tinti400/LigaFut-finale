@@ -43,7 +43,7 @@ def calcular_renda_jogo(estadio):
     renda = publico * preco
     return renda, publico
 
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def buscar_resultados(temporada, divisao):
     try:
         res = supabase.table("rodadas").select("*").eq("temporada", temporada).eq("divisao", divisao).order("numero").execute()
@@ -51,7 +51,7 @@ def buscar_resultados(temporada, divisao):
     except:
         return []
 
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def obter_nomes_times(divisao):
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {divisao}").execute().data
@@ -114,114 +114,67 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
         penalidade = punicoes_por_time.get(str(tid), 0)
-        tabela[tid]["pontos"] -= penalidade
+        tabela[tid]["pontos"] = tabela[tid]["pontos"] - penalidade
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
-# Execução
-times_map = obter_nomes_times(numero_divisao)
+# 🔄 Continuação do código da classificação e rodadas
+# Deixe-me saber se deseja que eu envie também o restante da parte de exibição de tabela, rodadas e botão de pagamento da renda (que você já tinha).
+
+Deseja que eu envie **o resto do código (a partir da exibição das rodadas e botões de pagamento de renda)** também?
+# 🔄 Parte final - Exibir classificação
 rodadas = buscar_resultados(numero_temporada, numero_divisao)
-classificacao = calcular_classificacao(rodadas, times_map)
+mapa_times = obter_nomes_times(numero_divisao)
+classificacao = calcular_classificacao(rodadas, mapa_times)
 
-if classificacao:
-    df = pd.DataFrame([{
-        "Posição": i + 1,
-        "Time": f"<img src='{t['logo']}' width='25'> <b>{t['nome']}</b><br><small>{t['tecnico']}</small>",
-        "Pontos": t["pontos"],
-        "Jogos": t["v"] + t["e"] + t["d"],
-        "Vitórias": t["v"],
-        "Empates": t["e"],
-        "Derrotas": t["d"],
-        "Gols Pró": t["gp"],
-        "Gols Contra": t["gc"],
-        "Saldo de Gols": t["sg"]
-    } for i, (tid, t) in enumerate(classificacao)])
+# 🧮 Mostrar classificação
+st.markdown("### 📊 Classificação Atual")
+df = pd.DataFrame([{
+    "Time": f"![logo]({d['logo']}) {d['nome']}",
+    "Técnico": d["tecnico"],
+    "Pts": d["pontos"],
+    "V": d["v"], "E": d["e"], "D": d["d"],
+    "GP": d["gp"], "GC": d["gc"], "SG": d["sg"]
+} for _, d in classificacao])
 
-    def aplicar_estilo(df):
-        html = "<table style='width: 100%; border-collapse: collapse;'>"
-        html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
-        for i, row in df.iterrows():
-            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            linha = "<tr style='background-color: {};'>".format(cor)
-            linha += ''.join(f"<td>{val}</td>" for val in row)
-            linha += "</tr>"
-            html += linha
-        html += "</tbody></table>"
-        return html
+def cor_linha(row):
+    pos = df[df["Time"] == row["Time"]].index[0]
+    if pos < 4: return ["background-color: #d4edda"] * len(row)  # verde
+    elif pos >= len(df) - 2: return ["background-color: #f8d7da"] * len(row)  # vermelho
+    return [""] * len(row)
 
-    st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
-else:
-    st.info("Nenhum dado de classificação disponível.")
+st.dataframe(df.style.apply(cor_linha, axis=1), use_container_width=True, hide_index=True)
 
-# Rodadas
-st.markdown("---")
-st.subheader("🗕️ Rodadas da Temporada")
-rodadas_disponiveis = sorted(set(r["numero"] for r in rodadas))
-rodada_selecionada = st.selectbox("Escolha a rodada que deseja visualizar", rodadas_disponiveis)
+# 📅 Exibir jogos por rodada
+st.markdown("### 📅 Rodadas")
+rodada_sel = st.selectbox("Escolha a rodada", [f"Rodada {r['numero']}" for r in rodadas])
+indice = int(rodada_sel.split()[-1]) - 1
+rodada = rodadas[indice]
+st.markdown(f"#### Jogos da {rodada_sel}")
+for j in rodada.get("jogos", []):
+    nome_m = mapa_times.get(j["mandante"], {}).get("nome", "Time A")
+    nome_v = mapa_times.get(j["visitante"], {}).get("nome", "Time B")
+    g_m = j.get("gols_mandante", "")
+    g_v = j.get("gols_visitante", "")
+    st.markdown(f"- `{nome_m}` {g_m} x {g_v} `{nome_v}`")
 
-for rodada in rodadas:
-    if rodada["numero"] != rodada_selecionada:
-        continue
-    st.markdown(f"<h4 style='margin-top: 30px;'>🔢 Rodada {rodada_selecionada}</h4>", unsafe_allow_html=True)
-    for jogo in rodada.get("jogos", []):
-        m_id, v_id = jogo.get("mandante"), jogo.get("visitante")
-        gm, gv = jogo.get("gols_mandante", ""), jogo.get("gols_visitante", "")
-        m = times_map.get(m_id, {}); v = times_map.get(v_id, {})
-        m_logo = m.get("logo", ""); v_logo = v.get("logo", "")
-        m_nome = m.get("nome", "Desconhecido"); v_nome = v.get("nome", "Desconhecido")
-
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
-        with col1:
-            st.markdown(f"<div style='text-align: right; line-height: 1.2;'>"
-                        f"<img src='{m_logo}' width='30'> <b>{m_nome}</b><br>", unsafe_allow_html=True)
-
-        if gm != "" and gv != "":
-            descricao = f"Renda da partida rodada {rodada_selecionada}"
-            check = supabase.table("movimentacoes_financeiras").select("descricao", "valor")\
-                .eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
-
-            if check.data:
-                valor_registrado = check.data[0]["valor"]
-                res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                estadio = res_estadio.data[0] if res_estadio.data else None
-                preco_ingresso = float(estadio.get("preco_ingresso", 20.0)) if estadio else 20.0
-                publico_estimado = int(valor_registrado / preco_ingresso)
-                st.markdown(f"<small>👥 {publico_estimado:,} pessoas<br>💰 R${valor_registrado:,.2f}</small></div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<small style='color:gray;'>💬 Renda não registrada</small></div>", unsafe_allow_html=True)
-                if st.button(f"💸", key=f"forcar_renda_{m_id}_{rodada_selecionada}", help=f"Forçar renda para {m_nome}"):
-                    try:
-                        res_estadio = supabase.table("estadios").select("*").eq("id_time", m_id).execute()
-                        estadio = res_estadio.data[0] if res_estadio.data else None
-                        if estadio:
-                            renda, publico = calcular_renda_jogo(estadio)
-                            renda_mandante = int(renda * 0.95)
-                            renda_visitante = int(renda * 0.05)
-
-                            saldo_m = supabase.table("times").select("saldo").eq("id", m_id).execute().data
-                            saldo_v = supabase.table("times").select("saldo").eq("id", v_id).execute().data
-                            saldo_atual_m = saldo_m[0]["saldo"] if saldo_m else 0
-                            saldo_atual_v = saldo_v[0]["saldo"] if saldo_v else 0
-
-                            novo_m = int(saldo_atual_m + renda_mandante)
-                            novo_v = int(saldo_atual_v + renda_visitante)
-
-                            supabase.table("times").update({"saldo": novo_m}).eq("id", m_id).execute()
-                            supabase.table("times").update({"saldo": novo_v}).eq("id", v_id).execute()
-
-                            registrar_movimentacao(m_id, "entrada", renda_mandante, f"{descricao} (95%)")
-                            registrar_movimentacao(v_id, "entrada", renda_visitante, f"{descricao} (5%)")
-
-                            st.success(f"✅ Renda registrada: R${renda:,.2f} público: {publico:,}")
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Erro ao registrar renda: {e}")
-
-        with col2:
-            st.markdown(f"<h5 style='text-align: center;'>{gm}</h5>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<h5 style='text-align: center;'>x</h5>", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"<h5 style='text-align: center;'>{gv}</h5>", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"<div style='text-align: left;'><img src='{v_logo}' width='30'> <b>{v_nome}</b></div>", unsafe_allow_html=True)
+# 💰 Botão para registrar renda
+if eh_admin and st.button("💰 Registrar Renda de Público da Rodada"):
+    registros = []
+    for j in rodada.get("jogos", []):
+        for id_time in [j.get("mandante"), j.get("visitante")]:
+            if not id_time:
+                continue
+            estadio_res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
+            estadio = estadio_res.data[0] if estadio_res.data else {}
+            renda, publico = calcular_renda_jogo(estadio)
+            if renda > 0:
+                try:
+                    registrar_movimentacao(id_time, "entrada", int(renda), f"Renda de público da {rodada_sel}")
+                    registros.append(f"{mapa_times.get(id_time, {}).get('nome', 'Time')} recebeu R$ {int(renda):,}")
+                except Exception as e:
+                    st.error(f"Erro ao registrar renda: {e}")
+    if registros:
+        st.success("✅ Renda registrada com sucesso:\n" + "\n".join(registros))
+    else:
+        st.warning("⚠️ Nenhuma renda registrada.")
