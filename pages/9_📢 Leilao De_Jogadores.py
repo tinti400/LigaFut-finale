@@ -19,7 +19,7 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 id_time_usuario = st.session_state["id_time"]
 nome_time_usuario = st.session_state.get("nome_time", "")
 
-# 🔒 Verifica restrições
+# 🔒 Verifica restrições do time
 restricoes = {}
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time_usuario).execute()
@@ -40,7 +40,7 @@ if not leiloes:
     st.warning("⚠️ Nenhum leilão ativo no momento.")
     st.stop()
 
-# 🔁 Loop nos leilões
+# 🔁 Exibir cada leilão
 for leilao in leiloes:
     fim = leilao.get("fim")
     fim_dt = datetime.fromisoformat(fim)
@@ -57,27 +57,29 @@ for leilao in leiloes:
     posicao = leilao.get("posicao_jogador")
     id_mercado = leilao.get("id_mercado")
 
-    # ⛔ Se o tempo acabou e ainda não foi finalizado
+    # 🛑 Finalizar leilão automaticamente se tempo acabar
     if tempo_restante == 0 and not leilao.get("finalizado", False):
         if id_time_vencedor:
             try:
-                # ✅ Transferir jogador para elenco do time vencedor
+                # ✅ Inserir jogador no elenco do time vencedor
                 supabase.table("elenco").insert({
                     "id_time": id_time_vencedor,
                     "nome": nome_jogador,
                     "posicao": posicao,
                     "overall": overall,
                     "valor": valor_atual,
-                    "imagem_url": imagem_url
+                    "imagem_url": imagem_url,
+                    "link_sofifa": link_sofifa,
+                    "nacionalidade": nacionalidade
                 }).execute()
 
-                # 💰 Atualiza saldo
+                # 💰 Atualizar saldo
                 saldo_res = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
                 saldo_atual = saldo_res.data[0]["saldo"]
                 novo_saldo = saldo_atual - valor_atual
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
 
-                # 🧾 Registra movimentação
+                # 🧾 Registrar movimentação
                 registrar_movimentacao(
                     id_time_vencedor, "saida", valor_atual,
                     descricao=f"Compra no leilão: {nome_jogador}",
@@ -86,14 +88,14 @@ for leilao in leiloes:
                     destino=nome_time_usuario
                 )
 
-                # ✅ Atualizar status do mercado_transferencias
+                # ✅ Atualizar mercado (se veio de lá)
                 if id_mercado:
                     supabase.table("mercado_transferencias").update({
                         "status": "atribuido",
                         "destino": nome_time_usuario
                     }).eq("id", id_mercado).execute()
 
-                # 🛑 Finaliza o leilão
+                # ✅ Finalizar leilão
                 supabase.table("leiloes").update({
                     "ativo": False,
                     "finalizado": True
@@ -113,7 +115,7 @@ for leilao in leiloes:
             st.warning(f"⛔ Leilão de {nome_jogador} expirado sem lances.")
             st.experimental_rerun()
 
-    # ⏳ Exibição enquanto ativo
+    # ⏳ Tempo restante
     minutos, segundos = divmod(tempo_restante, 60)
 
     st.markdown("---")
@@ -138,7 +140,7 @@ for leilao in leiloes:
             if time_res.data:
                 st.info(f"🏷️ Último Lance: {time_res.data[0]['nome']}")
 
-    # 💸 Lances
+    # 💸 Dar um lance
     st.markdown("#### 💥 Dar um Lance")
     botoes = [incremento * i for i in range(1, 11)]
     colunas = st.columns(5)
@@ -171,11 +173,7 @@ for leilao in leiloes:
                     except Exception as e:
                         st.error(f"❌ Erro ao atualizar o leilão: {e}")
 
-# 🔁 Botão manual
+# 🔁 Atualizar página manualmente
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
-
-
-
-
