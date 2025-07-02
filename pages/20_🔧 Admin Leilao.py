@@ -70,10 +70,21 @@ if uploaded_file:
 # 📥 Fila de jogadores aguardando leilão
 st.subheader("📥 Jogadores na Fila de Leilão (Aguardando Inclusão)")
 fila = supabase.table("fila_leilao").select("*").eq("status", "aguardando").execute().data
+
 if fila:
+    nomes_ids = [f"{jog['nome']} | {jog['posicao']} | {jog['overall']}" for jog in fila]
+    id_por_nome = {f"{jog['nome']} | {jog['posicao']} | {jog['overall']}": jog['id'] for jog in fila}
+    selecao_exclusao = st.multiselect("🗑️ Selecione jogadores para excluir da fila", nomes_ids)
+
+    if selecao_exclusao and st.button("❌ Excluir selecionados"):
+        for nome in selecao_exclusao:
+            id_jog = id_por_nome[nome]
+            supabase.table("fila_leilao").delete().eq("id", id_jog).execute()
+        st.success("Jogadores excluídos da fila com sucesso.")
+        st.experimental_rerun()
+
     for jogador in fila:
         with st.container():
-            c
             cols = st.columns([1, 3, 2, 2, 2])
             cols[0].image(jogador.get("imagem_url", ""), width=80)
             cols[1].markdown(f"**{jogador.get('nome')}**")
@@ -117,17 +128,6 @@ if fila:
 else:
     st.info("Nenhum jogador aguardando.")
 
-# ✅ Excluir jogadores da fila com seleção múltipla
-st.markdown("### ❌ Excluir jogadores da fila")
-ids_para_excluir = st.multiselect("Selecione os jogadores para excluir da fila", [f"{j['nome']} ({j['posicao']}) - {j['id']}" for j in fila])
-if ids_para_excluir:
-    if st.button("🗑️ Confirmar Exclusão"):
-        for identificador in ids_para_excluir:
-            id_jogador = identificador.split(" - ")[-1]
-            supabase.table("fila_leilao").delete().eq("id", id_jogador).execute()
-        st.success("Jogadores excluídos com sucesso.")
-        st.experimental_rerun()
-
 # 🔄 Ativação automática de leilões
 ativos = supabase.table("leiloes").select("*").eq("ativo", True).eq("finalizado", False).execute().data
 if not ativos:
@@ -151,13 +151,11 @@ if pendentes:
         id_time = item.get("id_time_atual")
 
         st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
-
         if item.get("link_sofifa"):
             st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({item['link_sofifa']})", unsafe_allow_html=True)
 
         if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
             try:
-                # 👥 Inserir no elenco
                 supabase.table("elenco").insert({
                     "id_time": id_time,
                     "nome": nome,
@@ -170,7 +168,6 @@ if pendentes:
                     "link_sofifa": item.get("link_sofifa", "")
                 }).execute()
 
-                # 💰 Atualizar saldo
                 saldo_res = supabase.table("times").select("saldo, nome").eq("id", id_time).execute()
                 if saldo_res.data:
                     saldo = saldo_res.data[0]["saldo"]
@@ -178,7 +175,6 @@ if pendentes:
                     novo_saldo = saldo - valor
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                    # 🧾 Registrar movimentação
                     registrar_movimentacao(
                         id_time, "saida", valor,
                         f"Compra do jogador {nome} via leilão",
@@ -187,7 +183,6 @@ if pendentes:
                         nome_time
                     )
 
-                # ✅ Finalizar leilão
                 supabase.table("leiloes").update({
                     "validado": True,
                     "finalizado": True,
@@ -197,7 +192,6 @@ if pendentes:
 
                 st.success(f"{nome} validado e adicionado ao elenco.")
                 st.experimental_rerun()
-
             except Exception as e:
                 st.error(f"Erro ao validar leilão: {e}")
 
