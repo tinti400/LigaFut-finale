@@ -10,7 +10,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# ✅ Verifica sessão ativa (agora inclui nome_time também)
+# ✅ Verifica sessão ativa
 def verificar_sessao():
     campos_obrigatorios = ["usuario_id", "id_time", "nome_time"]
     faltando = [campo for campo in campos_obrigatorios if campo not in st.session_state]
@@ -18,21 +18,28 @@ def verificar_sessao():
         st.warning("⚠️ Você precisa estar logado para acessar esta página.")
         st.stop()
 
-# 💰 Registrar movimentação financeira e opcionalmente no BID
+# 💰 Registrar movimentação financeira com verificação de duplicidade
 def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, categoria=None, origem=None, destino=None):
-    """
-    Registra uma movimentação financeira e, se aplicável, também registra no BID.
-
-    :param id_time: ID do time responsável
-    :param tipo: 'entrada' ou 'saida'
-    :param valor: valor numérico da movimentação
-    :param descricao: descrição da movimentação
-    :param jogador: nome do jogador (opcional)
-    :param categoria: tipo da negociação: mercado, leilao, proposta (opcional)
-    :param origem: nome do time de origem (opcional)
-    :param destino: nome do time de destino (opcional)
-    """
     try:
+        # ⚠️ Verifica se já existe movimentação idêntica nos últimos 10 segundos
+        dez_segundos_atras = datetime.now().isoformat(timespec='seconds')
+        consulta = supabase.table("movimentacoes_financeiras")\
+            .select("*")\
+            .eq("id_time", id_time)\
+            .eq("tipo", tipo)\
+            .eq("valor", valor)\
+            .eq("descricao", descricao)\
+            .order("data", desc=True)\
+            .limit(1)\
+            .execute()
+
+        if consulta.data:
+            ultima = consulta.data[0]
+            ultima_data = datetime.fromisoformat(ultima["data"])
+            if (datetime.now() - ultima_data).seconds < 10:
+                # ⛔ Já existe uma movimentação igual recente — evita duplicar
+                return
+
         nova = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
@@ -42,34 +49,24 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
             "data": datetime.now().isoformat()
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
+
+        # Se for venda ou compra, registra também no BID
+        if tipo in ["entrada", "saida"] and jogador and categoria:
+            registrar_bid(
+                id_time=id_time,
+                tipo="compra" if tipo == "saida" else "venda",
+                categoria=categoria,
+                jogador=jogador,
+                valor=valor,
+                origem=origem or "",
+                destino=destino or ""
+            )
+
     except Exception as e:
         st.error(f"Erro ao registrar movimentação financeira: {e}")
 
-    # Se for venda ou compra, registra no BID
-    if tipo in ["entrada", "saida"] and jogador and categoria:
-        registrar_bid(
-            id_time=id_time,
-            tipo="compra" if tipo == "saida" else "venda",
-            categoria=categoria,
-            jogador=jogador,
-            valor=valor,
-            origem=origem or "",
-            destino=destino or ""
-        )
-
 # 📈 Registrar movimentação pública no BID
 def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino=""):
-    """
-    Registra uma movimentação para exibição pública no BID (tabela 'movimentacoes').
-
-    :param id_time: ID do time responsável
-    :param tipo: 'compra' ou 'venda'
-    :param categoria: 'mercado', 'leilao', 'proposta', etc.
-    :param jogador: nome do jogador
-    :param valor: valor da movimentação (positivo para entrada, negativo para saída)
-    :param origem: nome do time de origem (opcional)
-    :param destino: nome do time de destino (opcional)
-    """
     try:
         if not all([id_time, tipo, categoria, jogador]) or valor is None:
             st.error("❌ Dados obrigatórios ausentes para registrar no BID.")
