@@ -32,7 +32,79 @@ if usuario_atual not in emails_admin:
     st.warning("🔐 Acesso restrito a administradores.")
     st.stop()
 
-st.title("🧑‍⚖️ Administração de Leilões (Fila)")
+st.title("🧑‍⚖️ Administração de Leilões")
+
+# 📄 Leilões aguardando validação
+st.subheader("📄 Leilões Aguardando Validação")
+pendentes = supabase.table("leiloes").select("*").eq("aguardando_validacao", True).eq("validado", False).order("fim", desc=True).limit(10).execute().data
+if pendentes:
+    for item in pendentes:
+        with st.container():
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.image(item.get("imagem_url", ""), width=90)
+            with col2:
+                nome = item["nome_jogador"]
+                posicao = item["posicao_jogador"]
+                valor = item["valor_atual"]
+                id_time = item.get("id_time_atual")
+
+                st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
+
+                if item.get("link_sofifa"):
+                    st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({item['link_sofifa']})", unsafe_allow_html=True)
+
+                if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
+                    try:
+                        ja_validado = supabase.table("leiloes").select("validado").eq("id", item["id"]).execute().data
+                        if ja_validado and ja_validado[0]["validado"]:
+                            st.warning("Este leilão já foi validado anteriormente.")
+                            continue
+
+                        # Inserir jogador no elenco
+                        supabase.table("elenco").insert({
+                            "id_time": id_time,
+                            "nome": nome,
+                            "posicao": posicao,
+                            "overall": item["overall_jogador"],
+                            "valor": valor,
+                            "origem": item.get("origem", ""),
+                            "nacionalidade": item.get("nacionalidade", ""),
+                            "imagem_url": item.get("imagem_url", ""),
+                            "link_sofifa": item.get("link_sofifa", "")
+                        }).execute()
+
+                        # Atualizar saldo e registrar movimentação
+                        saldo_res = supabase.table("times").select("saldo", "nome").eq("id", id_time).execute()
+                        if saldo_res.data:
+                            saldo = saldo_res.data[0]["saldo"]
+                            nome_time = saldo_res.data[0]["nome"]
+                            novo_saldo = saldo - valor
+                            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                            registrar_movimentacao(
+                                id_time, "saida", valor,
+                                f"Compra do jogador {nome} via leilão",
+                                nome, "leilao",
+                                item.get("origem", ""),
+                                nome_time
+                            )
+
+                        # Finalizar e validar o leilão
+                        supabase.table("leiloes").update({
+                            "validado": True,
+                            "finalizado": True,
+                            "enviado_bid": True,
+                            "aguardando_validacao": False
+                        }).eq("id", item["id"]).execute()
+
+                        st.success(f"{nome} validado e adicionado ao elenco.")
+                        st.experimental_rerun()
+
+                    except Exception as e:
+                        st.error(f"Erro ao validar leilão: {e}")
+else:
+    st.info("Nenhum leilão pendente de validação.")
 
 # 📊 Importação Excel
 st.markdown("### 📊 Importar Jogadores via Excel com origem e nacionalidade")
@@ -63,7 +135,7 @@ if uploaded_file:
                         "status": "aguardando"
                     }).execute()
                 st.success("✅ Jogadores importados com sucesso!")
-                st.rerun()
+                st.experimental_rerun()
     except Exception as e:
         st.error(f"Erro ao ler planilha: {e}")
 
@@ -109,7 +181,7 @@ if fila:
                     }).execute()
                     supabase.table("fila_leilao").update({"status": "enviado"}).eq("id", jogador["id"]).execute()
                     st.success(f"{jogador['nome']} movido para a fila oficial de leilões.")
-                    st.rerun()
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erro ao criar leilão: {e}")
 else:
@@ -125,69 +197,7 @@ if not ativos:
             fim = agora + timedelta(minutes=leilao.get("tempo_minutos", 2))
             supabase.table("leiloes").update({"ativo": True, "inicio": agora.isoformat(), "fim": fim.isoformat()}).eq("id", leilao["id"]).execute()
         st.success("Novos leilões ativados.")
-        st.rerun()
-
-# 📄 Leilões aguardando validação
-st.subheader("📄 Leilões Aguardando Validação")
-pendentes = supabase.table("leiloes").select("*").eq("aguardando_validacao", True).eq("validado", False).order("fim", desc=True).limit(5).execute().data
-if pendentes:
-    for item in pendentes:
-        nome = item["nome_jogador"]
-        posicao = item["posicao_jogador"]
-        valor = item["valor_atual"]
-        id_time = item.get("id_time_atual")
-
-        st.markdown(f"**{nome}** ({posicao}) - R$ {valor:,.0f}".replace(",", "."))
-
-        if item.get("link_sofifa"):
-            st.markdown(f"[📄 Ficha Técnica (SoFIFA)]({item['link_sofifa']})", unsafe_allow_html=True)
-
-        if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
-            try:
-                ja_validado = supabase.table("leiloes").select("validado").eq("id", item["id"]).execute().data
-                if ja_validado and ja_validado[0]["validado"]:
-                    st.warning("Este leilão já foi validado anteriormente.")
-                    continue
-
-                supabase.table("elenco").insert({
-                    "id_time": id_time,
-                    "nome": nome,
-                    "posicao": posicao,
-                    "overall": item["overall_jogador"],
-                    "valor": valor,
-                    "origem": item.get("origem", ""),
-                    "nacionalidade": item.get("nacionalidade", ""),
-                    "imagem_url": item.get("imagem_url", ""),
-                    "link_sofifa": item.get("link_sofifa", "")
-                }).execute()
-
-                saldo_res = supabase.table("times").select("saldo", "nome").eq("id", id_time).execute()
-                if saldo_res.data:
-                    saldo = saldo_res.data[0]["saldo"]
-                    nome_time = saldo_res.data[0]["nome"]
-                    novo_saldo = saldo - valor
-                    supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
-                    registrar_movimentacao(
-                        id_time, "saida", valor,
-                        f"Compra do jogador {nome} via leilão",
-                        nome, "leilao",
-                        item.get("origem", ""),
-                        nome_time
-                    )
-
-                supabase.table("leiloes").update({
-                    "validado": True,
-                    "finalizado": True,
-                    "enviado_bid": True,
-                    "aguardando_validacao": False
-                }).eq("id", item["id"]).execute()
-
-                st.success(f"{nome} validado e adicionado ao elenco.")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Erro ao validar leilão: {e}")
+        st.experimental_rerun()
 
 # 🧹 Apagar histórico
 st.markdown("---")
@@ -196,6 +206,6 @@ if st.button("🪩 Apagar Histórico"):
     try:
         supabase.table("leiloes").delete().eq("finalizado", True).eq("enviado_bid", True).execute()
         st.success("Histórico apagado.")
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.error(f"Erro ao apagar histórico: {e}")
