@@ -21,8 +21,6 @@ def verificar_sessao():
 # 💰 Registrar movimentação financeira com verificação de duplicidade
 def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, categoria=None, origem=None, destino=None):
     try:
-        # ⚠️ Verifica se já existe movimentação idêntica nos últimos 10 segundos
-        dez_segundos_atras = datetime.now().isoformat(timespec='seconds')
         consulta = supabase.table("movimentacoes_financeiras")\
             .select("*")\
             .eq("id_time", id_time)\
@@ -36,9 +34,8 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
         if consulta.data:
             ultima = consulta.data[0]
             ultima_data = datetime.fromisoformat(ultima["data"])
-            if (datetime.now() - ultima_data).seconds < 10:
-                # ⛔ Já existe uma movimentação igual recente — evita duplicar
-                return
+            if (datetime.now() - ultima_data).total_seconds() < 10:
+                return  # Já existe, evita duplicar
 
         nova = {
             "id": str(uuid.uuid4()),
@@ -50,11 +47,9 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
 
-        # Se for venda ou compra, registra também no BID
-        # 🔒 Evita registrar entrada no BID se for leilão (apenas o vencedor aparece)
         if tipo in ["entrada", "saida"] and jogador and categoria:
             if categoria == "leilao" and tipo != "saida":
-                return  # só registra no BID se for saída no leilão (compra)
+                return
 
             registrar_bid(
                 id_time=id_time,
