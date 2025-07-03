@@ -43,7 +43,7 @@ def calcular_renda_jogo(estadio):
     renda = publico * preco
     return renda, publico
 
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def buscar_resultados(temporada, divisao):
     try:
         res = supabase.table("rodadas").select("*").eq("temporada", temporada).eq("divisao", divisao).order("numero").execute()
@@ -51,7 +51,7 @@ def buscar_resultados(temporada, divisao):
     except:
         return []
 
-@st.cache_data(ttl=60)
+@st.cache(ttl=60)
 def obter_nomes_times(divisao):
     try:
         usuarios = supabase.table("usuarios").select("time_id").eq("Divisão", f"Divisão {divisao}").execute().data
@@ -114,7 +114,7 @@ def calcular_classificacao(rodadas, times_map):
                 "pontos": 0, "v": 0, "e": 0, "d": 0, "gp": 0, "gc": 0, "sg": 0
             }
         penalidade = punicoes_por_time.get(str(tid), 0)
-        tabela[tid]["pontos"] -= penalidade
+        tabela[tid]["pontos"] = tabela[tid]["pontos"] - penalidade
 
     return sorted(tabela.items(), key=lambda x: (x[1]["pontos"], x[1]["sg"], x[1]["gp"]), reverse=True)
 
