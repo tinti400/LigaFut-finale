@@ -51,7 +51,11 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
 
         # Se for venda ou compra, registra também no BID
+        # 🔒 Evita registrar entrada no BID se for leilão (apenas o vencedor aparece)
         if tipo in ["entrada", "saida"] and jogador and categoria:
+            if categoria == "leilao" and tipo != "saida":
+                return  # só registra no BID se for saída no leilão (compra)
+
             registrar_bid(
                 id_time=id_time,
                 tipo="compra" if tipo == "saida" else "venda",
@@ -90,3 +94,4 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     except Exception as e:
         st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
+
