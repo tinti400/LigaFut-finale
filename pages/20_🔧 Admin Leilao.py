@@ -1,4 +1,4 @@
-# 20_🔧 Admin Leilao.py (completo e atualizado)
+# 20_🔧 Admin Leilao.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
@@ -144,13 +144,11 @@ if pendentes:
 
         if st.button(f"✅ Validar Leilão de {nome}", key=f"validar_{item['id']}"):
             try:
-                # Verifica se já foi validado por algum motivo
                 ja_validado = supabase.table("leiloes").select("validado").eq("id", item["id"]).execute().data
                 if ja_validado and ja_validado[0]["validado"]:
                     st.warning("Este leilão já foi validado anteriormente.")
                     continue
 
-                # 👥 Inserir no elenco
                 supabase.table("elenco").insert({
                     "id_time": id_time,
                     "nome": nome,
@@ -163,15 +161,13 @@ if pendentes:
                     "link_sofifa": item.get("link_sofifa", "")
                 }).execute()
 
-                # 💰 Atualizar saldo
-                saldo_res = supabase.table("times").select("saldo, nome").eq("id", id_time).execute()
+                saldo_res = supabase.table("times").select("saldo", "nome").eq("id", id_time).execute()
                 if saldo_res.data:
                     saldo = saldo_res.data[0]["saldo"]
                     nome_time = saldo_res.data[0]["nome"]
                     novo_saldo = saldo - valor
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-                    # 🧾 Registrar movimentação
                     registrar_movimentacao(
                         id_time, "saida", valor,
                         f"Compra do jogador {nome} via leilão",
@@ -180,7 +176,6 @@ if pendentes:
                         nome_time
                     )
 
-                # ✅ Finalizar leilão
                 supabase.table("leiloes").update({
                     "validado": True,
                     "finalizado": True,
