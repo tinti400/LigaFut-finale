@@ -53,6 +53,7 @@ for leilao in leiloes:
     imagem_url = leilao.get("imagem_url", "")
     link_sofifa = leilao.get("link_sofifa", "")
     id_time_vencedor = leilao.get("id_time_atual", "")
+    nome_time_vencedor = leilao.get("time_vencedor", "")
     nome_jogador = leilao.get("nome_jogador")
     posicao = leilao.get("posicao_jogador")
     id_mercado = leilao.get("id_mercado")
@@ -73,26 +74,27 @@ for leilao in leiloes:
                     "nacionalidade": nacionalidade
                 }).execute()
 
-                # 💰 Atualizar saldo
-                saldo_res = supabase.table("times").select("saldo").eq("id", id_time_vencedor).execute()
+                # 💰 Atualizar saldo do time vencedor
+                saldo_res = supabase.table("times").select("saldo", "nome").eq("id", id_time_vencedor).execute()
                 saldo_atual = saldo_res.data[0]["saldo"]
+                nome_time_vencedor_confirmado = saldo_res.data[0]["nome"]
                 novo_saldo = saldo_atual - valor_atual
                 supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
 
-                # 🧾 Registrar movimentação
+                # 🧾 Registrar movimentação no BID e financeiro
                 registrar_movimentacao(
                     id_time_vencedor, "saida", valor_atual,
                     descricao=f"Compra no leilão: {nome_jogador}",
                     jogador=nome_jogador,
                     categoria="leilao",
-                    destino=nome_time_usuario
+                    destino=nome_time_vencedor_confirmado
                 )
 
                 # ✅ Atualizar mercado (se veio de lá)
                 if id_mercado:
                     supabase.table("mercado_transferencias").update({
                         "status": "atribuido",
-                        "destino": nome_time_usuario
+                        "destino": nome_time_vencedor_confirmado
                     }).eq("id", id_mercado).execute()
 
                 # ✅ Finalizar leilão
@@ -101,7 +103,7 @@ for leilao in leiloes:
                     "finalizado": True
                 }).eq("id", leilao["id"]).execute()
 
-                st.success(f"✅ Leilão de {nome_jogador} finalizado. Jogador transferido para {nome_time_usuario}.")
+                st.success(f"✅ Leilão de {nome_jogador} finalizado. Jogador transferido para {nome_time_vencedor_confirmado}.")
                 st.rerun()
 
             except Exception as e:
