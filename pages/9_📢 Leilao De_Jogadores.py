@@ -1,3 +1,4 @@
+# 9_📢 Leilao De_Jogadores.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -60,62 +61,22 @@ for leilao in leiloes:
 
     # 🛑 Finalizar leilão automaticamente se tempo acabar
     if tempo_restante == 0 and not leilao.get("finalizado", False):
-        if id_time_vencedor:
-            try:
-                # ✅ Inserir jogador no elenco do time vencedor
-                supabase.table("elenco").insert({
-                    "id_time": id_time_vencedor,
-                    "nome": nome_jogador,
-                    "posicao": posicao,
-                    "overall": overall,
-                    "valor": valor_atual,
-                    "imagem_url": imagem_url,
-                    "link_sofifa": link_sofifa,
-                    "nacionalidade": nacionalidade
-                }).execute()
-
-                # 💰 Atualizar saldo do time vencedor
-                saldo_res = supabase.table("times").select("saldo", "nome").eq("id", id_time_vencedor).execute()
-                saldo_atual = saldo_res.data[0]["saldo"]
-                nome_time_vencedor_confirmado = saldo_res.data[0]["nome"]
-                novo_saldo = saldo_atual - valor_atual
-                supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time_vencedor).execute()
-
-                # 🧾 Registrar movimentação no BID e financeiro
-                registrar_movimentacao(
-                    id_time_vencedor, "saida", valor_atual,
-                    descricao=f"Compra no leilão: {nome_jogador}",
-                    jogador=nome_jogador,
-                    categoria="leilao",
-                    destino=nome_time_vencedor_confirmado
-                )
-
-                # ✅ Atualizar mercado (se veio de lá)
-                if id_mercado:
-                    supabase.table("mercado_transferencias").update({
-                        "status": "atribuido",
-                        "destino": nome_time_vencedor_confirmado
-                    }).eq("id", id_mercado).execute()
-
-                # ✅ Finalizar leilão
-                supabase.table("leiloes").update({
-                    "ativo": False,
-                    "finalizado": True
-                }).eq("id", leilao["id"]).execute()
-
-                st.success(f"✅ Leilão de {nome_jogador} finalizado. Jogador transferido para {nome_time_vencedor_confirmado}.")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"❌ Erro ao finalizar leilão: {e}")
-                st.stop()
-        else:
+        try:
             supabase.table("leiloes").update({
                 "ativo": False,
-                "finalizado": True
+                "finalizado": True,
+                "aguardando_validacao": True
             }).eq("id", leilao["id"]).execute()
-            st.warning(f"⛔ Leilão de {nome_jogador} expirado sem lances.")
-            st.rerun()
+
+            if id_time_vencedor:
+                st.success(f"✅ Leilão de {nome_jogador} encerrado. Aguardando validação do administrador.")
+            else:
+                st.warning(f"⛔ Leilão de {nome_jogador} expirado sem lances.")
+            st.experimental_rerun()
+
+        except Exception as e:
+            st.error(f"❌ Erro ao finalizar leilão: {e}")
+            st.stop()
 
     # ⏳ Tempo restante
     minutos, segundos = divmod(tempo_restante, 60)
@@ -171,11 +132,11 @@ for leilao in leiloes:
                         supabase.table("leiloes").update(update_payload).eq("id", leilao["id"]).execute()
 
                         st.success("✅ Lance enviado com sucesso!")
-                        st.rerun()
+                        st.experimental_rerun()
                     except Exception as e:
                         st.error(f"❌ Erro ao atualizar o leilão: {e}")
 
 # 🔁 Atualizar página manualmente
 st.markdown("---")
 if st.button("🔄 Atualizar Página"):
-    st.rerun()
+    st.experimental_rerun()
