@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from supabase import create_client
 from utils import registrar_movimentacao
 
-st.set_page_config(page_title="🧑‍⚖️ Administração de Leilões (Fila)", layout="wide")
+st.set_page_config(page_title="🧑‍⚖️ Administração de Leilões", layout="wide")
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -194,7 +194,7 @@ if not ativos:
     if inativos:
         agora = datetime.utcnow()
         for leilao in inativos:
-            fim = agora + timedelta(minutes=leilao.get("tempo_minutos", 2))
+            fim = agora + timedelta(minutes=int(leilao.get("tempo_minutos", 2)))
             supabase.table("leiloes").update({"ativo": True, "inicio": agora.isoformat(), "fim": fim.isoformat()}).eq("id", leilao["id"]).execute()
         st.success("Novos leilões ativados.")
         st.experimental_rerun()
