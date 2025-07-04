@@ -40,6 +40,14 @@ setores = {
     "camarote": 0.05
 }
 
+precos_maximos = {
+    "geral": 50,
+    "norte": 80,
+    "sul": 80,
+    "central": 150,
+    "camarote": 1000
+}
+
 precos_padrao = {
     "geral": 20.0,
     "norte": 40.0,
@@ -78,7 +86,6 @@ def buscar_resultados_recentes(id_time, limite=5):
 
 def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias, derrotas):
     fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005 + vitorias * 0.01 - derrotas * 0.005
-
     if preco <= 20:
         fator_preco = 1.0
     elif preco <= 50:
@@ -96,7 +103,7 @@ def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias, derrot
     renda = publico_estimado * preco
     return publico_estimado, renda
 
-# 🎯 Buscar dados do estádio
+# 🔍 Dados do estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
@@ -110,53 +117,37 @@ if not estadio:
         "em_melhorias": False,
         **{f"preco_{k}": v for k, v in precos_padrao.items()}
     }
-    try:
-        supabase.table("estadios").insert(estadio_novo).execute()
-        res_novo = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
-        estadio = res_novo.data[0] if res_novo.data else estadio_novo
-    except Exception as e:
-        st.error(f"Erro ao criar estádio: {e}")
-        st.stop()
-else:
-    nivel_atual = estadio.get("nivel", 1)
-    capacidade_correta = capacidade_por_nivel.get(nivel_atual, 25000)
-    if estadio.get("capacidade", 0) != capacidade_correta:
-        estadio["capacidade"] = capacidade_correta
-        supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
+    supabase.table("estadios").insert(estadio_novo).execute()
+    estadio = estadio_novo
 
-# 📊 Dados de desempenho
+nivel = estadio["nivel"]
+capacidade = capacidade_por_nivel[nivel]
+supabase.table("estadios").update({"capacidade": capacidade}).eq("id_time", id_time).execute()
+
+# 📊 Desempenho e estimativas
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
 vitorias_recentes, derrotas_recentes = buscar_resultados_recentes(id_time)
 
-# 🎯 Dados do estádio
-nome = estadio["nome"]
-nivel = estadio["nivel"]
-capacidade = estadio["capacidade"]
-em_melhorias = estadio.get("em_melhorias", False)
-
-# 📝 Interface
-st.markdown(f"## 🏟️ {nome}")
-novo_nome = st.text_input("✏️ Renomear Estádio", value=nome)
-if novo_nome and novo_nome != nome:
+st.markdown(f"## 🏟️ {estadio['nome']}")
+novo_nome = st.text_input("✏️ Renomear Estádio", value=estadio["nome"])
+if novo_nome != estadio["nome"]:
     supabase.table("estadios").update({"nome": novo_nome}).eq("id_time", id_time).execute()
     st.success("✅ Nome atualizado!")
     st.experimental_rerun()
 
-st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
-
-# 💸 Preços e projeções por setor
-st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
 
+st.markdown(f"### 🎛 Preços por Setor")
 for setor, proporcao in setores.items():
     col1, col2, col3 = st.columns([3, 2, 2])
     lugares = int(capacidade * proporcao)
     preco_atual = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
-    novo_preco = col1.number_input(f"Preço - {setor.upper()}", min_value=1.0, max_value=2000.0, value=preco_atual, step=1.0, key=f"preco_{setor}")
-    
+    preco_max = precos_maximos[setor]
+    novo_preco = col1.number_input(f"Preço - {setor.upper()}", min_value=1.0, max_value=preco_max, value=preco_atual, step=1.0, key=f"preco_{setor}")
+
     if novo_preco != preco_atual:
         supabase.table("estadios").update({f"preco_{setor}": novo_preco}).eq("id_time", id_time).execute()
         st.experimental_rerun()
@@ -170,27 +161,19 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
-# 🔧 Melhorias no estádio
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
     st.markdown(f"💸 **Custo:** R${custo:,.2f}")
-    res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-    saldo = res_saldo.data[0].get("saldo", 0) if res_saldo.data else 0
+    saldo_data = supabase.table("times").select("saldo").eq("id", id_time).execute()
+    saldo = saldo_data.data[0].get("saldo", 0) if saldo_data.data else 0
 
-    if saldo < custo:
-        st.error("💰 Saldo insuficiente.")
-    else:
-        if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
-            nova_capacidade = capacidade_por_nivel[nivel + 1]
-            supabase.table("estadios").update({
-                "nivel": nivel + 1,
-                "capacidade": nova_capacidade
-            }).eq("id_time", id_time).execute()
-            novo_saldo = saldo - custo
-            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-            registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
-            st.success("🏗️ Estádio evoluído com sucesso!")
-            st.experimental_rerun()
+    if saldo >= custo and st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
+        nova_capacidade = capacidade_por_nivel[nivel + 1]
+        supabase.table("estadios").update({"nivel": nivel + 1, "capacidade": nova_capacidade}).eq("id_time", id_time).execute()
+        supabase.table("times").update({"saldo": saldo - custo}).eq("id", id_time).execute()
+        registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
+        st.success("🏗️ Estádio evoluído com sucesso!")
+        st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
