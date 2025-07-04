@@ -237,8 +237,10 @@ for rodada in rodadas:
                             novo_m = int(saldo_atual_m + renda)
                             supabase.table("times").update({"saldo": novo_m}).eq("id", m_id).execute()
                             registrar_movimentacao(m_id, "entrada", renda, f"{descricao}")
-                            st.success(f"✅ Renda registrada: R${renda:,.2f} público: {publico:,}")
-                            st.rerun()
+                            
+                            st.success(f"✅ Renda registrada: R${renda:,.2f} | Público: {publico:,} pessoas")
+                            st.experimental_rerun()
+
                     except Exception as e:
                         st.error(f"❌ Erro ao registrar renda: {e}")
 
