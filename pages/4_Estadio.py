@@ -146,6 +146,16 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
+
+# Limites por nível de estádio
+limites_precos = {
+    1: {"geral": 100.0, "norte": 150.0, "sul": 150.0, "central": 200.0, "camarote": 1000.0},
+    2: {"geral": 150.0, "norte": 200.0, "sul": 200.0, "central": 300.0, "camarote": 1500.0},
+    3: {"geral": 200.0, "norte": 250.0, "sul": 250.0, "central": 400.0, "camarote": 2000.0},
+    4: {"geral": 250.0, "norte": 300.0, "sul": 300.0, "central": 500.0, "camarote": 2500.0},
+    5: {"geral": 300.0, "norte": 350.0, "sul": 350.0, "central": 600.0, "camarote": 3000.0},
+}
+
 # 💸 Preços e projeções por setor
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
@@ -155,8 +165,20 @@ for setor, proporcao in setores.items():
     col1, col2, col3 = st.columns([3, 2, 2])
     lugares = int(capacidade * proporcao)
     preco_atual = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
-    novo_preco = col1.number_input(f"Preço - {setor.upper()}", min_value=1.0, max_value=2000.0, value=preco_atual, step=1.0, key=f"preco_{setor}")
-    
+    limite_setor = limites_precos[nivel].get(setor, 2000.0)
+
+    novo_preco = col1.number_input(
+        f"Preço - {setor.upper()}",
+        min_value=1.0,
+        max_value=limite_setor,
+        value=min(preco_atual, limite_setor),
+        step=1.0,
+        key=f"preco_{setor}"
+    )
+
+    if novo_preco >= limite_setor * 0.9:
+        col1.warning(f"⚠️ Valor próximo ao limite de R${limite_setor:,.2f}")
+
     if novo_preco != preco_atual:
         supabase.table("estadios").update({f"preco_{setor}": novo_preco}).eq("id_time", id_time).execute()
         st.experimental_rerun()
@@ -169,6 +191,7 @@ for setor, proporcao in setores.items():
 
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
+
 
 # 🔧 Melhorias no estádio
 if nivel < 5:
