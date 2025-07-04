@@ -28,6 +28,7 @@ temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
+
 def calcular_renda_jogo(estadio, desempenho=0, posicao=10, vitorias=0, derrotas=0):
     capacidade = estadio.get("capacidade", 25000)
     setores = {
@@ -38,13 +39,23 @@ def calcular_renda_jogo(estadio, desempenho=0, posicao=10, vitorias=0, derrotas=
         "camarote": 0.05
     }
 
+    precos_maximos = {
+        "geral": 100,
+        "norte": 150,
+        "sul": 150,
+        "central": 200,
+        "camarote": 1000
+    }
+
     precos = {
-        setor: float(estadio.get(f"preco_{setor}", 20.0))
+        setor: min(float(estadio.get(f"preco_{setor}", 20.0)), precos_maximos[setor])
         for setor in setores
     }
 
     def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias, derrotas):
         fator_base = 0.8 + desempenho * 0.007 + (20 - posicao) * 0.005 + vitorias * 0.01 - derrotas * 0.005
+        fator_base = max(min(fator_base, 1.0), 0.3)
+
         if preco <= 20:
             fator_preco = 1.0
         elif preco <= 50:
@@ -54,12 +65,35 @@ def calcular_renda_jogo(estadio, desempenho=0, posicao=10, vitorias=0, derrotas=
         elif preco <= 200:
             fator_preco = 0.4
         elif preco <= 500:
-            fator_preco = 0.2
+            fator_preco = 0.25
+        elif preco <= 1000:
+            fator_preco = 0.1
         else:
             fator_preco = 0.05
+
         publico_estimado = int(min(lugares, lugares * fator_base * fator_preco))
         renda = publico_estimado * preco
         return publico_estimado, renda
+
+    renda_total = 0
+    publico_total = 0
+
+    for setor, proporcao in setores.items():
+        lugares = int(capacidade * proporcao)
+        preco = precos[setor]
+        publico, renda = calcular_publico_setor(
+            lugares, preco, desempenho, posicao, vitorias, derrotas
+        )
+        renda_total += renda
+        publico_total += publico
+
+    ocupacao = publico_total / capacidade
+    if ocupacao < 0.4:
+        fator_penalizacao = 0.5 * (1 - ocupacao / 0.4)
+        renda_total *= (1 - fator_penalizacao)
+
+    return int(renda_total), publico_total
+
 
     renda_total = 0
     publico_total = 0
