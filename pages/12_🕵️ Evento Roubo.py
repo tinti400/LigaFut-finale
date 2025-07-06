@@ -1,4 +1,3 @@
-Você disse:
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -294,4 +293,5 @@ try:
         st.warning("Ainda não foi definido o sorteio dos times.")
 except Exception as e:
     st.error(f"Erro ao exibir a ordem dos times: {e}")
+
 
