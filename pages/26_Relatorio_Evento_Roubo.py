@@ -1,53 +1,55 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-from supabase import create_client
 import pandas as pd
+from supabase import create_client
+from datetime import datetime
+
+st.set_page_config(page_title="📄 Relatório - Evento de Roubo", layout="wide")
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="📋 Relatório - Evento de Roubo", layout="wide")
-st.title("📋 Relatório Final - Evento de Roubo")
+st.title("📄 Relatório do Evento de Roubo")
 
 # ✅ Verifica login
-if "usuario_id" not in st.session_state or "nome_time" not in st.session_state:
-    st.warning("Você precisa estar logado.")
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 🔄 Busca as transferências realizadas no evento
+# 📦 Buscar movimentações com categoria "roubo"
 try:
-    resposta = supabase.table("bids").select("*").eq("tipo", "roubo").order("data", desc=True).execute()
-    dados = resposta.data
+    res = supabase.table("movimentacoes").select("*").eq("categoria", "roubo").order("data", desc=True).execute()
+    dados = res.data
 except Exception as e:
     st.error(f"Erro ao buscar dados: {e}")
-    st.stop()
+    dados = []
 
-if not dados:
-    st.info("Nenhuma movimentação registrada no Evento de Roubo.")
-    st.stop()
+if dados:
+    df = pd.DataFrame(dados)
 
-# 📊 Monta o DataFrame para exibição
-df = pd.DataFrame([{
-    "Jogador": d["nome_jogador"],
-    "Posição": d.get("posicao", ""),
-    "Overall": d.get("overall", ""),
-    "Valor Pago (50%)": f'R${d["valor"]:,.2f}',
-    "Time que Roubou": d["time_destino"],
-    "Time que Perdeu": d["time_origem"],
-    "Data/Hora": pd.to_datetime(d["data"]).strftime("%d/%m %H:%M")
-} for d in dados])
+    # 🔁 Converte e organiza colunas
+    df["data"] = pd.to_datetime(df["data"])
+    df["valor"] = df["valor"].astype(float)
+    df["valor_formatado"] = df["valor"].map(lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
-# 📁 Exibição bonita
-st.markdown("### 🔄 Jogadores Roubados")
-st.dataframe(df, use_container_width=True)
+    colunas = ["data", "descricao", "valor_formatado", "origem", "destino"]
+    df_exibicao = df[colunas].rename(columns={
+        "data": "Data",
+        "descricao": "Descrição",
+        "valor_formatado": "Valor",
+        "origem": "Time que Roubou",
+        "destino": "Time Roubado"
+    })
 
-# 📥 Botão para baixar em Excel
-csv = df.to_csv(index=False).encode('utf-8')
-st.download_button(
-    label="📥 Baixar Relatório em CSV",
-    data=csv,
-    file_name="relatorio_evento_roubo.csv",
-    mime="text/csv"
-)
+    # 📊 Exibe tabela
+    st.markdown("### 📊 Transferências realizadas por roubo")
+    st.dataframe(df_exibicao, use_container_width=True)
+
+    # 📥 Download Excel
+    excel = df_exibicao.to_excel(index=False, engine="openpyxl")
+    st.download_button("📥 Baixar Excel", data=excel, file_name="relatorio_roubo.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+else:
+    st.info("Nenhum registro de roubo encontrado no BID.")
