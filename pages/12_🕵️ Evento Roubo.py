@@ -341,3 +341,4 @@ if evento.get("finalizado"):
             st.success("Evento reiniciado com sucesso.")
             st.experimental_rerun()
 
+
