@@ -18,7 +18,7 @@ if "usuario_id" not in st.session_state or "nome_time" not in st.session_state:
 
 # 🔄 Busca as transferências realizadas no evento
 try:
-    resposta = supabase.table("eventos_roubo").select("*").order("timestamp", desc=True).execute()
+    resposta = supabase.table("bids").select("*").eq("tipo", "roubo").order("data", desc=True).execute()
     dados = resposta.data
 except Exception as e:
     st.error(f"Erro ao buscar dados: {e}")
@@ -31,12 +31,12 @@ if not dados:
 # 📊 Monta o DataFrame para exibição
 df = pd.DataFrame([{
     "Jogador": d["nome_jogador"],
-    "Posição": d["posicao"],
+    "Posição": d.get("posicao", ""),
     "Overall": d.get("overall", ""),
-    "Valor": f'R${d["valor"]:,.2f}',
-    "Time Anterior": d["time_origem"],
-    "Novo Time": d["time_destino"],
-    "Data/Hora": pd.to_datetime(d["timestamp"]).strftime("%d/%m %H:%M")
+    "Valor Pago (50%)": f'R${d["valor"]:,.2f}',
+    "Time que Roubou": d["time_destino"],
+    "Time que Perdeu": d["time_origem"],
+    "Data/Hora": pd.to_datetime(d["data"]).strftime("%d/%m %H:%M")
 } for d in dados])
 
 # 📁 Exibição bonita
