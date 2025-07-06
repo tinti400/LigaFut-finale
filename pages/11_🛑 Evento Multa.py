@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -24,9 +24,11 @@ st.title("🛑 Evento de Multa - LigaFut")
 
 ID_CONFIG = "evento_multa"
 
+# ⚙️ Verifica se é admin
 admin_ref = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = admin_ref.data and admin_ref.data[0]["administrador"]
 
+# 🔍 Carrega configurações do evento
 res = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute()
 evento = res.data[0] if res.data else {}
 
@@ -179,7 +181,7 @@ if ativo and fase == "acao":
                 st.rerun()
 
         if eh_admin:
-            if st.button("⏭️ Avançar time (Admin)"):
+            if st.button("⏭️ Avançar time (Admin)") and vez + 1 < len(ordem):
                 supabase.table("configuracoes").update({"vez": str(vez + 1)}).eq("id", ID_CONFIG).execute()
                 st.rerun()
 
@@ -213,4 +215,3 @@ if evento.get("finalizado"):
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma transferência foi registrada.")
-
