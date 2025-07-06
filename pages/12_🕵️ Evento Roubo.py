@@ -273,7 +273,7 @@ if ativo and fase == "acao":
             }).eq("id", ID_CONFIG).execute()
 
             st.success(f"✅ {jogador['nome']} roubado com sucesso!")
-            st.rerun()
+            st.experimental_rerun()
 # 📋 Resumo do Evento
 if fase in ["acao", "concluido"] and roubos:
     st.subheader("📋 Resumo dos Roubos")
