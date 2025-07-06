@@ -177,48 +177,6 @@ elif fase == "acao":
                     supabase.table("times").update({"saldo": saldo_atual - valor_roubo}).eq("id", id_time).execute()
                     jogador["id_time"] = id_time
                     jogador["id"] = str(uuid.uuid4())
-                    supabase.table("elenco").insert(jogador).execute()
-                    supabase.table("elenco").delete().eq("id", id_original).execute()
-                    st.success(f"✅ Você roubou {nome} com sucesso!")
-                    st.experimental_rerun()
-
-    # Admin pode pular a vez
-    if eh_admin and st.button("⏭️ Pular Vez"):
-        supabase.table("configuracoes").update({
-            "vez": vez + 1,
-            "inicio_vez": datetime.utcnow().isoformat()
-        }).eq("id", ID_CONFIG).execute()
-        st.success("Vez pulada com sucesso.")
-        st.experimental_rerun()
-
-    # Qualquer usuário da vez pode finalizar
-    if st.button("✅ Finalizar Minha Vez"):
-        supabase.table("configuracoes").update({
-            "vez": vez + 1,
-            "inicio_vez": datetime.utcnow().isoformat()
-        }).eq("id", ID_CONFIG).execute()
-        st.success("Vez finalizada!")
-        st.experimental_rerun()
-# ✅ Fase 4: Finalizado
-elif fase == "finalizado":
-    st.title("🏁 Evento Finalizado")
-    st.success("✅ O Evento de Roubo foi concluído com sucesso!")
-
-    # Exibe a ordem dos times e os jogadores roubados
-    evento = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute().data[0]
-    ordem = evento.get("ordem", [])
-    bloqueios = evento.get("bloqueios", {})
-    roubos = evento.get("roubos", {})
-
-    st.markdown("### 🔄 Ordem dos Times na Fase de Roubo")
-    for i, id_t in enumerate(ordem):
-        nome = supabase.table("times").select("nome").eq("id", id_t).execute().data[0]["nome"]
-        st.markdown(f"{i+1}️⃣ {nome}")
-
-    st.markdown("### 🛡️ Jogadores Protegidos")
-    for id_t, bloqueados in bloqueios.items():
-        nome_time = supabase.table("times").select("nome").eq("id", id_t).execute().data[0]["nome"]
-        nomes = [j["nome"] for j in bloqueados]
-        st.markdown(f"**{nome_time}**: {', '.join(nomes) if nomes else 'Nenhum'}")
+                    supabn(nomes) if nomes else 'Nenhum'}")
 
     # Histórico de roubos pode ser exibido aqui futuramente (se for salvo em evento["roubos"])
