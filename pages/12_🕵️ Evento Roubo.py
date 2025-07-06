@@ -294,7 +294,7 @@ if evento.get("finalizado"):
 
     df = pd.DataFrame(resumo)
     if not df.empty:
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df)
     else:
         st.info("Nenhum jogador foi roubado.")
 
