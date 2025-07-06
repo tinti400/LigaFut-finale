@@ -95,6 +95,30 @@ limite_bloqueios = evento.get("limite_bloqueios", 3)
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
 
+# 🔘 Botão para iniciar o evento (aparece apenas para admin se não estiver ativo)
+if eh_admin and not ativo:
+    st.subheader("🟢 Iniciar Evento de Roubo")
+    if st.button("🚀 Iniciar Evento"):
+        # Sorteia a ordem dos times participantes
+        todos_times = supabase.table("times").select("id", "nome").execute().data
+        ordem_sorteada = [t["id"] for t in todos_times]
+        random.shuffle(ordem_sorteada)
+
+        supabase.table("configuracoes").update({
+            "ativo": True,
+            "fase": "bloqueio",
+            "ordem": ordem_sorteada,
+            "vez": "0",
+            "concluidos": [],
+            "roubos": {},
+            "bloqueios": {},
+            "ja_perderam": {},
+            "finalizado": False
+        }).eq("id", ID_CONFIG).execute()
+
+        st.success("🚀 Evento iniciado com sucesso! Fase de bloqueio liberada.")
+        st.experimental_rerun()
+
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
