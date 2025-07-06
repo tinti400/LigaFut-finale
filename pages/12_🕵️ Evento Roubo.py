@@ -1,3 +1,66 @@
+# -*- coding: utf-8 -*-
+import streamlit as st
+from supabase import create_client
+from datetime import datetime
+import uuid
+import pandas as pd
+import random
+
+st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
+
+# 🔐 Conexão Supabase
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
+
+# ✅ Verificar login
+if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+id_usuario = st.session_state["usuario_id"]
+id_time = st.session_state["id_time"]
+nome_time = st.session_state["nome_time"]
+email_usuario = st.session_state["usuario"]
+
+# ✅ Funções utilitárias
+def registrar_movimentacao(id_time, jogador, tipo, valor):
+    try:
+        supabase.table("movimentacoes_financeiras").insert({
+            "id": str(uuid.uuid4()),
+            "id_time": id_time,
+            "tipo": tipo,
+            "descricao": f"{tipo.capitalize()} de {jogador}",
+            "valor": valor,
+            "data": str(datetime.utcnow())
+        }).execute()
+    except Exception as e:
+        st.error(f"Erro ao registrar movimentação: {e}")
+
+def registrar_bid(id_time_origem, id_time_destino, jogador, tipo, valor):
+    try:
+        if not jogador or not isinstance(jogador, dict):
+            st.error("❌ Dados do jogador inválidos para o BID.")
+            return
+
+        nome_jogador = jogador.get("nome") or "Desconhecido"
+        posicao = jogador.get("posicao") or "?"
+        valor_final = int(valor) if valor else 0
+        tipo_final = tipo or "transferencia"
+
+        supabase.table("bid_transferencias").insert({
+            "id": str(uuid.uuid4()),
+            "id_time_origem": id_time_origem,
+            "id_time_destino": id_time_destino,
+            "nome_jogador": nome_jogador,
+            "posicao": posicao,
+            "valor": valor_final,
+            "tipo": tipo_final,
+            "data": str(datetime.utcnow())
+        }).execute()
+    except Exception as e:
+        st.error(f"Erro ao registrar no BID: {e}")
+
 # 🚫 Verifica restrições
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
@@ -25,22 +88,26 @@ ja_perderam = evento.get("ja_perderam", {})
 roubos = evento.get("roubos", {})
 limite_bloqueios = evento.get("limite_bloqueios", 3)
 
+# ✅ Verifica se é admin
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0]["administrador"]
 
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
-# Mostrar jogadores bloqueados
+# 🔍 Mostrar jogadores bloqueados do time atual
 st.subheader("🛡️ Seus jogadores bloqueados")
+
 bloqueios_atual = bloqueios.get(id_time, [])
 ultimos_bloqueios_time = ultimos_bloqueios.get(id_time, [])
 todos_bloqueados = bloqueios_atual + ultimos_bloqueios_time
+
 if todos_bloqueados:
     for jogador in todos_bloqueados:
         st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']})")
 else:
     st.info("Você ainda não bloqueou nenhum jogador.")
+
 # 🔐 Início do evento (admin)
 if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
@@ -186,13 +253,14 @@ if ativo and fase == "acao" and vez < len(ordem):
             supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success("⏭️ Pulado.")
             st.experimental_rerun()
+
 # ✅ Finaliza evento automaticamente
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
     st.experimental_rerun()
 
-# ✅ Exibe o resumo das transferências após o evento
+# ✅ Exibição do resumo com verificação segura
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
     resumo = []
@@ -211,13 +279,16 @@ if evento.get("finalizado"):
         except Exception as e:
             st.error(f"Erro ao montar resumo: {e}")
 
-    # ✅ Corrigido: verificação antes de exibir o DataFrame
     if isinstance(resumo, list) and all(isinstance(item, dict) for item in resumo):
-        st.dataframe(pd.DataFrame(resumo), use_container_width=True)
+        df_resumo = pd.DataFrame(resumo)
+        if not df_resumo.empty:
+            st.dataframe(df_resumo, use_container_width=True)
+        else:
+            st.info("Nenhuma movimentação registrada.")
     else:
         st.info("Nenhuma movimentação registrada.")
 
-# 📋 Ordem de Participação (Sorteio)
+# 📋 Ordem de Participação
 st.subheader("📋 Ordem de Participação (Sorteio)")
 try:
     if ordem:
