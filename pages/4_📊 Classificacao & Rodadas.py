@@ -28,7 +28,6 @@ temporada = col2.selectbox("Selecione a temporada", ["Temporada 1", "Temporada 2
 numero_divisao = int(divisao.split()[-1])
 numero_temporada = int(temporada.split()[-1])
 
-
 def calcular_renda_jogo(estadio, desempenho=0, posicao=10, vitorias=0, derrotas=0):
     capacidade = estadio.get("capacidade", 25000)
     setores = {
@@ -94,21 +93,6 @@ def calcular_renda_jogo(estadio, desempenho=0, posicao=10, vitorias=0, derrotas=
 
     return int(renda_total), publico_total
 
-
-    renda_total = 0
-    publico_total = 0
-
-    for setor, proporcao in setores.items():
-        lugares = int(capacidade * proporcao)
-        preco = precos[setor]
-        publico, renda = calcular_publico_setor(
-            lugares, preco, desempenho, posicao, vitorias, derrotas
-        )
-        renda_total += renda
-        publico_total += publico
-
-    return int(renda_total), publico_total
-
 @st.cache(ttl=60)
 def buscar_resultados(temporada, divisao):
     try:
@@ -141,7 +125,6 @@ def buscar_posicao_vitorias(time_id):
     posicao = ids.index(time_id) + 1 if time_id in ids else 20
     vitorias = next((t["vitorias"] for t in res.data if t["id_time"] == time_id), 0)
     return posicao, vitorias
-
 
 def calcular_classificacao(rodadas, times_map):
     tabela = {}
@@ -252,7 +235,8 @@ for rodada in rodadas:
 
         if gm != "" and gv != "":
             descricao = f"Renda da partida rodada {rodada_selecionada}"
-            check = supabase.table("movimentacoes_financeiras").select("descricao", "valor")                .eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
+            check = supabase.table("movimentacoes_financeiras").select("descricao", "valor") \
+                .eq("id_time", m_id).like("descricao", f"{descricao}%").execute()
 
             if check.data:
                 valor_registrado = check.data[0]["valor"]
@@ -266,12 +250,19 @@ for rodada in rodadas:
                         if estadio:
                             posicao, vitorias = buscar_posicao_vitorias(m_id)
                             renda, publico = calcular_renda_jogo(estadio, desempenho=vitorias, posicao=posicao, vitorias=vitorias, derrotas=0)
+
                             saldo_m = supabase.table("times").select("saldo").eq("id", m_id).execute().data
                             saldo_atual_m = saldo_m[0]["saldo"] if saldo_m else 0
-                            novo_m = int(saldo_atual_m + renda)
+                            novo_m = int(saldo_atual_m + renda * 0.95)
                             supabase.table("times").update({"saldo": novo_m}).eq("id", m_id).execute()
-                            registrar_movimentacao(m_id, "entrada", renda, f"{descricao}")
-                            
+                            registrar_movimentacao(m_id, "entrada", int(renda * 0.95), f"{descricao} (95%)")
+
+                            saldo_v = supabase.table("times").select("saldo").eq("id", v_id).execute().data
+                            saldo_atual_v = saldo_v[0]["saldo"] if saldo_v else 0
+                            novo_v = int(saldo_atual_v + renda * 0.05)
+                            supabase.table("times").update({"saldo": novo_v}).eq("id", v_id).execute()
+                            registrar_movimentacao(v_id, "entrada", int(renda * 0.05), f"Cota visitante rodada {rodada_selecionada} (5%)")
+
                             st.success(f"✅ Renda registrada: R${renda:,.2f} | Público: {publico:,} pessoas")
                             st.experimental_rerun()
 
