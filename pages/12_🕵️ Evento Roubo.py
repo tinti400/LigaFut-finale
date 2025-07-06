@@ -60,6 +60,7 @@ def registrar_bid(id_time_origem, id_time_destino, jogador, tipo, valor):
         }).execute()
     except Exception as e:
         st.error(f"Erro ao registrar no BID: {e}")
+
 # 🚫 Verifica restrições
 try:
     res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
@@ -87,22 +88,25 @@ ja_perderam = evento.get("ja_perderam", {})
 roubos = evento.get("roubos", {})
 limite_bloqueios = evento.get("limite_bloqueios", 3)
 
+# ✅ Verifica se é admin
 res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
 eh_admin = res_admin.data and res_admin.data[0]["administrador"]
 
 if st.button("🔄 Atualizar Página"):
     st.experimental_rerun()
 
-# Mostrar jogadores bloqueados
+# 🔍 Mostrar jogadores bloqueados do time atual
 st.subheader("🛡️ Seus jogadores bloqueados")
 bloqueios_atual = bloqueios.get(id_time, [])
 ultimos_bloqueios_time = ultimos_bloqueios.get(id_time, [])
 todos_bloqueados = bloqueios_atual + ultimos_bloqueios_time
+
 if todos_bloqueados:
     for jogador in todos_bloqueados:
         st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']})")
 else:
     st.info("Você ainda não bloqueou nenhum jogador.")
+
 # 🔐 Início do evento (admin)
 if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
@@ -248,38 +252,46 @@ if ativo and fase == "acao" and vez < len(ordem):
             supabase.table("configuracoes").update({"vez": str(vez + 1), "concluidos": concluidos + [id_atual]}).eq("id", ID_CONFIG).execute()
             st.success("⏭️ Pulado.")
             st.experimental_rerun()
+
 # ✅ Finaliza evento automaticamente
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
     st.experimental_rerun()
 
-# ✅ Exibe o resumo das transferências após o evento
+# ✅ Exibição do resumo com verificação segura
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
     resumo = []
-    for id_destino, lista in roubos.items():
-        try:
-            nome_destino = supabase.table("times").select("nome").eq("id", id_destino).execute().data[0]["nome"]
+    try:
+        for id_destino, lista in roubos.items():
+            nome_destino_data = supabase.table("times").select("nome").eq("id", id_destino).execute().data
+            nome_destino = nome_destino_data[0]["nome"] if nome_destino_data else "Desconhecido"
+
             for jogador in lista:
-                nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
+                nome_origem_data = supabase.table("times").select("nome").eq("id", jogador.get("de")).execute().data
+                nome_origem = nome_origem_data[0]["nome"] if nome_origem_data else "Desconhecido"
+
                 resumo.append({
                     "🌟 Time que Roubou": nome_destino,
-                    "👤 Jogador": jogador["nome"],
-                    "⚽ Posição": jogador["posicao"],
-                    "💰 Pago": f"R$ {int(jogador['valor'])//2:,.0f}",
+                    "👤 Jogador": jogador.get("nome", "N/A"),
+                    "⚽ Posição": jogador.get("posicao", "N/A"),
+                    "💰 Pago": f"R$ {int(jogador.get('valor', 0))//2:,.0f}",
                     "🔴 Time Roubado": nome_origem
                 })
-        except Exception as e:
-            st.error(f"Erro ao montar resumo: {e}")
+    except Exception as e:
+        st.error(f"Erro ao montar resumo: {e}")
 
-    # ✅ Corrigido: verificação antes de exibir o DataFrame
-    if isinstance(resumo, list) and all(isinstance(item, dict) for item in resumo):
-        st.dataframe(pd.DataFrame(resumo), use_container_width=True)
-    else:
-        st.info("Nenhuma movimentação registrada.")
+    try:
+        if resumo and isinstance(resumo, list) and all(isinstance(x, dict) for x in resumo):
+            df_resumo = pd.DataFrame(resumo)
+            st.dataframe(df_resumo, use_container_width=True)
+        else:
+            st.info("Nenhuma movimentação registrada.")
+    except Exception as e:
+        st.error(f"Erro ao exibir resumo: {e}")
 
-# 📋 Ordem de Participação (Sorteio)
+# 📋 Ordem de Participação
 st.subheader("📋 Ordem de Participação (Sorteio)")
 try:
     if ordem:
