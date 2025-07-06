@@ -97,7 +97,6 @@ if st.button("🔄 Atualizar Página"):
 
 # 🔍 Mostrar jogadores bloqueados do time atual
 st.subheader("🛡️ Seus jogadores bloqueados")
-
 bloqueios_atual = bloqueios.get(id_time, [])
 ultimos_bloqueios_time = ultimos_bloqueios.get(id_time, [])
 todos_bloqueados = bloqueios_atual + ultimos_bloqueios_time
@@ -264,29 +263,33 @@ if ativo and fase == "acao" and vez >= len(ordem):
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
     resumo = []
-    for id_destino, lista in roubos.items():
-        try:
-            nome_destino = supabase.table("times").select("nome").eq("id", id_destino).execute().data[0]["nome"]
+    try:
+        for id_destino, lista in roubos.items():
+            nome_destino_data = supabase.table("times").select("nome").eq("id", id_destino).execute().data
+            nome_destino = nome_destino_data[0]["nome"] if nome_destino_data else "Desconhecido"
+
             for jogador in lista:
-                nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
+                nome_origem_data = supabase.table("times").select("nome").eq("id", jogador.get("de")).execute().data
+                nome_origem = nome_origem_data[0]["nome"] if nome_origem_data else "Desconhecido"
+
                 resumo.append({
                     "🌟 Time que Roubou": nome_destino,
-                    "👤 Jogador": jogador["nome"],
-                    "⚽ Posição": jogador["posicao"],
-                    "💰 Pago": f"R$ {int(jogador['valor'])//2:,.0f}",
+                    "👤 Jogador": jogador.get("nome", "N/A"),
+                    "⚽ Posição": jogador.get("posicao", "N/A"),
+                    "💰 Pago": f"R$ {int(jogador.get('valor', 0))//2:,.0f}",
                     "🔴 Time Roubado": nome_origem
                 })
-        except Exception as e:
-            st.error(f"Erro ao montar resumo: {e}")
+    except Exception as e:
+        st.error(f"Erro ao montar resumo: {e}")
 
-    if isinstance(resumo, list) and all(isinstance(item, dict) for item in resumo):
-        df_resumo = pd.DataFrame(resumo)
-        if not df_resumo.empty:
+    try:
+        if resumo and isinstance(resumo, list) and all(isinstance(x, dict) for x in resumo):
+            df_resumo = pd.DataFrame(resumo)
             st.dataframe(df_resumo, use_container_width=True)
         else:
             st.info("Nenhuma movimentação registrada.")
-    else:
-        st.info("Nenhuma movimentação registrada.")
+    except Exception as e:
+        st.error(f"Erro ao exibir resumo: {e}")
 
 # 📋 Ordem de Participação
 st.subheader("📋 Ordem de Participação (Sorteio)")
