@@ -3,6 +3,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import uuid
+import pandas as pd
 import random
 
 st.set_page_config(page_title="Evento de Roubo - LigaFut", layout="wide")
@@ -22,30 +23,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 email_usuario = st.session_state["usuario"]
 
-# ✅ Verifica se é admin
-res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
-eh_admin = res_admin.data and res_admin.data[0]["administrador"]
-
-# 🔄 Recuperar dados do evento
-ID_CONFIG = "evento_multa"
-res_config = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute()
-if not res_config.data:
-    st.error("Evento de Multa não encontrado.")
-    st.stop()
-evento = res_config.data[0]
-
-ativo = evento.get("ativo", False)
-fase = evento.get("fase", "bloqueio")
-ordem = evento.get("ordem", [])
-vez = int(evento.get("vez", 0))
-concluidos = evento.get("concluidos", [])
-ja_perderam = evento.get("ja_perderam", {})
-bloqueios = evento.get("bloqueios", {})
-limite_bloqueio = evento.get("limite_bloqueio", 3)
-roubos = evento.get("roubos", {})
-
-# ✅ Utilitários
-
+# ✅ Funções utilitárias
 def registrar_movimentacao(id_time, jogador, tipo, valor):
     try:
         supabase.table("movimentacoes_financeiras").insert({
@@ -61,134 +39,208 @@ def registrar_movimentacao(id_time, jogador, tipo, valor):
 
 def registrar_bid(id_time_origem, id_time_destino, jogador, tipo, valor):
     try:
+        if not jogador or not isinstance(jogador, dict):
+            st.error("❌ Dados do jogador inválidos para o BID.")
+            return
+
+        nome_jogador = jogador.get("nome") or "Desconhecido"
+        posicao = jogador.get("posicao") or "?"
+        valor_final = int(valor) if valor else 0
+        tipo_final = tipo or "transferencia"
+
         supabase.table("bid_transferencias").insert({
             "id": str(uuid.uuid4()),
             "id_time_origem": id_time_origem,
             "id_time_destino": id_time_destino,
-            "nome_jogador": jogador["nome"],
-            "posicao": jogador.get("posicao", "?"),
-            "valor": int(valor),
-            "tipo": tipo,
+            "nome_jogador": nome_jogador,
+            "posicao": posicao,
+            "valor": valor_final,
+            "tipo": tipo_final,
             "data": str(datetime.utcnow())
         }).execute()
     except Exception as e:
         st.error(f"Erro ao registrar no BID: {e}")
 
-# 🔒 BLOQUEIO
-if fase == "bloqueio":
-    st.title("🕵️ Evento de Roubo - LigaFut")
-    st.subheader("🔐 Seus jogadores bloqueados")
+# 🚫 Verifica restrições
+try:
+    res_restricoes = supabase.table("times").select("restricoes").eq("id", id_time).execute()
+    restricoes = res_restricoes.data[0].get("restricoes", {}) if res_restricoes.data else {}
+    if restricoes.get("roubo", False):
+        st.error("🚫 Seu time está proibido de participar do Evento de Roubo.")
+        st.stop()
+except Exception as e:
+    st.warning(f"⚠️ Erro ao verificar restrições: {e}")
 
-    meus_bloqueados = bloqueios.get(id_time, [])
-    if meus_bloqueados:
-        st.success("Jogadores bloqueados:")
-        for nome in meus_bloqueados:
-            st.markdown(f"✅ {nome}")
-    else:
-        st.info("Você ainda não bloqueou nenhum jogador.")
+st.title("🕵️ Evento de Roubo - LigaFut")
 
-    elenco_res = supabase.table("elenco").select("nome", "posicao", "overall").eq("id_time", id_time).execute()
-    elenco = elenco_res.data
-    disponiveis = [j for j in elenco if j["nome"] not in meus_bloqueados]
-    nomes_disponiveis = [j["nome"] for j in disponiveis]
+# 🔧 Configuração do evento
+ID_CONFIG = "56f3af29-a4ac-4a76-aeb3-35400aa2a773"
+evento = supabase.table("configuracoes").select("*").eq("id", ID_CONFIG).execute().data[0]
 
-    if len(meus_bloqueados) < limite_bloqueio:
-        jogador = st.selectbox("Selecione um jogador para bloquear", [""] + nomes_disponiveis)
-        if jogador and st.button("🔒 Bloquear jogador"):
-            meus_bloqueados.append(jogador)
-            bloqueios[id_time] = meus_bloqueados
-            supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
-            st.success(f"{jogador} bloqueado!")
-            st.experimental_rerun()
-    else:
-        st.warning(f"Você já bloqueou o limite de {limite_bloqueio} jogadores.")
+ativo = evento.get("ativo", False)
+fase = evento.get("fase", "sorteio")
+ordem = evento.get("ordem", [])
+vez = int(evento.get("vez", "0"))
+concluidos = evento.get("concluidos", [])
+bloqueios = evento.get("bloqueios", {})
+ultimos_bloqueios = evento.get("ultimos_bloqueios", {})
+ja_perderam = evento.get("ja_perderam", {})
+roubos = evento.get("roubos", {})
+limite_bloqueios = evento.get("limite_bloqueios", 3)
 
-    st.markdown("---")
+# ✅ Verifica se é admin
+res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+eh_admin = res_admin.data and res_admin.data[0]["administrador"]
+
+if st.button("🔄 Atualizar Página"):
+    st.experimental_rerun()
+
+# 🔍 Mostrar jogadores bloqueados do time atual
+st.subheader("🛡️ Seus jogadores bloqueados")
+
+bloqueios_atual = bloqueios.get(id_time, [])
+ultimos_bloqueios_time = ultimos_bloqueios.get(id_time, [])
+todos_bloqueados = bloqueios_atual + ultimos_bloqueios_time
+
+if todos_bloqueados:
+    for jogador in todos_bloqueados:
+        st.markdown(f"- **{jogador['nome']}** ({jogador['posicao']})")
+else:
+    st.info("Você ainda não bloqueou nenhum jogador.")
+
+# 🔐 Início do evento (admin)
+if eh_admin:
     st.subheader("🔐 Configurar Limite de Bloqueio")
-    if eh_admin:
-        novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=limite_bloqueio, step=1)
-        if st.button("✅ Salvar limite e iniciar evento"):
-            times_res = supabase.table("times").select("id").execute()
-            ordem_sorteada = [t["id"] for t in times_res.data]
-            random.shuffle(ordem_sorteada)
-            supabase.table("configuracoes").update({
-                "limite_bloqueio": novo_limite,
-                "fase": "acao",
-                "ordem": ordem_sorteada,
-                "vez": 0,
-                "concluidos": [],
-                "ja_perderam": {},
-                "roubos": {},
-                "ativo": True
-            }).eq("id", ID_CONFIG).execute()
-            st.success("✅ Evento iniciado!")
-            st.experimental_rerun()
-    else:
-        st.info("Aguardando o administrador iniciar o evento.")
-    st.stop()
+    novo_limite = st.number_input("Quantos jogadores cada time pode bloquear?", min_value=1, max_value=5, value=3, step=1)
+    if st.button("✅ Salvar limite e iniciar evento"):
+        times_data = supabase.table("times").select("id", "nome").execute().data
+        palmeiras = next((t for t in times_data if t["nome"].strip().lower() == "palmeiras"), None)
+        restantes = [t for t in times_data if t != palmeiras]
+        random.shuffle(restantes)
+        nova_ordem = [palmeiras["id"]] + [t["id"] for t in restantes] if palmeiras else [t["id"] for t in times_data]
+        supabase.table("configuracoes").update({
+            "ativo": True,
+            "fase": "bloqueio",
+            "ordem": nova_ordem,
+            "vez": "0",
+            "roubos": {},
+            "bloqueios": {},
+            "ultimos_bloqueios": bloqueios,
+            "ja_perderam": {},
+            "concluidos": [],
+            "inicio": str(datetime.utcnow()),
+            "limite_bloqueios": novo_limite
+        }).eq("id", ID_CONFIG).execute()
+        st.success("✅ Evento iniciado.")
+        st.experimental_rerun()
 
-# 🛒 FASE DE AÇÃO
+# 🔐 Fase de Bloqueio
+if ativo and fase == "bloqueio":
+    st.subheader("🔐 Proteja seus jogadores")
+    bloqueios_atual = bloqueios.get(id_time, [])
+    bloqueios_anteriores = ultimos_bloqueios.get(id_time, [])
+    nomes_bloqueados = [j["nome"] for j in bloqueios_atual]
+    nomes_anteriores = [j["nome"] for j in bloqueios_anteriores]
+
+    elenco = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data or []
+    jogadores_livres = [j for j in elenco if j["nome"] not in nomes_bloqueados + nomes_anteriores]
+    nomes_livres = [j["nome"] for j in jogadores_livres]
+
+    if len(nomes_bloqueados) < limite_bloqueios:
+        max_selecao = limite_bloqueios - len(nomes_bloqueados)
+        selecionados = st.multiselect(f"Selecione até {max_selecao} jogador(es):", nomes_livres)
+        if selecionados and st.button("🔐 Confirmar proteção"):
+            novos_bloqueios = []
+            for j in jogadores_livres:
+                if j["nome"] in selecionados:
+                    bloqueio = {"nome": j["nome"], "posicao": j["posicao"]}
+                    novos_bloqueios.append(bloqueio)
+                    try:
+                        supabase.table("jogadores_bloqueados_roubo").insert({
+                            "id": str(uuid.uuid4()),
+                            "id_jogador": j["id"],
+                            "id_time": id_time,
+                            "temporada": 1,
+                            "evento": "roubo",
+                            "data_bloqueio": str(datetime.utcnow())
+                        }).execute()
+                    except Exception as e:
+                        st.warning(f"Erro ao salvar bloqueio no histórico: {e}")
+            bloqueios[id_time] = bloqueios_atual + novos_bloqueios
+            supabase.table("configuracoes").update({"bloqueios": bloqueios}).eq("id", ID_CONFIG).execute()
+            st.success("✅ Proteção realizada.")
+            st.experimental_rerun()
+
+    if eh_admin and st.button("👉 Iniciar Fase de Ação"):
+        supabase.table("configuracoes").update({"fase": "acao", "vez": "0", "concluidos": []}).eq("id", ID_CONFIG).execute()
+        st.experimental_rerun()
+
+# ⚔️ Fase de Ação
 if ativo and fase == "acao" and vez < len(ordem):
     id_atual = ordem[vez]
     if id_time == id_atual:
-        st.header("💸 Sua vez de aplicar multas")
+        st.header("⚔️ Sua vez de roubar")
         if id_time in concluidos:
             st.info("✅ Você já finalizou.")
         else:
-            st.info("Você pode comprar até 5 jogadores. Máximo de 2 do mesmo time. Times só podem perder até 4.")
+            st.info("Você pode roubar até 5 jogadores. Máximo de 2 do mesmo time.")
             times_data = supabase.table("times").select("id", "nome").execute().data
             times_dict = {t["id"]: t["nome"] for t in times_data if t["id"] != id_time}
-
             time_alvo_nome = st.selectbox("Selecione o time alvo:", list(times_dict.values()))
             id_alvo = next(i for i, n in times_dict.items() if n == time_alvo_nome)
 
-            if ja_perderam.get(id_alvo, 0) >= 4:
-                st.warning("❌ Esse time já perdeu 4 jogadores.")
-                st.stop()
-            if len([r for r in roubos.get(id_time, []) if r["de"] == id_alvo]) >= 2:
-                st.warning("❌ Já aplicou 2 multas neste time.")
-                st.stop()
+            if ja_perderam.get(id_alvo, 0) >= 5:
+                st.warning("❌ Esse time já perdeu 5 jogadores.")
+            else:
+                if len([r for r in roubos.get(id_time, []) if r["de"] == id_alvo]) >= 2:
+                    st.warning("❌ Já roubou 2 desse time.")
+                    st.stop()
 
-            elenco_alvo = supabase.table("elenco").select("*").eq("id_time", id_alvo).execute().data
-            bloqueados_alvo = bloqueios.get(id_alvo, [])
-            disponiveis = [j for j in elenco_alvo if j["nome"] not in bloqueados_alvo]
+                elenco_alvo = supabase.table("elenco").select("*").eq("id_time", id_alvo).execute().data
+                bloqueados = [j["nome"] for j in bloqueios.get(id_alvo, [])]
+                ja_roubados = [r["nome"] for sub in roubos.values() for r in sub]
+                disponiveis = [j for j in elenco_alvo if j["nome"] not in bloqueados + ja_roubados]
 
-            opcoes_jogadores = {f"{j['nome']} | {j['posicao']} | OVR: {j.get('overall', '?')} | R$ {j['valor']:,.0f}": j for j in disponiveis}
-            jogador_selecionado = st.selectbox("Escolha um jogador:", [""] + list(opcoes_jogadores.keys()))
+                opcoes_jogadores = {
+                    f"{j['nome']} | {j['posicao']} | OVR: {j.get('overall', '?')} | 🇧🇷 {j.get('nacionalidade', 'Desconhecida')} | R$ {j['valor']:,.0f}": j
+                    for j in disponiveis
+                }
 
-            if jogador_selecionado:
-                jogador = opcoes_jogadores[jogador_selecionado]
-                valor_pago = int(jogador["valor"])
-                st.info(f"💰 Valor do jogador: R$ {valor_pago:,.0f}")
+                jogador_selecionado = st.selectbox("Escolha um jogador:", [""] + list(opcoes_jogadores.keys()))
 
-                if st.button("💰 Comprar via multa"):
-                    supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador["nome"]).execute()
-                    supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
+                if jogador_selecionado:
+                    jogador = opcoes_jogadores[jogador_selecionado]
+                    valor = int(jogador["valor"])
+                    valor_pago = valor // 2
+                    st.info(f"💰 Valor do jogador: R$ {valor:,.0f} | Valor a ser pago: R$ {valor_pago:,.0f}")
 
-                    registrar_movimentacao(id_time, jogador["nome"], "saida", valor_pago)
-                    registrar_movimentacao(id_alvo, jogador["nome"], "entrada", valor_pago)
-                    registrar_bid(id_alvo, id_time, jogador, "multa", valor_pago)
+                    if st.button("💰 Roubar jogador"):
+                        supabase.table("elenco").delete().eq("id_time", id_alvo).eq("nome", jogador["nome"]).execute()
+                        supabase.table("elenco").insert({**jogador, "id_time": id_time}).execute()
 
-                    saldo = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute().data
-                    saldo_dict = {s["id"]: s["saldo"] for s in saldo}
-                    supabase.table("times").update({"saldo": saldo_dict[id_time] - valor_pago}).eq("id", id_time).execute()
-                    supabase.table("times").update({"saldo": saldo_dict[id_alvo] + valor_pago}).eq("id", id_alvo).execute()
+                        registrar_movimentacao(id_time, jogador["nome"], "saida", valor_pago)
+                        registrar_movimentacao(id_alvo, jogador["nome"], "entrada", valor_pago)
+                        registrar_bid(id_alvo, id_time, jogador, "roubo", valor_pago)
 
-                    roubos.setdefault(id_time, []).append({
-                        "nome": jogador["nome"],
-                        "posicao": jogador["posicao"],
-                        "valor": valor_pago,
-                        "de": id_alvo
-                    })
-                    ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
+                        saldo = supabase.table("times").select("id", "saldo").in_("id", [id_time, id_alvo]).execute().data
+                        saldo_dict = {s["id"]: s["saldo"] for s in saldo}
+                        supabase.table("times").update({"saldo": saldo_dict[id_time] - valor_pago}).eq("id", id_time).execute()
+                        supabase.table("times").update({"saldo": saldo_dict[id_alvo] + valor_pago}).eq("id", id_alvo).execute()
 
-                    supabase.table("configuracoes").update({
-                        "roubos": roubos,
-                        "ja_perderam": ja_perderam
-                    }).eq("id", ID_CONFIG).execute()
+                        roubos.setdefault(id_time, []).append({
+                            "nome": jogador["nome"],
+                            "posicao": jogador["posicao"],
+                            "valor": valor,
+                            "de": id_alvo
+                        })
+                        ja_perderam[id_alvo] = ja_perderam.get(id_alvo, 0) + 1
 
-                    st.success("✅ Jogador adquirido!")
-                    st.experimental_rerun()
+                        supabase.table("configuracoes").update({
+                            "roubos": roubos,
+                            "ja_perderam": ja_perderam
+                        }).eq("id", ID_CONFIG).execute()
+                        st.success("✅ Jogador roubado!")
+                        st.experimental_rerun()
 
             if st.button("➡️ Finalizar minha vez"):
                 concluidos.append(id_time)
@@ -209,15 +261,37 @@ if ativo and fase == "acao" and vez >= len(ordem):
     supabase.table("configuracoes").update({"ativo": False, "finalizado": True}).eq("id", ID_CONFIG).execute()
     st.experimental_rerun()
 
+if evento.get("finalizado"):
+    st.success("✅ Transferências finalizadas:")
+    resumo = []
+    for id_destino, lista in roubos.items():
+        nome_destino = supabase.table("times").select("nome").eq("id", id_destino).execute().data[0]["nome"]
+        for jogador in lista:
+            nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
+            resumo.append({
+                "🌟 Time que Roubou": nome_destino,
+                "👤 Jogador": jogador["nome"],
+                "⚽ Posição": jogador["posicao"],
+                "💰 Pago": f"R$ {int(jogador['valor'])//2:,.0f}",
+                "🔴 Time Roubado": nome_origem
+            })
+    if resumo:
+        st.dataframe(pd.DataFrame(resumo), use_container_width=True)
+    else:
+        st.info("Nenhuma movimentação registrada.")
+
 # 📋 Ordem de Participação
 st.subheader("📋 Ordem de Participação (Sorteio)")
-if ordem:
-    times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
-    mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
-    for i, idt in enumerate(ordem):
-        indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
-        st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
-else:
-    st.warning("Ainda não foi definido o sorteio dos times.")
+try:
+    if ordem:
+        times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
+        mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
+        for i, idt in enumerate(ordem):
+            indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
+            st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
+    else:
+        st.warning("Ainda não foi definido o sorteio dos times.")
+except Exception as e:
+    st.error(f"Erro ao exibir a ordem dos times: {e}")
 
 
