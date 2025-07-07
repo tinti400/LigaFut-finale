@@ -39,7 +39,7 @@ def pagar_bonus_vitoria(id_time):
         if valor > 0:
             registrar_movimentacao(
                 id_time=id_time,
-                tipo="entrada",
+                tipo="Entrada",
                 valor=valor,
                 descricao="Bônus por Vitória do Patrocinador"
             )
