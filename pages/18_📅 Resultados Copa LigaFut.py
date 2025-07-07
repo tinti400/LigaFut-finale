@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from utils import registrar_movimentacao
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -51,7 +52,22 @@ def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
             jogos_atuais = jogador.get("jogos", 0) or 0
             supabase.table("elenco").update({"jogos": jogos_atuais + 1}).eq("id", id_jogador).execute()
 
-# 🔢 Buscar jogos da fase de grupos
+# ⚫️ Aplica bônus para vencedor da partida
+def aplicar_bonus_vitoria(vencedores):
+    for time_id in vencedores:
+        patrocinadores = supabase.table("patrocinios_ativos").select("*").eq("id_time", time_id).execute().data
+        for p in patrocinadores:
+            bonus = p.get("bonus_vitoria", 0)
+            nome_patrocinador = p.get("nome_empresa", "Patrocinador")
+            if bonus > 0:
+                registrar_movimentacao(
+                    time_id,
+                    "BONUS",
+                    bonus,
+                    f"Bônus por Vitória - {nome_patrocinador}"
+                )
+
+# 🎲 Buscar jogos da fase de grupos
 res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
 grupo_data = res.data if res.data else []
 
@@ -59,7 +75,7 @@ if not grupo_data:
     st.info("A fase de grupos ainda não foi gerada.")
     st.stop()
 
-# 🂪 Interface para editar jogos por grupo
+# 🃺 Interface para editar jogos por grupo
 grupos = sorted(set([g["grupo"] for g in grupo_data]))
 tab = st.selectbox("Escolha o grupo para editar resultados:", grupos)
 
@@ -84,15 +100,11 @@ for idx, jogo in enumerate(jogos):
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
-        gols_m_edit = st.number_input(f"Gols {mandante_nome}", min_value=0,
-            value=int(gols_m) if gols_m is not None else 0,
-            key=f"gm_{idx}", format="%d")
+        gols_m_edit = st.number_input(f"Gols {mandante_nome}", min_value=0, value=int(gols_m) if gols_m is not None else 0, key=f"gm_{idx}", format="%d")
     with col3:
         st.markdown("**X**")
     with col4:
-        gols_v_edit = st.number_input(f"Gols {visitante_nome}", min_value=0,
-            value=int(gols_v) if gols_v is not None else 0,
-            key=f"gv_{idx}", format="%d")
+        gols_v_edit = st.number_input(f"Gols {visitante_nome}", min_value=0, value=int(gols_v) if gols_v is not None else 0, key=f"gv_{idx}", format="%d")
     with col5:
         st.markdown(f"**{visitante_nome}**")
 
@@ -106,52 +118,26 @@ for idx, jogo in enumerate(jogos):
             supabase.table("copa_ligafut").update({"jogos": jogos}).eq("grupo", tab).eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
 
-            # 🏆 Verifica vencedor e aplica bônus por vitória
+            # 🔵 Aplica bônus por vitória
             if gols_m_edit > gols_v_edit:
-                vencedor_id = mandante_id
+                aplicar_bonus_vitoria([mandante_id])
             elif gols_v_edit > gols_m_edit:
-                vencedor_id = visitante_id
-            else:
-                vencedor_id = None
+                aplicar_bonus_vitoria([visitante_id])
 
-            if vencedor_id:
-                res_patro = supabase.table("patrocinios_ativos").select("*").eq("id_time", vencedor_id).execute()
-                patrocinios = res_patro.data if res_patro.data else []
-
-                for pat in patrocinios:
-                    bonus = pat.get("bonus_vitoria") or 0
-                    descricao = f"Bônus por Vitória do Patrocinador - {pat.get('tipo', 'Desconhecido')}"
-                    if bonus > 0:
-                        # Atualiza saldo do time
-                        res_saldo = supabase.table("times").select("saldo").eq("id", vencedor_id).execute()
-                        saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-                        novo_saldo = int(saldo_atual) + int(bonus)
-                        supabase.table("times").update({"saldo": novo_saldo}).eq("id", vencedor_id).execute()
-
-                        # Registra movimentação
-                        supabase.table("movimentacoes_financeiras").insert({
-                            "id_time": vencedor_id,
-                            "tipo": "entrada",
-                            "valor": int(bonus),
-                            "descricao": descricao,
-                            "data": datetime.now().isoformat()
-                        }).execute()
-
-            st.success(f"✅ Resultado salvo para {mandante_nome} x {visitante_nome}")
+            st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
 
     st.markdown("---")
 
-# ===============================
 # ⚔️ Resultados do Mata-Mata
-# ===============================
 st.markdown("---")
 st.subheader("⚔️ Resultados do Mata-Mata")
 
 fases_mata = ["oitavas", "quartas", "semifinal", "final"]
 fase_selecionada = st.selectbox("Escolha a fase para editar os resultados:", fases_mata)
 
+# Buscar a fase eliminatória mais recente
 res_fase = supabase.table("copa_ligafut").select("*").eq("fase", fase_selecionada).order("data_criacao", desc=True).limit(1).execute()
 fase_data = res_fase.data[0] if res_fase.data else None
 
@@ -173,34 +159,32 @@ for idx, jogo in enumerate(jogos_mata):
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
-        gols_m_edit = st.number_input(f"Gols {mandante_nome}", min_value=0,
-            value=int(gols_m) if gols_m is not None else 0,
-            key=f"mata_gm_{idx}", format="%d")
+        gols_m_edit = st.number_input(f"Gols {mandante_nome}", min_value=0, value=int(gols_m) if gols_m is not None else 0, key=f"mata_gm_{idx}", format="%d")
     with col3:
         st.markdown("**X**")
     with col4:
-        gols_v_edit = st.number_input(f"Gols {visitante_nome}", min_value=0,
-            value=int(gols_v) if gols_v is not None else 0,
-            key=f"mata_gv_{idx}", format="%d")
+        gols_v_edit = st.number_input(f"Gols {visitante_nome}", min_value=0, value=int(gols_v) if gols_v is not None else 0, key=f"mata_gv_{idx}", format="%d")
     with col5:
         st.markdown(f"**{visitante_nome}**")
 
     st.markdown("")
 
-    if st.button("📏 Salvar Resultado", key=f"salvar_mata_{idx}"):
+    if st.button("\ud83d\udccf Salvar Resultado", key=f"salvar_mata_{idx}"):
         jogos_mata[idx]["gols_mandante"] = gols_m_edit
         jogos_mata[idx]["gols_visitante"] = gols_v_edit
+
         try:
             supabase.table("copa_ligafut").update({"jogos": jogos_mata}).eq("id", fase_data["id"]).execute()
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
-            st.success(f"✅ Resultado salvo para {mandante_nome} x {visitante_nome}")
+
+            # 🔵 Aplica bônus por vitória
+            if gols_m_edit > gols_v_edit:
+                aplicar_bonus_vitoria([mandante_id])
+            elif gols_v_edit > gols_m_edit:
+                aplicar_bonus_vitoria([visitante_id])
+
+            st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
-    st.markdown("---")
 
-if st.button("📏 Salvar todos os resultados da fase eliminatória"):
-    try:
-        supabase.table("copa_ligafut").update({"jogos": jogos_mata}).eq("id", fase_data["id"]).execute()
-        st.success("✅ Resultados atualizados com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
+    st.markdown("---")
