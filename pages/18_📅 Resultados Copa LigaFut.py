@@ -9,7 +9,7 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-# 📆 Horário de Brasília (UTC-3)
+# 📆 Horário de Brasília
 def agora_brasilia():
     return datetime.now(timezone.utc) - timedelta(hours=3)
 
@@ -31,7 +31,7 @@ if not res_admin.data:
 res_times = supabase.table("times").select("id, nome").execute()
 times = {t["id"]: t["nome"] for t in res_times.data}
 
-# Função para pagar bônus dos patrocinadores ativos
+# 💰 Função para pagar bônus por vitória
 def pagar_bonus_vitoria(id_time):
     patrocinadores = supabase.table("patrocinios_ativos").select("*").eq("id_time", id_time).execute().data
     for p in patrocinadores:
@@ -41,10 +41,11 @@ def pagar_bonus_vitoria(id_time):
                 id_time=id_time,
                 tipo="entrada",
                 valor=valor,
-                descricao="Bônus por Vitória do Patrocinador"
+                descricao="Bônus por Vitória do Patrocinador",
+                categoria="bonus_vitoria"
             )
 
-# Atualizar jogos no elenco
+# 🔁 Atualizar jogos dos jogadores no elenco
 def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
     for id_time in [id_time_mandante, id_time_visitante]:
         jogadores = supabase.table("elenco").select("id", "jogos").eq("id_time", id_time).execute().data
@@ -52,7 +53,7 @@ def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
             jogos_atuais = jogador.get("jogos", 0) or 0
             supabase.table("elenco").update({"jogos": jogos_atuais + 1}).eq("id", jogador["id"]).execute()
 
-# Buscar data mais recente da fase de grupos
+# Buscar última edição da copa
 data_grupos = supabase.table("grupos_copa").select("data_criacao").order("data_criacao", desc=True).limit(1).execute().data
 data_atual_grupos = data_grupos[0]["data_criacao"] if data_grupos else None
 
@@ -60,7 +61,7 @@ if not data_atual_grupos:
     st.info("Nenhuma edição da copa encontrada.")
     st.stop()
 
-# Resultados da fase de grupos
+# Resultados fase de grupos
 res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
 grupo_data = res.data if res.data else []
 
@@ -86,11 +87,11 @@ for idx, jogo in enumerate(jogos):
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
-        gm = st.number_input(f"Gols {mandante_nome}", min_value=0, value=int(gols_m) if gols_m is not None else 0, key=f"gm_{idx}")
+        gm = st.number_input(f"Gols {mandante_nome}", min_value=0, value=int(gols_m or 0), key=f"gm_{idx}")
     with col3:
         st.markdown("**X**")
     with col4:
-        gv = st.number_input(f"Gols {visitante_nome}", min_value=0, value=int(gols_v) if gols_v is not None else 0, key=f"gv_{idx}")
+        gv = st.number_input(f"Gols {visitante_nome}", min_value=0, value=int(gols_v or 0), key=f"gv_{idx}")
     with col5:
         st.markdown(f"**{visitante_nome}**")
 

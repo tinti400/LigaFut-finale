@@ -52,7 +52,9 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
             "tipo": tipo,
             "valor": valor,
             "descricao": descricao,
-            "data": agora.isoformat()
+            "data": agora.isoformat(),
+            "categoria": categoria or None,
+            "jogador": jogador or None
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
 
@@ -98,3 +100,4 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     except Exception as e:
         st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
+
