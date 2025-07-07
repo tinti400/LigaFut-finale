@@ -82,11 +82,11 @@ for idx, jogo in enumerate(jogos):
     with col1:
         st.markdown(f"**{mandante_nome}**")
     with col2:
-        gm = st.number_input(f"Gols {mandante_nome}", min_value=0, value=gols_m, key=f"gm_{idx}")
+        gm = st.number_input(f"Gols {mandante_nome}", min_value=0, value=int(gols_m) if gols_m is not None else 0, key=f"gm_{idx}")
     with col3:
         st.markdown("**X**")
     with col4:
-        gv = st.number_input(f"Gols {visitante_nome}", min_value=0, value=gols_v, key=f"gv_{idx}")
+        gv = st.number_input(f"Gols {visitante_nome}", min_value=0, value=int(gols_v) if gols_v is not None else 0, key=f"gv_{idx}")
     with col5:
         st.markdown(f"**{visitante_nome}**")
 
