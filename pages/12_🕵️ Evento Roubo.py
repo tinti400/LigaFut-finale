@@ -91,7 +91,7 @@ if eh_admin and not ativo:
 
         supabase.table("configuracoes").update(config).eq("id", ID_CONFIG).execute()
         st.success("✅ Evento iniciado com sucesso!")
-        st.rerun()
+        st.experimental_rerun()
 # ✅ FASE 3 – BLOQUEIO DE JOGADORES (fase 'bloqueio')
 if ativo and fase == "bloqueio":
     st.subheader("🛡️ Proteja seus jogadores")
@@ -134,7 +134,7 @@ if ativo and fase == "bloqueio":
                     }).eq("id", ID_CONFIG).execute()
 
                     st.success("✅ Bloqueios registrados com sucesso!")
-                    st.rerun()
+                    st.experimental_rerun()
 
     # ✅ ADM pode avançar de fase quando todos tiverem bloqueado
     if eh_admin:
@@ -150,7 +150,7 @@ if ativo and fase == "bloqueio":
                     "vez": 0
                 }).eq("id", ID_CONFIG).execute()
                 st.success("Fase de bloqueios encerrada. Vamos para a ação!")
-                st.rerun()
+                st.experimental_rerun()
 # ✅ FASE 4 – AÇÃO (fase "acao")
 if ativo and fase == "acao":
     st.subheader("🕵️ Sua vez de roubar jogadores!")
@@ -234,7 +234,7 @@ if ativo and fase == "acao":
                             }).eq("id", ID_CONFIG).execute()
 
                             st.success(f"✅ Jogador {nome} roubado com sucesso!")
-                            st.rerun()
+                            st.experimental_rerun()
 
             # ✅ Finalizar vez
             if st.button("➡️ Finalizar minha vez"):
@@ -242,7 +242,7 @@ if ativo and fase == "acao":
                     "vez": vez + 1
                 }).eq("id", ID_CONFIG).execute()
                 st.success("🔄 Vez finalizada!")
-                st.rerun()
+                st.experimental_rerun()
 
     # ✅ Botão ADM para encerrar evento a qualquer momento
     if eh_admin:
@@ -254,7 +254,7 @@ if ativo and fase == "acao":
                 "finalizado": True
             }).eq("id", ID_CONFIG).execute()
             st.success("✅ Evento encerrado.")
-            st.rerun()
+            st.experimental_rerun()
 # ✅ FASE 5 – RELATÓRIO FINAL
 if not ativo and fase == "final":
     st.subheader("📊 Relatório Final do Evento de Roubo")
