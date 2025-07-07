@@ -1,15 +1,19 @@
+# 19_✏️ Editar Resultados.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
+from datetime import datetime
 import pandas as pd
+import uuid
+from utils import registrar_movimentacao
+
+st.set_page_config(page_title="🏕️ Gerenciar Resultados", layout="wide")
+st.title("🏕️ Gerenciar Resultados das Rodadas")
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
-
-st.set_page_config(page_title="🏕️ Gerenciar Resultados", layout="wide")
-st.title("🏕️ Gerenciar Resultados das Rodadas")
 
 # ✅ Verifica login e admin
 if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
@@ -38,19 +42,12 @@ def buscar_times_nomes_logos():
 times_info = buscar_times_nomes_logos()
 
 # 🔄 Rodadas
-try:
-    res_rodadas = (
-        supabase.table("rodadas")
-        .select("*")
-        .eq("temporada", numero_temporada)
-        .eq("divisao", numero_divisao)
-        .order("numero")
-        .execute()
-    )
-    rodadas_data = res_rodadas.data if res_rodadas.data else []
-except Exception as e:
-    st.error(f"Erro ao carregar rodadas: {e}")
-    st.stop()
+res_rodadas = supabase.table("rodadas")\
+    .select("*")\
+    .eq("temporada", numero_temporada)\
+    .eq("divisao", numero_divisao)\
+    .order("numero").execute()
+rodadas_data = res_rodadas.data if res_rodadas.data else []
 
 if not rodadas_data:
     st.warning("Nenhuma rodada encontrada.")
@@ -60,23 +57,43 @@ rodada_nums = [r["numero"] for r in rodadas_data]
 rodada_atual = st.selectbox("Escolha a rodada para editar:", rodada_nums)
 rodada = next((r for r in rodadas_data if r["numero"] == rodada_atual), None)
 
-# 🔍 Filtro por time
+# 🔎 Filtro por time
 todos_ids = [j["mandante"] for j in rodada["jogos"]] + [j["visitante"] for j in rodada["jogos"]]
 nomes_filtrados = sorted(set(times_info.get(id_, {}).get("nome", "?") for id_ in todos_ids))
 nome_time_filtro = st.selectbox("🔎 Filtrar por time da rodada:", ["Todos"] + nomes_filtrados)
 
-# 🧮 Função para atualizar classificação
+# ✅ Aplica bônus por vitória
+def aplicar_bonus_vitoria(id_time):
+    hoje = datetime.now().isoformat()
+    contratos = supabase.table("patrocinios_ativos")\
+        .select("id_patrocinador, inicio, fim")\
+        .eq("id_time", id_time).execute().data
+
+    if not contratos:
+        return
+
+    for c in contratos:
+        if c["inicio"] <= hoje and c["fim"] >= hoje:
+            prop = supabase.table("propostas_patrocinio")\
+                .select("bonus_vitoria")\
+                .eq("id_time", id_time)\
+                .eq("id_patrocinador", c["id_patrocinador"])\
+                .eq("status", "aceita").execute().data
+            if prop and prop[0]["bonus_vitoria"] > 0:
+                bonus = prop[0]["bonus_vitoria"]
+                saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
+                supabase.table("times").update({"saldo": saldo + bonus}).eq("id", id_time).execute()
+                registrar_movimentacao(id_time, "entrada", bonus, "Bônus por vitória (patrocínio)", categoria="patrocinio")
+
+# 🧮 Atualizar classificação
 def atualizar_classificacao():
     classificacao = {}
-
     for r in rodadas_data:
         for j in r["jogos"]:
             m, v = j["mandante"], j["visitante"]
             gm, gv = j.get("gols_mandante"), j.get("gols_visitante")
-
             if not all(isinstance(x, (int, float)) for x in [gm, gv]):
                 continue
-
             for time_id in [m, v]:
                 if time_id not in classificacao:
                     classificacao[time_id] = {
@@ -92,7 +109,6 @@ def atualizar_classificacao():
                         "temporada": numero_temporada,
                         "divisao": numero_divisao
                     }
-
             classificacao[m]["jogos"] += 1
             classificacao[v]["jogos"] += 1
             classificacao[m]["gols_pro"] += gm
@@ -119,16 +135,14 @@ def atualizar_classificacao():
         c["saldo"] = c["gols_pro"] - c["gols_contra"]
 
     supabase.table("classificacao").delete().eq("temporada", numero_temporada).eq("divisao", numero_divisao).execute()
-
     if classificacao:
         supabase.table("classificacao").insert(list(classificacao.values())).execute()
 
-# ✅ Atualiza jogos no elenco após resultado salvo
+# ✅ Atualiza jogos no elenco
 def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
     for id_time in [id_time_mandante, id_time_visitante]:
         res = supabase.table("elenco").select("id", "jogos").eq("id_time", id_time).execute()
         jogadores = res.data if res.data else []
-
         for jogador in jogadores:
             id_jogador = jogador["id"]
             jogos_atuais = jogador.get("jogos", 0) or 0
@@ -157,24 +171,14 @@ for idx, jogo in enumerate(rodada["jogos"]):
 
     with col2:
         gols_m_valor = jogo.get("gols_mandante")
-        gols_m = st.number_input(
-            f"Gols {nome_m}",
-            value=int(gols_m_valor) if isinstance(gols_m_valor, (int, float)) else 0,
-            min_value=0,
-            key=f"gm_{idx}"
-        )
+        gols_m = st.number_input(f"Gols {nome_m}", value=int(gols_m_valor) if isinstance(gols_m_valor, (int, float)) else 0, min_value=0, key=f"gm_{idx}")
 
     with col3:
         st.markdown("<h4 style='text-align:center;'>⚔️</h4>", unsafe_allow_html=True)
 
     with col4:
         gols_v_valor = jogo.get("gols_visitante")
-        gols_v = st.number_input(
-            f"Gols {nome_v}",
-            value=int(gols_v_valor) if isinstance(gols_v_valor, (int, float)) else 0,
-            min_value=0,
-            key=f"gv_{idx}"
-        )
+        gols_v = st.number_input(f"Gols {nome_v}", value=int(gols_v_valor) if isinstance(gols_v_valor, (int, float)) else 0, min_value=0, key=f"gv_{idx}")
 
     with col5:
         st.image(logo_v or "https://cdn-icons-png.flaticon.com/512/147/147144.png", width=50)
@@ -194,6 +198,13 @@ for idx, jogo in enumerate(rodada["jogos"]):
             supabase.table("rodadas").update({"jogos": novos_jogos}).eq("id", rodada["id"]).execute()
             atualizar_jogos_elenco_completo(id_m, id_v)
             atualizar_classificacao()
+
+            # ✅ Aplica bônus
+            if gols_m > gols_v:
+                aplicar_bonus_vitoria(id_m)
+            elif gols_v > gols_m:
+                aplicar_bonus_vitoria(id_v)
+
             st.success(f"✅ Resultado atualizado e classificação recalculada.")
             st.rerun()
 
