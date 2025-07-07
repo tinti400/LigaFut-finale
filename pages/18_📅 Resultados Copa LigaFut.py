@@ -25,24 +25,6 @@ if len(admin_ref.data) == 0:
     st.warning("⛔️ Acesso restrito aos administradores.")
     st.stop()
 
-# 💰 Aplicar bônus por vitória
-def aplicar_bonus_vitoria(id_time):
-    patrocinio = supabase.table("patrocinios_ativos").select("id_patrocinador").eq("id_time", id_time).execute()
-    if patrocinio.data:
-        id_patro = patrocinio.data[0]["id_patrocinador"]
-        bonus_ref = supabase.table("patrocinadores").select("bonus_vitoria").eq("id", id_patro).execute()
-        if bonus_ref.data:
-            bonus = bonus_ref.data[0]["bonus_vitoria"]
-            supabase.table("times").update({"saldo": f"saldo + {bonus}"}).eq("id", id_time).execute()
-            supabase.table("movimentacoes_financeiras").insert({
-                "id": str(uuid.uuid4()),
-                "id_time": id_time,
-                "tipo": "Entrada",
-                "valor": bonus,
-                "descricao": "Bônus por Vitória do Patrocinador",
-                "data": datetime.now().isoformat()
-            }).execute()
-
 # ⏲️ Data da copa mais recente (fase de grupos)
 def buscar_data_recente_grupos():
     res = supabase.table("grupos_copa").select("data_criacao").order("data_criacao", desc=True).limit(1).execute()
@@ -70,6 +52,30 @@ def atualizar_jogos_elenco_completo(id_time_mandante, id_time_visitante):
             id_jogador = jogador["id"]
             jogos_atuais = jogador.get("jogos", 0) or 0
             supabase.table("elenco").update({"jogos": jogos_atuais + 1}).eq("id", id_jogador).execute()
+
+# 💰 Aplicar bônus por vitória
+def aplicar_bonus_vitoria(id_time):
+    patrocinio = supabase.table("patrocinios_ativos").select("id_patrocinador").eq("id_time", id_time).execute()
+    if patrocinio.data:
+        id_patro = patrocinio.data[0]["id_patrocinador"]
+        bonus_ref = supabase.table("patrocinadores").select("bonus_vitoria").eq("id", id_patro).execute()
+        if bonus_ref.data:
+            bonus = bonus_ref.data[0]["bonus_vitoria"]
+
+            res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+            saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
+            novo_saldo = saldo_atual + bonus
+
+            supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+            supabase.table("movimentacoes_financeiras").insert({
+                "id": str(uuid.uuid4()),
+                "id_time": id_time,
+                "tipo": "Entrada",
+                "valor": bonus,
+                "descricao": "Bônus por Vitória do Patrocinador",
+                "data": datetime.now().isoformat()
+            }).execute()
 
 # 🔢 Buscar jogos da fase de grupos
 res = supabase.table("copa_ligafut").select("*").eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
