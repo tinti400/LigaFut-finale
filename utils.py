@@ -3,12 +3,16 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import uuid
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
+
+# 📍 Timezone de Brasília
+TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 # ✅ Verifica sessão ativa
 def verificar_sessao():
@@ -21,6 +25,7 @@ def verificar_sessao():
 # 💰 Registrar movimentação financeira com verificação de duplicidade
 def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, categoria=None, origem=None, destino=None):
     try:
+        agora = datetime.now(TZ_BR)
         consulta = supabase.table("movimentacoes_financeiras")\
             .select("*")\
             .eq("id_time", id_time)\
@@ -33,9 +38,13 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
 
         if consulta.data:
             ultima = consulta.data[0]
-            ultima_data = datetime.fromisoformat(ultima["data"])
-            if (datetime.now() - ultima_data).total_seconds() < 10:
-                return  # Já existe, evita duplicar
+            data_mov = ultima.get("data")
+            if data_mov:
+                mov_time = datetime.fromisoformat(data_mov)
+                if mov_time.tzinfo is None:
+                    mov_time = mov_time.replace(tzinfo=TZ_BR)
+                if (agora - mov_time).total_seconds() < 10:
+                    return  # Já existe, evita duplicar
 
         nova = {
             "id": str(uuid.uuid4()),
@@ -43,7 +52,7 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
             "tipo": tipo,
             "valor": valor,
             "descricao": descricao,
-            "data": datetime.now().isoformat()
+            "data": agora.isoformat()
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
 
@@ -78,7 +87,7 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
             "categoria": str(categoria),
             "jogador": str(jogador),
             "valor": int(valor),
-            "data": datetime.now().isoformat(),
+            "data": datetime.now(TZ_BR).isoformat(),
             "origem": origem or "",
             "destino": destino or ""
         }
@@ -89,4 +98,3 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     except Exception as e:
         st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
-
