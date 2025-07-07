@@ -2,6 +2,7 @@
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
+import uuid
 
 # 🔐 Conexão com Supabase
 url = st.secrets["supabase"]["url"]
@@ -23,6 +24,24 @@ admin_ref = supabase.table("admins").select("email").eq("email", email_usuario).
 if len(admin_ref.data) == 0:
     st.warning("⛔️ Acesso restrito aos administradores.")
     st.stop()
+
+# 💰 Aplicar bônus por vitória
+def aplicar_bonus_vitoria(id_time):
+    patrocinio = supabase.table("patrocinios_ativos").select("id_patrocinador").eq("id_time", id_time).execute()
+    if patrocinio.data:
+        id_patro = patrocinio.data[0]["id_patrocinador"]
+        bonus_ref = supabase.table("patrocinadores").select("bonus_vitoria").eq("id", id_patro).execute()
+        if bonus_ref.data:
+            bonus = bonus_ref.data[0]["bonus_vitoria"]
+            supabase.table("times").update({"saldo": f"saldo + {bonus}"}).eq("id", id_time).execute()
+            supabase.table("movimentacoes_financeiras").insert({
+                "id": str(uuid.uuid4()),
+                "id_time": id_time,
+                "tipo": "Entrada",
+                "valor": bonus,
+                "descricao": "Bônus por Vitória do Patrocinador",
+                "data": datetime.now().isoformat()
+            }).execute()
 
 # ⏲️ Data da copa mais recente (fase de grupos)
 def buscar_data_recente_grupos():
@@ -108,6 +127,10 @@ for idx, jogo in enumerate(jogos):
         try:
             supabase.table("copa_ligafut").update({"jogos": jogos}).eq("grupo", tab).eq("data_criacao", data_atual_grupos).eq("fase", "grupos").execute()
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
+            if gols_m_edit > gols_v_edit:
+                aplicar_bonus_vitoria(mandante_id)
+            elif gols_v_edit > gols_m_edit:
+                aplicar_bonus_vitoria(visitante_id)
             st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
@@ -168,6 +191,10 @@ for idx, jogo in enumerate(jogos_mata):
         try:
             supabase.table("copa_ligafut").update({"jogos": jogos_mata}).eq("id", fase_data["id"]).execute()
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
+            if gols_m_edit > gols_v_edit:
+                aplicar_bonus_vitoria(mandante_id)
+            elif gols_v_edit > gols_m_edit:
+                aplicar_bonus_vitoria(visitante_id)
             st.success(f"Resultado salvo para {mandante_nome} x {visitante_nome}")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
