@@ -1,4 +1,4 @@
-# 27_Propostas_Recebidas_Patrocinio.py
+# 4_Propostas_Recebidas_Patrocinio.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -45,7 +45,7 @@ for tipo in tipos:
     for proposta in propostas_tipo:
         pat = proposta["patrocinadores"]
         with st.container():
-    st.markdown("---")  # linha divisória manual para dar separação visual
+            st.markdown("---")
             col1, col2 = st.columns([1, 4])
             with col1:
                 st.image(pat["logo_url"], width=80)
