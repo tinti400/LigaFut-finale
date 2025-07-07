@@ -266,26 +266,30 @@ if evento.get("finalizado"):
     resumo = []
 
     try:
-        for id_destino, lista in roubos.items():
-            res_dest = supabase.table("times").select("nome").eq("id", id_destino).execute().data
-            nome_destino = res_dest[0]["nome"] if res_dest else "Desconhecido"
+        if isinstance(roubos, dict):
+            for id_destino, lista in roubos.items():
+                res_dest = supabase.table("times").select("nome").eq("id", id_destino).execute().data
+                nome_destino = res_dest[0]["nome"] if res_dest else "Desconhecido"
 
-            for jogador in lista:
-                id_origem = jogador.get("de")
-                res_origem = supabase.table("times").select("nome").eq("id", id_origem).execute().data
-                nome_origem = res_origem[0]["nome"] if res_origem else "Desconhecido"
+                for jogador in lista:
+                    id_origem = jogador.get("de")
+                    res_origem = supabase.table("times").select("nome").eq("id", id_origem).execute().data
+                    nome_origem = res_origem[0]["nome"] if res_origem else "Desconhecido"
 
-                resumo.append({
-                    "🌟 Time que Roubou": nome_destino,
-                    "👤 Jogador": jogador.get("nome", "N/D"),
-                    "⚽ Posição": jogador.get("posicao", "N/D"),
-                    "💰 Pago": f"R$ {int(jogador.get('valor', 0)) // 2:,.0f}",
-                    "🔴 Time Roubado": nome_origem
-                })
+                    resumo.append({
+                        "🌟 Time que Roubou": nome_destino,
+                        "👤 Jogador": jogador.get("nome", "N/D"),
+                        "⚽ Posição": jogador.get("posicao", "N/D"),
+                        "💰 Pago": f"R$ {int(jogador.get('valor', 0)) // 2:,.0f}",
+                        "🔴 Time Roubado": nome_origem
+                    })
+        else:
+            st.warning("❌ Estrutura de dados inválida para exibir transferências.")
     except Exception as e:
         st.error(f"❌ Erro ao gerar resumo: {e}")
 
-    if resumo:
-        st.dataframe(pd.DataFrame(resumo), use_container_width=True)
+    if isinstance(resumo, list) and resumo:
+        df = pd.DataFrame(resumo)
+        st.dataframe(df, use_container_width=True)
     else:
         st.info("Nenhuma movimentação registrada.")
