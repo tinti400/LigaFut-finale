@@ -129,8 +129,8 @@ for idx, jogo in enumerate(jogos_mata):
     visitante_id = jogo["visitante"]
     mandante_nome = times.get(mandante_id, "Mandante")
     visitante_nome = times.get(visitante_id, "Visitante")
-    gols_m = jogo.get("gols_mandante", 0)
-    gols_v = jogo.get("gols_visitante", 0)
+    gols_m = int(jogo.get("gols_mandante") or 0)
+    gols_v = int(jogo.get("gols_visitante") or 0)
 
     col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1, 1.5, 3])
     with col1:
