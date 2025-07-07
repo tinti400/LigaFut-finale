@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from utils import registrar_movimentacao
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
+
+# 📆 Horário de Brasília (UTC-3)
+def agora_brasilia():
+    return datetime.now(timezone.utc) - timedelta(hours=3)
 
 st.set_page_config(page_title="🗕️ Resultados Fase de Grupos", layout="wide")
 st.title("🗕️ Resultados da Fase de Grupos")
@@ -95,10 +99,13 @@ for idx, jogo in enumerate(jogos):
         jogos[idx]["gols_visitante"] = gv
 
         try:
-            supabase.table("copa_ligafut").update({"jogos": jogos}).eq("grupo", grupo_escolhido).eq("fase", "grupos").eq("data_criacao", data_atual_grupos).execute()
+            supabase.table("copa_ligafut").update({
+                "jogos": jogos,
+                "data_alteracao": agora_brasilia().isoformat()
+            }).eq("grupo", grupo_escolhido).eq("fase", "grupos").eq("data_criacao", data_atual_grupos).execute()
+
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
 
-            # Pagar bônus para o vencedor
             if gm > gv:
                 pagar_bonus_vitoria(mandante_id)
             elif gv > gm:
@@ -149,10 +156,13 @@ for idx, jogo in enumerate(jogos_mata):
         jogos_mata[idx]["gols_visitante"] = gv
 
         try:
-            supabase.table("copa_ligafut").update({"jogos": jogos_mata}).eq("id", fase_data["id"]).execute()
+            supabase.table("copa_ligafut").update({
+                "jogos": jogos_mata,
+                "data_alteracao": agora_brasilia().isoformat()
+            }).eq("id", fase_data["id"]).execute()
+
             atualizar_jogos_elenco_completo(mandante_id, visitante_id)
 
-            # Bônus por vitória
             if gm > gv:
                 pagar_bonus_vitoria(mandante_id)
             elif gv > gm:
@@ -166,7 +176,10 @@ for idx, jogo in enumerate(jogos_mata):
 
 if st.button("📥 Salvar todos os resultados da fase eliminatória"):
     try:
-        supabase.table("copa_ligafut").update({"jogos": jogos_mata}).eq("id", fase_data["id"]).execute()
+        supabase.table("copa_ligafut").update({
+            "jogos": jogos_mata,
+            "data_alteracao": agora_brasilia().isoformat()
+        }).eq("id", fase_data["id"]).execute()
         st.success("✅ Resultados atualizados com sucesso!")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
