@@ -71,7 +71,7 @@ def aplicar_bonus_vitoria(id_time):
             supabase.table("movimentacoes_financeiras").insert({
                 "id": str(uuid.uuid4()),
                 "id_time": id_time,
-                "tipo": "Entrada",
+                "tipo": "entrada",
                 "valor": bonus,
                 "descricao": "Bônus por Vitória do Patrocinador",
                 "data": datetime.now().isoformat()
