@@ -39,7 +39,7 @@ def pagar_bonus_vitoria(id_time):
         if valor > 0:
             registrar_movimentacao(
                 id_time=id_time,
-                tipo="Entrada",
+                tipo="entrada",
                 valor=valor,
                 descricao="Bônus por Vitória do Patrocinador"
             )
@@ -182,4 +182,4 @@ if st.button("📥 Salvar todos os resultados da fase eliminatória"):
         }).eq("id", fase_data["id"]).execute()
         st.success("✅ Resultados atualizados com sucesso!")
     except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
+        st.error(f"Erro ao salvar: {e}")ntrad
