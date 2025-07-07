@@ -294,7 +294,7 @@ if evento.get("finalizado"):
                         "🌟 Time que Roubou": nome_destino,
                         "👤 Jogador": jogador.get("nome", "N/D"),
                         "⚽ Posição": jogador.get("posicao", "N/D"),
-                        "💰 Pago": f"R$ {int(jogador.get('valor', 0)) // 2:,.0f}",
+                        "💰 Pago": f"R$ {int(jogador.get('valor', 0)):,.0f}",
                         "🔴 Time Roubado": nome_origem
                     })
         else:
