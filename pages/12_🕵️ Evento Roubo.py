@@ -264,35 +264,28 @@ if ativo and fase == "acao" and vez >= len(ordem):
 if evento.get("finalizado"):
     st.success("✅ Transferências finalizadas:")
     resumo = []
-    for id_destino, lista in roubos.items():
-        nome_destino = supabase.table("times").select("nome").eq("id", id_destino).execute().data[0]["nome"]
-        for jogador in lista:
-            nome_origem = supabase.table("times").select("nome").eq("id", jogador["de"]).execute().data[0]["nome"]
-            resumo.append({
-                "🌟 Time que Roubou": nome_destino,
-                "👤 Jogador": jogador["nome"],
-                "⚽ Posição": jogador["posicao"],
-                "💰 Pago": f"R$ {int(jogador['valor'])//2:,.0f}",
-                "🔴 Time Roubado": nome_origem
-            })
+
+    try:
+        for id_destino, lista in roubos.items():
+            res_dest = supabase.table("times").select("nome").eq("id", id_destino).execute().data
+            nome_destino = res_dest[0]["nome"] if res_dest else "Desconhecido"
+
+            for jogador in lista:
+                id_origem = jogador.get("de")
+                res_origem = supabase.table("times").select("nome").eq("id", id_origem).execute().data
+                nome_origem = res_origem[0]["nome"] if res_origem else "Desconhecido"
+
+                resumo.append({
+                    "🌟 Time que Roubou": nome_destino,
+                    "👤 Jogador": jogador.get("nome", "N/D"),
+                    "⚽ Posição": jogador.get("posicao", "N/D"),
+                    "💰 Pago": f"R$ {int(jogador.get('valor', 0)) // 2:,.0f}",
+                    "🔴 Time Roubado": nome_origem
+                })
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar resumo: {e}")
+
     if resumo:
         st.dataframe(pd.DataFrame(resumo), use_container_width=True)
     else:
         st.info("Nenhuma movimentação registrada.")
-
-# 📋 Ordem de Participação
-st.subheader("📋 Ordem de Participação (Sorteio)")
-try:
-    if ordem:
-        times_ordenados = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
-        mapa_times = {t["id"]: t["nome"] for t in times_ordenados}
-        for i, idt in enumerate(ordem):
-            indicador = "🔛" if i == vez else "⏳" if i > vez else "✅"
-            st.markdown(f"{indicador} {i+1}º - **{mapa_times.get(idt, 'Desconhecido')}**")
-    else:
-        st.warning("Ainda não foi definido o sorteio dos times.")
-except Exception as e:
-    st.error(f"Erro ao exibir a ordem dos times: {e}")
-
-
-
