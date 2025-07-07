@@ -4,6 +4,7 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import uuid
+from utils import registrar_movimentacao
 
 st.set_page_config(page_title="📄 Propostas de Patrocínio", layout="wide")
 
@@ -80,6 +81,15 @@ for tipo in tipos:
                     saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0]["saldo"]
                     novo_saldo = saldo + proposta["valor_fixo"]
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+
+                    # 🧾 Registrar movimentação
+                    registrar_movimentacao(
+                        id_time=id_time,
+                        tipo="entrada",
+                        valor=proposta["valor_fixo"],
+                        descricao=f"Recebimento de patrocínio ({pat['nome']})",
+                        categoria="patrocinio"
+                    )
 
                     st.success(f"🎉 Patrocínio com {pat['nome']} assinado!")
                     st.experimental_rerun()
