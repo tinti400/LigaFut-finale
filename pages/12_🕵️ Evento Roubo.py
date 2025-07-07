@@ -50,7 +50,7 @@ limite_roubo = evento.get("limite_roubo", 5)
 limite_perder = evento.get("limite_perder", 4)
 
 # 🔁 Botão de recarregar manual
-st.button("🔄 Atualizar Página", on_click=st.rerun)
+st.button("🔄 Atualizar Página", on_click=lambda: st.rerun())
 # ✅ FASE 2 – Configuração inicial do evento (ADM)
 if eh_admin and not ativo:
     st.subheader("⚙️ Configurações Iniciais do Evento de Roubo")
