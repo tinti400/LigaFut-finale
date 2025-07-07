@@ -216,7 +216,7 @@ if ativo and fase == "acao" and vez < len(ordem):
                 if jogador_selecionado:
                     jogador = opcoes_jogadores[jogador_selecionado]
                     valor = int(jogador["valor"])
-                    valor_pago = valor // 2
+                    valor_pago = valor
                     st.info(f"💰 Valor do jogador: R$ {valor:,.0f} | Valor a ser pago: R$ {valor_pago:,.0f}")
 
                     if st.button("💰 Roubar jogador"):
