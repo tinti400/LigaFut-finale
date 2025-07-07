@@ -44,7 +44,8 @@ for tipo in tipos:
 
     for proposta in propostas_tipo:
         pat = proposta["patrocinadores"]
-        with st.container(border=True):
+        with st.container():
+    st.markdown("---")  # linha divisória manual para dar separação visual
             col1, col2 = st.columns([1, 4])
             with col1:
                 st.image(pat["logo_url"], width=80)
