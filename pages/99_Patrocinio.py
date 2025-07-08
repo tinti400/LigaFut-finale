@@ -1,4 +1,4 @@
-# 26_Gerar_Propostas_Patrocinio.py
+# 99_Patrocinio.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -13,6 +13,21 @@ url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
+# 🛡️ Verifica se usuário está logado
+if "usuario" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
+    st.stop()
+
+# 🧑‍⚖️ Verifica se o usuário é administrador
+email_usuario = st.session_state.get("usuario", "")
+res_admin = supabase.table("usuarios").select("administrador").eq("usuario", email_usuario).execute()
+eh_admin = res_admin.data and res_admin.data[0].get("administrador", False)
+
+if not eh_admin:
+    st.error("❌ Acesso restrito. Esta página é exclusiva para administradores.")
+    st.stop()
+
+# ✅ Título e botão
 st.title("📢 Gerar Propostas de Patrocínio para os Times")
 
 if st.button("🚀 Gerar 9 propostas por time"):
