@@ -217,34 +217,43 @@ if nivel < 5:
             st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
-# 🗺️ Mapa visual de ocupação por setor
-st.markdown("### 🗺️ Mapa de Ocupação por Setor")
+st.markdown("### 🏟️ Arena Visual - Ocupação por Setor")
 
-ocupacao_por_setor = {}
-for setor, proporcao in setores.items():
-    lugares = int(capacidade * proporcao)
-    preco = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
-    publico, _ = calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recentes, derrotas_recentes)
-    ocupacao_por_setor[setor.upper()] = round(publico / lugares, 2) if lugares else 0
+def cor_por_ocupacao(taxa):
+    if taxa > 0.9:
+        return "green"
+    elif taxa > 0.7:
+        return "yellow"
+    elif taxa > 0.4:
+        return "orange"
+    else:
+        return "red"
 
-cores_setores = {
-    "GERAL": "skyblue",
-    "NORTE": "limegreen",
-    "SUL": "orange",
-    "CENTRAL": "deepskyblue",
-    "CAMAROTE": "gold"
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.set_xlim(0, 10)
+ax.set_ylim(0, 10)
+ax.axis("off")
+
+# Fundo da arena
+arena = plt.Circle((5, 5), 4.5, color="#e0e0e0", zorder=0)
+ax.add_artist(arena)
+
+# Setores
+setores_posicoes = {
+    "NORTE": (5, 8.5),
+    "SUL": (5, 1.5),
+    "GERAL": (1.5, 5),
+    "CENTRAL": (8.5, 5),
+    "CAMAROTE": (5, 5)
 }
 
-import matplotlib.pyplot as plt
+for setor, (x, y) in setores_posicoes.items():
+    ocupacao = ocupacoes.get(setor, 0)
+    cor = cor_por_ocupacao(ocupacao)
+    tamanho = 0.9 if setor != "CAMAROTE" else 0.6
+    circle = plt.Circle((x, y), tamanho, color=cor, alpha=0.8, ec="black")
+    ax.add_artist(circle)
+    ax.text(x, y, f"{setor}\n{int(ocupacao * 100)}%", ha="center", va="center", fontsize=10, weight='bold', color="black")
 
-fig, ax = plt.subplots(figsize=(8, 2.5))
-ax.barh(
-    list(ocupacao_por_setor.keys()),
-    [v * 100 for v in ocupacao_por_setor.values()],
-    color=[cores_setores[s] for s in ocupacao_por_setor]
-)
-ax.set_xlim(0, 100)
-ax.set_xlabel("Ocupação (%)")
-ax.set_title("Mapa de Ocupação por Setor")
 st.pyplot(fig)
 
