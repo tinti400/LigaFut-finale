@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="🏟️ Estádio - LigaFut", layout="wide")
 
