@@ -194,17 +194,28 @@ if classificacao:
         "Saldo de Gols": t["sg"]
     } for i, (tid, t) in enumerate(classificacao)])
 
+    # (mantido todo o código acima igual ao original do usuário)
+
     def aplicar_estilo(df):
         html = "<table style='width: 100%; border-collapse: collapse;'>"
         html += "<thead><tr>" + ''.join(f"<th>{col}</th>" for col in df.columns) + "</tr></thead><tbody>"
         for i, row in df.iterrows():
-            cor = "#d4edda" if i < 4 else "#f8d7da" if i >= len(df) - 2 else "white"
-            linha = "<tr style='background-color: {};'>".format(cor)
-            linha += ''.join(f"<td>{val}</td>" for val in row)
-            linha += "</tr>"
+            pos = i + 1
+            if pos in [1, 2]:
+                cor = "#d4edda"  # verde claro
+            elif pos == 3:
+                cor = "#ffeeba"  # laranja
+            elif pos == 8:
+                cor = "#f8d7da"  # vermelho claro
+            elif pos >= len(df) - 1:
+                cor = "#f5c6cb"  # vermelho forte
+            else:
+                cor = "white"
+            linha = f"<tr style='background-color: {cor};'>" + ''.join(f"<td>{val}</td>" for val in row) + "</tr>"
             html += linha
         html += "</tbody></table>"
         return html
+
 
     st.markdown(aplicar_estilo(df), unsafe_allow_html=True)
 
