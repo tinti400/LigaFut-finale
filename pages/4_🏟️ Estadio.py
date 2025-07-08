@@ -147,8 +147,6 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
-
-# Limites por nível de estádio
 limites_precos = {
     1: {"geral": 100.0, "norte": 150.0, "sul": 150.0, "central": 200.0, "camarote": 1000.0},
     2: {"geral": 150.0, "norte": 200.0, "sul": 200.0, "central": 300.0, "camarote": 1500.0},
@@ -193,7 +191,6 @@ for setor, proporcao in setores.items():
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
 st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
-
 # 🔧 Melhorias no estádio
 if nivel < 5:
     custo = 250_000_000 + (nivel) * 120_000_000
@@ -218,7 +215,17 @@ if nivel < 5:
             st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
+
+# ✅ Visual gráfico da Arena
 st.markdown("### 🏟️ Arena Visual - Ocupação por Setor")
+
+# 🔢 Cálculo real da ocupação por setor
+ocupacoes = {}
+for setor, proporcao in setores.items():
+    lugares = int(capacidade * proporcao)
+    preco = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
+    publico_estimado, _ = calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recentes, derrotas_recentes)
+    ocupacoes[setor.upper()] = publico_estimado / lugares if lugares > 0 else 0
 
 def cor_por_ocupacao(taxa):
     if taxa > 0.9:
@@ -235,11 +242,9 @@ ax.set_xlim(0, 10)
 ax.set_ylim(0, 10)
 ax.axis("off")
 
-# Fundo da arena
 arena = plt.Circle((5, 5), 4.5, color="#e0e0e0", zorder=0)
 ax.add_artist(arena)
 
-# Setores
 setores_posicoes = {
     "NORTE": (5, 8.5),
     "SUL": (5, 1.5),
@@ -257,4 +262,3 @@ for setor, (x, y) in setores_posicoes.items():
     ax.text(x, y, f"{setor}\n{int(ocupacao * 100)}%", ha="center", va="center", fontsize=10, weight='bold', color="black")
 
 st.pyplot(fig)
-
