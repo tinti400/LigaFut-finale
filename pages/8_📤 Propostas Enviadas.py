@@ -1,3 +1,4 @@
+# 8_📤 Propostas Enviadas.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
@@ -51,12 +52,42 @@ else:
                 st.write(f"📅 **Data da Proposta:** {datetime.fromisoformat(proposta['data']).strftime('%d/%m/%Y %H:%M')}")
 
                 status = proposta.get("status", "pendente")
+
                 if status == "pendente":
                     st.warning("⏳ Proposta ainda não respondida.")
+
+                    # 🔧 Edição do valor
+                    with st.expander("✏️ Editar Proposta"):
+                        novo_valor = st.number_input(
+                            f"Novo valor para {proposta['jogador_nome']}",
+                            min_value=1,
+                            value=int(proposta["valor_oferecido"]),
+                            step=1_000_000,
+                            key=f"edit_{proposta['id']}"
+                        )
+                        if st.button("💾 Salvar alteração", key=f"save_{proposta['id']}"):
+                            try:
+                                supabase.table("propostas").update({
+                                    "valor_oferecido": novo_valor,
+                                    "data": datetime.now().isoformat()
+                                }).eq("id", proposta["id"]).execute()
+                                st.success("✅ Proposta atualizada com sucesso!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao atualizar proposta: {e}")
+
+                    # ❌ Cancelar proposta
+                    if st.button("❌ Cancelar Proposta", key=f"cancel_{proposta['id']}"):
+                        try:
+                            supabase.table("propostas").delete().eq("id", proposta["id"]).execute()
+                            st.success("✅ Proposta cancelada com sucesso.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao cancelar proposta: {e}")
+
                 elif status == "aceita":
                     st.success("✅ Proposta aceita.")
                 elif status == "recusada":
                     st.error("❌ Proposta recusada.")
                 elif status == "contraproposta":
                     st.info("🔁 Contra proposta enviada.")
-
