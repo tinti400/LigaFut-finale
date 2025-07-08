@@ -217,3 +217,34 @@ if nivel < 5:
             st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
+# 🗺️ Mapa visual de ocupação por setor
+st.markdown("### 🗺️ Mapa de Ocupação por Setor")
+
+ocupacao_por_setor = {}
+for setor, proporcao in setores.items():
+    lugares = int(capacidade * proporcao)
+    preco = float(estadio.get(f"preco_{setor}", precos_padrao[setor]))
+    publico, _ = calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias_recentes, derrotas_recentes)
+    ocupacao_por_setor[setor.upper()] = round(publico / lugares, 2) if lugares else 0
+
+cores_setores = {
+    "GERAL": "skyblue",
+    "NORTE": "limegreen",
+    "SUL": "orange",
+    "CENTRAL": "deepskyblue",
+    "CAMAROTE": "gold"
+}
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(8, 2.5))
+ax.barh(
+    list(ocupacao_por_setor.keys()),
+    [v * 100 for v in ocupacao_por_setor.values()],
+    color=[cores_setores[s] for s in ocupacao_por_setor]
+)
+ax.set_xlim(0, 100)
+ax.set_xlabel("Ocupação (%)")
+ax.set_title("Mapa de Ocupação por Setor")
+st.pyplot(fig)
+
