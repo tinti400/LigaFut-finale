@@ -23,7 +23,8 @@ st.markdown("Invista no seu time com um empréstimo escalonado por divisão.")
 # 🔍 Verifica divisão do time
 res_div = supabase.table("times").select("divisao", "saldo").eq("id", id_time).execute()
 time_data = res_div.data[0]
-divisao = time_data.get("divisao", "Outros").lower()
+divisao_raw = time_data.get("divisao")
+divisao = str(divisao_raw).strip().lower() if divisao_raw else "outros"
 saldo_atual = time_data.get("saldo", 0)
 
 # 💳 Limite por divisão
