@@ -38,10 +38,17 @@ saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 res = supabase.table("elenco").select("*").eq("id_time", id_time).execute()
 jogadores = res.data if res.data else []
 
+# ➕ Verifica benefício do naming rights
+res_beneficio = supabase.table("naming_rights").select("beneficio_extra").eq("id_time", id_time).eq("ativo", True).execute()
+beneficio_extra = res_beneficio.data[0]["beneficio_extra"] if res_beneficio.data else None
+
 # 📊 Estatísticas
 quantidade = len(jogadores)
 valor_total = sum(j.get("valor", 0) for j in jogadores)
 salario_total = sum(int(j.get("valor", 0) * 0.007) for j in jogadores)
+
+if beneficio_extra == "desconto_folha":
+    salario_total = int(salario_total * 0.9)
 
 st.markdown(
     f"""
@@ -124,10 +131,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 try:
                     valor_venda = round(valor * 0.7)
 
-                    # 🟢 Verifica bônus extra do naming rights
-                    res_bonus = supabase.table("naming_rights").select("beneficio_extra").eq("id_time", id_time).eq("ativo", True).execute()
-                    beneficio = res_bonus.data[0]["beneficio_extra"] if res_bonus.data else None
-                    if beneficio == "bonus_venda_atletas":
+                    if beneficio_extra == "bonus_venda_atletas":
                         valor_venda = round(valor_venda * 1.05)
 
                     res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
@@ -187,3 +191,4 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 st.error(f"Erro ao excluir jogador: {e}")
 
         st.markdown("</div>", unsafe_allow_html=True)
+
