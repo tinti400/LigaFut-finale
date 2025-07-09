@@ -47,6 +47,7 @@ res_naming = supabase.table("naming_rights").select("*").eq("id_time", id_time).
 naming = res_naming.data[0] if res_naming.data else None
 beneficio_extra = naming.get("beneficio_extra", "") if naming else ""
 percentual_evolucao = naming.get("percentual_evolucao", 0) if naming else 0
+evolucao_utilizada = naming.get("evolucao_utilizada", False) if naming else False
 
 if beneficio_extra == "area_vip":
     setores["vip"] = 0.02
@@ -116,7 +117,6 @@ if not estadio:
     supabase.table("estadios").insert(estadio).execute()
 
 estadio = supabase.table("estadios").select("*").eq("id_time", id_time).execute().data[0]
-
 nivel = estadio.get("nivel", 1)
 capacidade = capacidade_por_nivel.get(nivel, 25000)
 
@@ -176,12 +176,13 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 # 🔧 Melhorias de estádio
 if nivel < 5:
     custo_base = 250_000_000 + nivel * 120_000_000
-    custo = int(custo_base * (1 - percentual_evolucao / 100)) if percentual_evolucao > 0 else custo_base
+    if percentual_evolucao > 0 and not evolucao_utilizada:
+        custo = int(custo_base * (1 - percentual_evolucao / 100))
+        st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
+    else:
+        custo = custo_base
 
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
-    if percentual_evolucao > 0:
-        st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
-
     st.markdown(f"💸 Custo: **R${custo:,.2f}**")
     saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0].get("saldo", 0)
 
@@ -193,6 +194,8 @@ if nivel < 5:
             supabase.table("estadios").update({"nivel": nivel + 1, "capacidade": nova_capacidade}).eq("id_time", id_time).execute()
             supabase.table("times").update({"saldo": saldo - custo}).eq("id", id_time).execute()
             registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
+            if percentual_evolucao > 0 and not evolucao_utilizada:
+                supabase.table("naming_rights").update({"evolucao_utilizada": True}).eq("id_time", id_time).execute()
             st.success("✅ Estádio melhorado com sucesso!")
             st.experimental_rerun()
 else:
