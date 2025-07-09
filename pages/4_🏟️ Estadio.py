@@ -49,7 +49,7 @@ beneficio_extra = naming.get("beneficio_extra", "") if naming else ""
 percentual_evolucao = naming.get("percentual_evolucao", 0) if naming else 0
 evolucao_utilizada = naming.get("evolucao_utilizada", False) if naming else False
 
-if beneficio_extra == "area_vip":
+if beneficio_extra in ["area_vip", "vip_gold"]:
     setores["vip"] = 0.02
 
 # 💵 Preços padrão por setor
@@ -117,6 +117,7 @@ if not estadio:
     supabase.table("estadios").insert(estadio).execute()
 
 estadio = supabase.table("estadios").select("*").eq("id_time", id_time).execute().data[0]
+
 nivel = estadio.get("nivel", 1)
 capacidade = capacidade_por_nivel.get(nivel, 25000)
 
@@ -124,6 +125,7 @@ capacidade = capacidade_por_nivel.get(nivel, 25000)
 if estadio.get("capacidade") != capacidade:
     supabase.table("estadios").update({"capacidade": capacidade}).eq("id_time", id_time).execute()
 
+# Dados auxiliares
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
@@ -174,11 +176,11 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 
 # 🔧 Melhorias de estádio
 if nivel < 5:
-    custo_base = 250_000_000 + nivel * 120_000_000
-    custo = custo_base
+    custo = 250_000_000 + nivel * 120_000_000
+    custo_original = custo
 
     if percentual_evolucao > 0 and not evolucao_utilizada:
-        custo = int(custo_base * (1 - percentual_evolucao / 100))
+        custo = int(custo * (1 - percentual_evolucao / 100))
         st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
 
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
