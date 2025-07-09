@@ -19,9 +19,14 @@ if "usuario_id" not in st.session_state or not st.session_state["usuario_id"]:
 id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
-# 🔄 Buscar propostas recebidas
+# 🔄 Buscar as 5 últimas propostas recebidas
 try:
-    res = supabase.table("propostas").select("*").eq("destino_id", id_time).order("created_at", desc=True).execute()
+    res = supabase.table("propostas")\
+        .select("*")\
+        .eq("destino_id", id_time)\
+        .order("created_at", desc=True)\
+        .limit(5)\
+        .execute()
     propostas = res.data if res.data else []
 except Exception as e:
     st.error(f"Erro ao buscar propostas: {e}")
@@ -30,7 +35,7 @@ except Exception as e:
 st.markdown(f"<h2>📨 Propostas Recebidas - {nome_time}</h2>", unsafe_allow_html=True)
 
 if not propostas:
-    st.info("Nenhuma proposta recebida ainda.")
+    st.info("Nenhuma proposta recebida.")
 else:
     for proposta in propostas:
         with st.container():
@@ -62,12 +67,12 @@ else:
                 with col1:
                     if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
                         try:
-                            # ➕ Adiciona o jogador comprado ao time comprador com novo valor
+                            # ➕ Adiciona o jogador ao time comprador com novo valor
                             jogador = {
                                 "nome": proposta["jogador_nome"],
                                 "posicao": proposta["jogador_posicao"],
                                 "overall": proposta["jogador_overall"],
-                                "valor": proposta["valor_oferecido"],  # valor atualizado!
+                                "valor": proposta["valor_oferecido"],  # novo valor
                                 "imagem_url": proposta.get("imagem_url", ""),
                                 "nacionalidade": proposta.get("nacionalidade", "-"),
                                 "origem": proposta.get("origem", "-"),
@@ -75,13 +80,13 @@ else:
                             }
                             supabase.table("elenco").insert({"id_time": proposta["id_time_origem"], **jogador}).execute()
 
-                            # 🗑️ Remove o jogador do time vendedor
+                            # 🗑️ Remove do vendedor
                             supabase.table("elenco").delete().match({
                                 "id_time": proposta["id_time_alvo"],
                                 "nome": proposta["jogador_nome"]
                             }).execute()
 
-                            # 🔁 Se houver jogadores oferecidos, transfere para o time vendedor
+                            # 🔁 Troca (se houver)
                             for j in jogadores_oferecidos:
                                 supabase.table("elenco").insert({
                                     "id_time": proposta["id_time_alvo"],
@@ -95,65 +100,31 @@ else:
                                     "imagem_url": j.get("imagem_url", "")
                                 }).execute()
 
-                                # Remove do elenco do time comprador
                                 supabase.table("elenco").delete().match({
                                     "id_time": proposta["id_time_origem"],
                                     "nome": j["nome"]
                                 }).execute()
 
-                            # 💰 Atualiza saldos
+                            # 💰 Saldos
                             if proposta["valor_oferecido"] > 0:
                                 saldo_comp = supabase.table("times").select("saldo").eq("id", proposta["id_time_origem"]).execute().data[0]["saldo"]
-                                novo_saldo_comp = saldo_comp - proposta["valor_oferecido"]
-                                supabase.table("times").update({"saldo": novo_saldo_comp}).eq("id", proposta["id_time_origem"]).execute()
-
                                 saldo_vend = supabase.table("times").select("saldo").eq("id", proposta["id_time_alvo"]).execute().data[0]["saldo"]
-                                novo_saldo_vend = saldo_vend + proposta["valor_oferecido"]
-                                supabase.table("times").update({"saldo": novo_saldo_vend}).eq("id", proposta["id_time_alvo"]).execute()
+
+                                supabase.table("times").update({"saldo": saldo_comp - proposta["valor_oferecido"]}).eq("id", proposta["id_time_origem"]).execute()
+                                supabase.table("times").update({"saldo": saldo_vend + proposta["valor_oferecido"]}).eq("id", proposta["id_time_alvo"]).execute()
 
                                 registrar_movimentacao(proposta["id_time_origem"], "saida", proposta["valor_oferecido"], f"Compra de {proposta['jogador_nome']}")
                                 registrar_movimentacao(proposta["id_time_alvo"], "entrada", proposta["valor_oferecido"], f"Venda de {proposta['jogador_nome']}")
 
                             # 📝 Registro no BID
-                            registrar_bid(
-                                id_time=proposta["id_time_origem"],
-                                tipo="compra",
-                                categoria="proposta",
-                                jogador=proposta["jogador_nome"],
-                                valor=-proposta["valor_oferecido"],
-                                origem=nome_time,
-                                destino=proposta["nome_time_origem"]
-                            )
-                            registrar_bid(
-                                id_time=proposta["id_time_alvo"],
-                                tipo="venda",
-                                categoria="proposta",
-                                jogador=proposta["jogador_nome"],
-                                valor=proposta["valor_oferecido"],
-                                origem=nome_time,
-                                destino=proposta["nome_time_origem"]
-                            )
+                            registrar_bid(proposta["id_time_origem"], "compra", "proposta", proposta["jogador_nome"], -proposta["valor_oferecido"], nome_time, proposta["nome_time_origem"])
+                            registrar_bid(proposta["id_time_alvo"], "venda", "proposta", proposta["jogador_nome"], proposta["valor_oferecido"], nome_time, proposta["nome_time_origem"])
 
                             for j in jogadores_oferecidos:
-                                registrar_bid(
-                                    id_time=proposta["id_time_alvo"],
-                                    tipo="compra",
-                                    categoria="troca",
-                                    jogador=j["nome"],
-                                    valor=0,
-                                    origem=proposta["nome_time_origem"],
-                                    destino=nome_time
-                                )
-                                registrar_bid(
-                                    id_time=proposta["id_time_origem"],
-                                    tipo="venda",
-                                    categoria="troca",
-                                    jogador=j["nome"],
-                                    valor=0,
-                                    origem=proposta["nome_time_origem"],
-                                    destino=nome_time
-                                )
+                                registrar_bid(proposta["id_time_alvo"], "compra", "troca", j["nome"], 0, proposta["nome_time_origem"], nome_time)
+                                registrar_bid(proposta["id_time_origem"], "venda", "troca", j["nome"], 0, proposta["nome_time_origem"], nome_time)
 
+                            # Atualiza status
                             supabase.table("propostas").update({"status": "aceita"}).eq("id", proposta["id"]).execute()
 
                             st.success("✅ Proposta aceita com sucesso!")
