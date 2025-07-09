@@ -22,10 +22,12 @@ def verificar_sessao():
         st.warning("⚠️ Você precisa estar logado para acessar esta página.")
         st.stop()
 
-# 💰 Registrar movimentação financeira com verificação de duplicidade
+# 💰 Registrar movimentação financeira (com BID automático)
 def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, categoria=None, origem=None, destino=None):
     try:
         agora = datetime.now(TZ_BR)
+
+        # 🔎 Verificação de duplicidade (somente para a tabela de movimentações financeiras)
         consulta = supabase.table("movimentacoes_financeiras")\
             .select("*")\
             .eq("id_time", id_time)\
@@ -46,6 +48,7 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
                 if (agora - mov_time).total_seconds() < 10:
                     return  # Já existe, evita duplicar
 
+        # 💾 Registro principal
         nova = {
             "id": str(uuid.uuid4()),
             "id_time": id_time,
@@ -58,24 +61,21 @@ def registrar_movimentacao(id_time, tipo, valor, descricao, jogador=None, catego
         }
         supabase.table("movimentacoes_financeiras").insert(nova).execute()
 
-        if tipo in ["entrada", "saida"] and jogador and categoria:
-            if categoria == "leilao" and tipo != "saida":
-                return
-
-            registrar_bid(
-                id_time=id_time,
-                tipo="compra" if tipo == "saida" else "venda",
-                categoria=categoria,
-                jogador=jogador,
-                valor=valor,
-                origem=origem or "",
-                destino=destino or ""
-            )
+        # 📝 Também registrar no BID
+        registrar_bid(
+            id_time=id_time,
+            tipo="compra" if tipo == "saida" else "venda",
+            categoria=categoria,
+            jogador=jogador,
+            valor=valor,
+            origem=origem or "",
+            destino=destino or ""
+        )
 
     except Exception as e:
         st.error(f"Erro ao registrar movimentação financeira: {e}")
 
-# 📈 Registrar movimentação pública no BID
+# 📈 Registrar movimentação pública no BID (tabela 'movimentacoes')
 def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino=""):
     try:
         if not all([id_time, tipo, categoria, jogador]) or valor is None:
@@ -100,4 +100,3 @@ def registrar_bid(id_time, tipo, categoria, jogador, valor, origem="", destino="
     except Exception as e:
         st.error(f"❌ Erro ao registrar no BID: {e}")
         return False
-
