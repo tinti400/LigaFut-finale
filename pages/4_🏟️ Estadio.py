@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="🏟️ Estádio - LigaFut", layout="wide")
 
@@ -46,7 +47,6 @@ res_naming = supabase.table("naming_rights").select("*").eq("id_time", id_time).
 naming = res_naming.data[0] if res_naming.data else None
 beneficio_extra = naming.get("beneficio_extra", "") if naming else ""
 percentual_evolucao = naming.get("percentual_evolucao", 0) if naming else 0
-evolucao_utilizada = naming.get("evolucao_utilizada", False) if naming else False
 
 if beneficio_extra == "area_vip":
     setores["vip"] = 0.02
@@ -105,7 +105,7 @@ res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
 if not estadio:
-    estadio_novo = {
+    estadio = {
         "id_time": id_time,
         "nome": f"Estádio {nome_time}",
         "nivel": 1,
@@ -113,8 +113,9 @@ if not estadio:
         "em_melhorias": False,
         **{f"preco_{k}": v for k, v in precos_padrao.items()}
     }
-    supabase.table("estadios").insert(estadio_novo).execute()
-    estadio = estadio_novo
+    supabase.table("estadios").insert(estadio).execute()
+
+estadio = supabase.table("estadios").select("*").eq("id_time", id_time).execute().data[0]
 
 nivel = estadio.get("nivel", 1)
 capacidade = capacidade_por_nivel.get(nivel, 25000)
@@ -175,29 +176,23 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 # 🔧 Melhorias de estádio
 if nivel < 5:
     custo_base = 250_000_000 + nivel * 120_000_000
-    custo_final = custo_base
+    custo = int(custo_base * (1 - percentual_evolucao / 100)) if percentual_evolucao > 0 else custo_base
 
-    if percentual_evolucao > 0 and not evolucao_utilizada:
-        desconto = int(custo_base * percentual_evolucao / 100)
-        custo_final = custo_base - desconto
-        st.markdown(f"🔖 Desconto aplicado via naming rights: **{percentual_evolucao}%**")
-        st.markdown(f"💡 De R${custo_base:,.0f} por **R${custo_final:,.0f}**")
-    else:
-        st.markdown(f"💸 Custo da melhoria: **R${custo_base:,.0f}**")
+    st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
+    if percentual_evolucao > 0:
+        st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
 
-    st.markdown(f"### ⬆️ Melhorar para Nível {nivel + 1}")
+    st.markdown(f"💸 Custo: **R${custo:,.2f}**")
     saldo = supabase.table("times").select("saldo").eq("id", id_time).execute().data[0].get("saldo", 0)
 
-    if saldo < custo_final:
+    if saldo < custo:
         st.error("💰 Saldo insuficiente.")
     else:
         if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
             nova_capacidade = capacidade_por_nivel[nivel + 1]
             supabase.table("estadios").update({"nivel": nivel + 1, "capacidade": nova_capacidade}).eq("id_time", id_time).execute()
-            supabase.table("times").update({"saldo": saldo - custo_final}).eq("id", id_time).execute()
-            registrar_movimentacao(id_time, "saida", custo_final, f"Melhoria do estádio para nível {nivel + 1}")
-            if percentual_evolucao > 0 and not evolucao_utilizada:
-                supabase.table("naming_rights").update({"evolucao_utilizada": True}).eq("id_time", id_time).execute()
+            supabase.table("times").update({"saldo": saldo - custo}).eq("id", id_time).execute()
+            registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
             st.success("✅ Estádio melhorado com sucesso!")
             st.experimental_rerun()
 else:
