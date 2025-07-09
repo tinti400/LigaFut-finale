@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-from datetime import datetime, timedelta
 from supabase import create_client
 from utils import verificar_sessao, registrar_movimentacao
 import uuid
 
-st.set_page_config(page_title="💼 Naming Rights - LigaFut", layout="wide")
+st.set_page_config(page_title="📢 Naming Rights - LigaFut", layout="wide")
 
 # 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
@@ -15,91 +14,71 @@ supabase = create_client(url, key)
 # ✅ Verifica sessão
 verificar_sessao()
 
-# 🔍 Dados do time logado
-id_time = st.session_state["id_time"]
-nome_time = st.session_state["nome_time"]
-email_usuario = st.session_state.get("usuario", "")
-
-# 📄 Consulta naming rights ativos
-res = supabase.table("naming_rights").select("*").eq("id_time", id_time).eq("ativo", True).execute()
-contrato_ativo = res.data[0] if res.data else None
-
-# 📄 Consulta estádio
-res_estadio = supabase.table("estadios").select("nome", "nivel").eq("id_time", id_time).execute()
-estadio_data = res_estadio.data[0] if res_estadio.data else None
-nome_estadio = estadio_data["nome"] if estadio_data else f"Estádio {nome_time}"
-nivel_atual = estadio_data["nivel"] if estadio_data else 1
-
-# 💰 Tabela de valores por nível
-valor_por_nivel = {
-    1: 250_000_000,
-    2: 350_000_000,
-    3: 450_000_000,
-    4: 550_000_000
-}
-valor_evolucao = valor_por_nivel.get(nivel_atual, 0)
-
-st.markdown(f"## 🏟️ Naming Rights do {nome_estadio}")
-
-if contrato_ativo:
-    st.success("📢 Você já possui um contrato ativo de naming rights.")
-    st.markdown(f"**Estádio nomeado:** `{contrato_ativo['nome_estadio_custom']}`")
-    st.markdown(f"**Patrocinador:** `{contrato_ativo['nome_patrocinador']}`")
-    st.markdown(f"**Início:** `{contrato_ativo['data_inicio'][:10]}`")
-    st.markdown(f"**Fim:** `{contrato_ativo['data_fim'][:10]}`")
-    st.markdown(f"**Valor pago:** `R${contrato_ativo['entrada_caixa']:,}`".replace(",", "."))
-    st.markdown(f"**Benefício extra:** `{contrato_ativo['beneficio_extra']}`")
+if "id_time" not in st.session_state:
+    st.warning("Você precisa estar logado para acessar esta página.")
     st.stop()
 
-# 🏷️ Propostas disponíveis (valor será definido dinamicamente)
-beneficios = [
-    {"marca": "NeoBank", "nome": "NeoBank Arena", "beneficio": "duracao_3_turnos", "descricao": "Contrato mais longo: 3 turnos", "duracao_turnos": 3},
-    {"marca": "FastFuel", "nome": "FastFuel Stadium", "beneficio": "estacionamento", "descricao": "Gera +R$5 por torcedor (estacionamento)", "duracao_turnos": 2},
-    {"marca": "GoMobile", "nome": "GoMobile Park", "beneficio": "bonus_venda_atletas", "descricao": "+5% nas vendas de jogadores", "duracao_turnos": 2},
-    {"marca": "TechOne", "nome": "TechOne Field", "beneficio": "vip_gold", "descricao": "Adiciona setor VIP ao estádio", "duracao_turnos": 2},
-    {"marca": "SuperBet", "nome": "Arena SuperBet", "beneficio": "desconto_salarios", "descricao": "-10% no custo dos salários dos jogadores", "duracao_turnos": 2},
-    {"marca": "PlayZone", "nome": "Estádio PlayZone", "beneficio": "renda_bonus", "descricao": "+10% na renda total dos jogos", "duracao_turnos": 2},
-    {"marca": "Brahza", "nome": "Brahza Arena", "beneficio": "comida_bebida", "descricao": "+5% extra com vendas de bebidas/comidas", "duracao_turnos": 2},
+id_time = st.session_state["id_time"]
+nome_time = st.session_state["nome_time"]
+
+# 🏟️ Busca o nível atual do estádio
+res_estadio = supabase.table("estadios").select("nivel").eq("id_time", id_time).execute()
+nivel = res_estadio.data[0]["nivel"] if res_estadio.data else 1
+
+# 💵 Calcula o valor da evolução para o próximo nível
+custo_base = 250_000_000 + nivel * 120_000_000
+
+# 🧠 Verifica se já existe naming ativo
+res_naming = supabase.table("naming_rights").select("*").eq("id_time", id_time).eq("ativo", True).execute()
+ja_tem_naming = len(res_naming.data) > 0
+
+if ja_tem_naming:
+    st.success("✅ Seu time já possui um contrato de naming rights ativo.")
+    st.stop()
+
+st.title("📢 Ofertas de Naming Rights")
+st.markdown(f"💡 Todas as propostas têm valor de **R${custo_base:,.0f}**, suficiente para cobrir a evolução do estádio para o nível {nivel + 1}.")
+
+# 📋 Lista de propostas
+propostas = [
+    {"nome": "NeoBank", "beneficio_extra": "estacionamento"},
+    {"nome": "TechMaster", "beneficio_extra": "area_vip"},
+    {"nome": "PowerCell", "beneficio_extra": "desconto_ingressos"},
+    {"nome": "VittaCard", "beneficio_extra": "loja_exclusiva"},
 ]
 
-st.markdown("### 📜 Propostas de Naming Rights Disponíveis")
+# 💰 Saldo do time
+res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
+saldo = res_saldo.data[0]["saldo"] if res_saldo.data else 0
 
-for prop in beneficios:
-    with st.expander(f"{prop['nome']} - {prop['descricao']}"):
-        st.markdown(f"- 📢 Patrocinador: **{prop['marca']}**")
-        st.markdown(f"- 🧠 Benefício extra: **{prop['beneficio']}**")
-        st.markdown(f"- ⏱️ Duração: **{prop['duracao_turnos']} turnos**")
-        st.markdown(f"💰 Valor a receber: **R${valor_evolucao:,.0f}**".replace(",", "."))
-        if st.button(f"📄 Assinar contrato com {prop['marca']}", key=prop["marca"]):
-            agora = datetime.now()
-            fim = agora + timedelta(weeks=prop["duracao_turnos"] * 5)
+for proposta in propostas:
+    st.markdown("---")
+    col1, col2 = st.columns([6, 2])
+    col1.markdown(f"### 🏷️ {proposta['nome']}")
+    col1.markdown(f"- 💰 Valor: **R${custo_base:,.0f}**")
+    col1.markdown(f"- 🎁 Benefício Extra: **{proposta['beneficio_extra'].replace('_', ' ').capitalize()}**")
 
-            entrada_caixa = valor_evolucao
-            id_contrato = str(uuid.uuid4())
-
-            # 💾 Salvar contrato
-            supabase.table("naming_rights").insert({
-                "id": id_contrato,
+    if col2.button(f"💼 Aceitar {proposta['nome']}", key=proposta["nome"]):
+        if saldo < custo_base:
+            st.error("❌ Saldo insuficiente para aceitar esta proposta.")
+        else:
+            # Insere contrato
+            novo_naming = {
+                "id": str(uuid.uuid4()),
                 "id_time": id_time,
-                "nome_patrocinador": prop["marca"],
-                "nome_estadio_custom": prop["nome"],
-                "percentual_cobertura": 100,
-                "entrada_caixa": entrada_caixa,
-                "data_inicio": agora.isoformat(),
-                "data_fim": fim.isoformat(),
+                "empresa": proposta["nome"],
+                "valor": custo_base,
+                "beneficio_extra": proposta["beneficio_extra"],
                 "ativo": True,
-                "beneficio_extra": prop["beneficio"],
-                "desconto_upgrade": 0
-            }).execute()
+                "percentual_evolucao": 100,
+                "evolucao_utilizada": False
+            }
+            supabase.table("naming_rights").insert(novo_naming).execute()
 
-            # 💰 Atualizar saldo do time
-            res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-            saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-            novo_saldo = saldo_atual + entrada_caixa
+            # Atualiza saldo e registra movimentação
+            novo_saldo = saldo + custo_base
             supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
+            registrar_movimentacao(id_time, "entrada", custo_base, f"Contrato naming rights com {proposta['nome']}", categoria="naming")
 
-            # 💼 Registrar movimentação
-            registrar_movimentacao(id_time, tipo="entrada", valor=entrada_caixa, descricao=f"Contrato naming rights com {prop['marca']}", categoria="naming_rights")
-
-            st.success(f"✅ Contrato com {prop['marca']} assinado com sucesso!")
+            st.success("✅ Proposta aceita com sucesso!")
             st.rerun()
