@@ -49,10 +49,10 @@ propostas = [
     {"marca": "FastFuel", "cobertura": 60, "nome": "FastFuel Stadium", "beneficio": "estacionamento", "descricao": "Gera +R$5 por torcedor (estacionamento)", "duracao_turnos": 2},
     {"marca": "GoMobile", "cobertura": 50, "nome": "GoMobile Park", "beneficio": "bonus_venda_atletas", "descricao": "+5% nas vendas de jogadores", "duracao_turnos": 2},
     {"marca": "TechOne", "cobertura": 40, "nome": "TechOne Field", "beneficio": "vip_gold", "descricao": "Adiciona setor VIP ao estádio", "duracao_turnos": 2},
-    {"marca": "SuperBet", "cobertura": 30, "nome": "Arena SuperBet", "beneficio": "mais_publico", "descricao": "+10% de público em casa", "duracao_turnos": 2},
+    {"marca": "SuperBet", "cobertura": 30, "nome": "Arena SuperBet", "beneficio": "desconto_salarios", "descricao": "-10% no custo dos salários dos jogadores", "duracao_turnos": 2},
     {"marca": "PlayZone", "cobertura": 70, "nome": "Estádio PlayZone", "beneficio": "renda_bonus", "descricao": "+10% na renda total dos jogos", "duracao_turnos": 2},
-    {"marca": "Brahza", "cobertura": 25, "nome": "Brahza Arena", "beneficio": "comida_bebida", "descricao": "+5% extra com vendas de bebidas", "duracao_turnos": 2},
-    {"marca": "ZaraBank", "cobertura": 90, "nome": "ZaraBank Stadium", "beneficio": "desconto_salarios", "descricao": "-7% no custo dos salários", "duracao_turnos": 2}
+    {"marca": "Brahza", "cobertura": 25, "nome": "Brahza Arena", "beneficio": "comida_bebida", "descricao": "+5% extra com vendas de bebidas/comidas", "duracao_turnos": 2},
+    {"marca": "ZaraBank", "cobertura": 90, "nome": "ZaraBank Stadium", "beneficio": "desconto_salarios", "descricao": "-7% no custo dos salários dos jogadores", "duracao_turnos": 2}
 ]
 
 st.markdown("### 📋 Escolha uma proposta:")
