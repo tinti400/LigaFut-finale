@@ -117,19 +117,29 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
-        if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
+                if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             if jogos < 3:
                 st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
             else:
                 try:
                     valor_venda = round(valor * 0.7)
+
+                    # 🔎 Verifica benefício de bônus de venda de atletas
+                    res_beneficio = supabase.table("naming_rights").select("beneficio_extra").eq("id_time", id_time).eq("ativo", True).execute()
+                    beneficio = res_beneficio.data[0]["beneficio_extra"] if res_beneficio.data else None
+                    if beneficio == "bonus_venda_atletas":
+                        valor_venda = round(valor_venda * 1.05)
+
+                    # 💰 Atualiza saldo
                     res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
                     saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
                     novo_saldo = saldo_atual + valor_venda
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
+                    # 🔁 Remove do elenco
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
 
+                    # 🧾 Adiciona ao mercado
                     supabase.table("mercado_transferencias").insert({
                         "nome": nome,
                         "posicao": posicao,
@@ -166,14 +176,3 @@ for idx, jogador in enumerate(jogadores_filtrados):
 
                 except Exception as e:
                     st.error(f"Erro ao vender jogador: {e}")
-
-        # 🗑️ Excluir jogador (somente admins)
-        if is_admin and st.button(f"🗑️ Excluir", key=f"excluir_{jogador['id']}"):
-            try:
-                supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-                st.success(f"✅ {nome} foi excluído do elenco com sucesso!")
-                st.experimental_rerun()
-            except Exception as e:
-                st.error(f"Erro ao excluir jogador: {e}")
-
-        st.markdown("</div>", unsafe_allow_html=True)
