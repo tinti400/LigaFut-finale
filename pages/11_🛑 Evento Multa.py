@@ -289,3 +289,36 @@ if evento.get("finalizado"):
                     id_origem = jogador.get("de")
                     res_origem = supabase.table("times").select("nome").eq("id", id_origem).execute().data
                     nome_origem = res_origem[0]["nome"] if res_origem else "Desconhecido"
+
+                    resumo.append({
+                        "🌟 Time que Roubou": nome_destino,
+                        "👤 Jogador": jogador.get("nome", "N/D"),
+                        "⚽ Posição": jogador.get("posicao", "N/D"),
+                        "💰 Pago": f"R$ {int(jogador.get('valor', 0)):,.0f}",
+                        "🔴 Time Roubado": nome_origem
+                    })
+        else:
+            st.warning("❌ Estrutura de dados inválida para exibir transferências.")
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar resumo: {e}")
+
+    if isinstance(resumo, list) and resumo:
+        df = pd.DataFrame(resumo)
+        st.dataframe(df, width=1000, height=500)
+    else:
+        st.info("Nenhuma movimentação registrada.")
+# 📋 Ordem de Participação (Sorteio)
+st.subheader("📋 Ordem de Participação (Sorteio)")
+
+try:
+    if ordem:
+        dados_times = supabase.table("times").select("id", "nome").in_("id", ordem).execute().data
+        mapa = {t["id"]: t["nome"] for t in dados_times}
+
+        for i, tid in enumerate(ordem):
+            icone = "🔛" if i == vez else "⏳" if i > vez else "✅"
+            st.markdown(f"{icone} {i+1}º - **{mapa.get(tid, 'Desconhecido')}**")
+    else:
+        st.warning("Ainda não foi definido o sorteio dos times.")
+except Exception as e:
+    st.error(f"Erro ao exibir a ordem dos times: {e}")
