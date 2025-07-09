@@ -27,7 +27,7 @@ if not emprestimos:
     st.info("📭 Nenhum empréstimo foi encontrado para seu clube.")
 else:
     for emp in emprestimos:
-        st.divider()
+        st.markdown("---")
         status = "🟢 Ativo" if emp["status"] == "ativo" else "✅ Quitado"
         data_formatada = datetime.fromisoformat(emp["data_inicio"]).strftime('%d/%m/%Y %H:%M')
 
@@ -43,5 +43,5 @@ else:
 
         st.success(f"**Status:** {status}" if emp["status"] == "ativo" else f"**Status:** ✅ Quitado")
 
-st.divider()
+st.markdown("---")
 st.markdown("🔙 Volte ao menu lateral para acessar outras áreas da LigaFut.")
