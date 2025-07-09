@@ -176,3 +176,5 @@ for idx, jogador in enumerate(jogadores_filtrados):
 
             except Exception as e:
                 st.error(f"Erro ao vender jogador: {e}")
+
+
