@@ -267,6 +267,22 @@ if ativo and fase == "acao" and vez < len(ordem):
             }).eq("id", ID_CONFIG).execute()
             st.success("⏭️ Pulado.")
             st.experimental_rerun()
+if eh_admin and vez > 0 and st.button("🔙 Voltar vez"):
+    vez_anterior = vez - 1
+    id_anterior = ordem[vez_anterior]
+
+    # Remove da lista de concluídos, se estiver presente
+    if id_anterior in concluidos:
+        concluidos.remove(id_anterior)
+
+    supabase.table("configuracoes").update({
+        "vez": str(vez_anterior),
+        "concluidos": concluidos
+    }).eq("id", ID_CONFIG).execute()
+
+    st.success(f"🔙 Voltou para o time anterior.")
+    st.experimental_rerun()
+
 # ✅ Finaliza evento automaticamente
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
