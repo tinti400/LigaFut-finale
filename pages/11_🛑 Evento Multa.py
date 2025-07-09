@@ -268,7 +268,6 @@ if ativo and fase == "acao" and vez < len(ordem):
             st.success("⏭️ Pulado.")
             st.experimental_rerun()
 if eh_admin and st.button("⏭️ Pular vez"):
-
 # ✅ Finaliza evento automaticamente
 if ativo and fase == "acao" and vez >= len(ordem):
     st.success("✅ Evento Finalizado!")
