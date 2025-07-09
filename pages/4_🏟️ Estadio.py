@@ -35,7 +35,12 @@ capacidade_por_nivel = {
 
 # 🧠 Verifica naming rights com benefícios extras
 res_naming = supabase.table("naming_rights").select("*").eq("id_time", id_time).eq("ativo", True).execute()
-beneficio_extra = res_naming.data[0].get("beneficio_extra", "") if res_naming.data else ""
+naming_data = res_naming.data[0] if res_naming.data else {}
+beneficio_extra = naming_data.get("beneficio_extra", "")
+desconto_evolucao = 0
+desconto_utilizado = naming_data.get("desconto_utilizado", False)
+if beneficio_extra == "desconto_evolucao" and not desconto_utilizado:
+    desconto_evolucao = naming_data.get("percentual_desconto", 0)
 
 # 📌 Setores e proporções
 setores = {
@@ -192,13 +197,19 @@ st.markdown(f"### 💸 Renda total estimada (com estacionamento): **R${renda_tot
 
 # 🔧 Melhorias
 if nivel < 5:
-    custo = 250_000_000 + (nivel) * 120_000_000
+    custo_base = 250_000_000 + (nivel) * 120_000_000
+    valor_desconto = int(custo_base * (desconto_evolucao / 100))
+    custo_final = custo_base - valor_desconto
+
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
-    st.markdown(f"💸 **Custo:** R${custo:,.2f}")
+    st.markdown(f"💸 **Custo:** R${custo_final:,.2f}")
+    if desconto_evolucao > 0:
+        st.markdown(f"🎁 Desconto aplicado: **-{desconto_evolucao}%** (Economia de R${valor_desconto:,.2f})")
+
     res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
     saldo = res_saldo.data[0].get("saldo", 0) if res_saldo.data else 0
 
-    if saldo < custo:
+    if saldo < custo_final:
         st.error("💰 Saldo insuficiente.")
     else:
         if st.button(f"📈 Melhorar Estádio para Nível {nivel + 1}"):
@@ -207,11 +218,12 @@ if nivel < 5:
                 "nivel": nivel + 1,
                 "capacidade": nova_capacidade
             }).eq("id_time", id_time).execute()
-            novo_saldo = saldo - custo
+            novo_saldo = saldo - custo_final
             supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-            registrar_movimentacao(id_time, "saida", custo, f"Melhoria do estádio para nível {nivel + 1}")
+            registrar_movimentacao(id_time, "saida", custo_final, f"Melhoria do estádio para nível {nivel + 1}")
+            if desconto_evolucao > 0:
+                supabase.table("naming_rights").update({"desconto_utilizado": True}).eq("id_time", id_time).eq("ativo", True).execute()
             st.success("🏗️ Estádio evoluído com sucesso!")
             st.experimental_rerun()
 else:
     st.success("🌟 Estádio já está no nível máximo (5). Parabéns!")
-
