@@ -101,12 +101,12 @@ def calcular_publico_setor(lugares, preco, desempenho, posicao, vitorias, derrot
     publico_estimado = int(min(lugares, lugares * fator_base * fator_preco))
     return publico_estimado, publico_estimado * preco
 
-# 🎯 Buscar estádio
+# 🎯 Buscar ou criar estádio
 res = supabase.table("estadios").select("*").eq("id_time", id_time).execute()
 estadio = res.data[0] if res.data else None
 
 if not estadio:
-    estadio = {
+    estadio_novo = {
         "id_time": id_time,
         "nome": f"Estádio {nome_time}",
         "nivel": 1,
@@ -114,10 +114,11 @@ if not estadio:
         "em_melhorias": False,
         **{f"preco_{k}": v for k, v in precos_padrao.items()}
     }
-    supabase.table("estadios").insert(estadio).execute()
+    supabase.table("estadios").insert(estadio_novo).execute()
+    estadio = estadio_novo
 
+# Atualiza dados
 estadio = supabase.table("estadios").select("*").eq("id_time", id_time).execute().data[0]
-
 nivel = estadio.get("nivel", 1)
 capacidade = capacidade_por_nivel.get(nivel, 25000)
 
@@ -177,8 +178,6 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 # 🔧 Melhorias de estádio
 if nivel < 5:
     custo = 250_000_000 + nivel * 120_000_000
-    custo_original = custo
-
     if percentual_evolucao > 0 and not evolucao_utilizada:
         custo = int(custo * (1 - percentual_evolucao / 100))
         st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
