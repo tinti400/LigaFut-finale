@@ -117,7 +117,7 @@ for idx, jogador in enumerate(jogadores_filtrados):
             supabase.table("elenco").update({"classificacao": nova_classificacao.lower()}).eq("id", jogador["id"]).execute()
             st.experimental_rerun()
 
-                if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
+               if st.button(f"💸 Vender", key=f"vender_{jogador['id']}"):
             if jogos < 3:
                 st.warning(f"❌ {nome} ainda não pode ser vendido. É necessário completar 3 jogos.")
             else:
