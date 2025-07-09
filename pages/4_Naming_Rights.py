@@ -25,8 +25,19 @@ res = supabase.table("naming_rights").select("*").eq("id_time", id_time).eq("ati
 contrato_ativo = res.data[0] if res.data else None
 
 # 📄 Consulta estádio
-res_estadio = supabase.table("estadios").select("nome").eq("id_time", id_time).execute()
-nome_estadio = res_estadio.data[0]["nome"] if res_estadio.data else f"Estádio {nome_time}"
+res_estadio = supabase.table("estadios").select("nome", "nivel").eq("id_time", id_time).execute()
+estadio_data = res_estadio.data[0] if res_estadio.data else None
+nome_estadio = estadio_data["nome"] if estadio_data else f"Estádio {nome_time}"
+nivel_atual = estadio_data["nivel"] if estadio_data else 1
+
+# 💰 Tabela de valores por nível
+valor_por_nivel = {
+    1: 250_000_000,
+    2: 350_000_000,
+    3: 450_000_000,
+    4: 550_000_000
+}
+valor_evolucao = valor_por_nivel.get(nivel_atual, 0)
 
 st.markdown(f"## 🏟️ Naming Rights do {nome_estadio}")
 
@@ -36,40 +47,34 @@ if contrato_ativo:
     st.markdown(f"**Patrocinador:** `{contrato_ativo['nome_patrocinador']}`")
     st.markdown(f"**Início:** `{contrato_ativo['data_inicio'][:10]}`")
     st.markdown(f"**Fim:** `{contrato_ativo['data_fim'][:10]}`")
-    st.markdown(f"**Cobertura:** `{contrato_ativo['percentual_cobertura']}%`")
-    if contrato_ativo.get("beneficio_extra"):
-        st.markdown(f"**Benefício extra:** `{contrato_ativo['beneficio_extra']}`")
-    if contrato_ativo.get("desconto_upgrade"):
-        st.markdown(f"**Desconto evolução estádio:** `{contrato_ativo['desconto_upgrade']}%`")
+    st.markdown(f"**Valor pago:** `R${contrato_ativo['entrada_caixa']:,}`".replace(",", "."))
+    st.markdown(f"**Benefício extra:** `{contrato_ativo['beneficio_extra']}`")
     st.stop()
 
-# 🏷️ Propostas disponíveis
-propostas = [
-    {"marca": "NeoBank", "cobertura": 85, "nome": "NeoBank Arena", "beneficio": "duracao_3_turnos", "descricao": "Contrato mais longo: 3 turnos", "duracao_turnos": 3, "desconto_upgrade": 0},
-    {"marca": "FastFuel", "cobertura": 60, "nome": "FastFuel Stadium", "beneficio": "estacionamento", "descricao": "Gera +R$5 por torcedor (estacionamento)", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "GoMobile", "cobertura": 50, "nome": "GoMobile Park", "beneficio": "bonus_venda_atletas", "descricao": "+5% nas vendas de jogadores", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "TechOne", "cobertura": 40, "nome": "TechOne Field", "beneficio": "vip_gold", "descricao": "Adiciona setor VIP ao estádio", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "SuperBet", "cobertura": 30, "nome": "Arena SuperBet", "beneficio": "desconto_salarios", "descricao": "-10% no custo dos salários dos jogadores", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "PlayZone", "cobertura": 70, "nome": "Estádio PlayZone", "beneficio": "renda_bonus", "descricao": "+10% na renda total dos jogos", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "Brahza", "cobertura": 25, "nome": "Brahza Arena", "beneficio": "comida_bebida", "descricao": "+5% extra com vendas de bebidas/comidas", "duracao_turnos": 2, "desconto_upgrade": 0},
-    {"marca": "ZaraBank", "cobertura": 90, "nome": "ZaraBank Stadium", "beneficio": "desconto_upgrade", "descricao": "-70% no custo da próxima evolução do estádio", "duracao_turnos": 2, "desconto_upgrade": 70},
+# 🏷️ Propostas disponíveis (valor será definido dinamicamente)
+beneficios = [
+    {"marca": "NeoBank", "nome": "NeoBank Arena", "beneficio": "duracao_3_turnos", "descricao": "Contrato mais longo: 3 turnos", "duracao_turnos": 3},
+    {"marca": "FastFuel", "nome": "FastFuel Stadium", "beneficio": "estacionamento", "descricao": "Gera +R$5 por torcedor (estacionamento)", "duracao_turnos": 2},
+    {"marca": "GoMobile", "nome": "GoMobile Park", "beneficio": "bonus_venda_atletas", "descricao": "+5% nas vendas de jogadores", "duracao_turnos": 2},
+    {"marca": "TechOne", "nome": "TechOne Field", "beneficio": "vip_gold", "descricao": "Adiciona setor VIP ao estádio", "duracao_turnos": 2},
+    {"marca": "SuperBet", "nome": "Arena SuperBet", "beneficio": "desconto_salarios", "descricao": "-10% no custo dos salários dos jogadores", "duracao_turnos": 2},
+    {"marca": "PlayZone", "nome": "Estádio PlayZone", "beneficio": "renda_bonus", "descricao": "+10% na renda total dos jogos", "duracao_turnos": 2},
+    {"marca": "Brahza", "nome": "Brahza Arena", "beneficio": "comida_bebida", "descricao": "+5% extra com vendas de bebidas/comidas", "duracao_turnos": 2},
 ]
 
 st.markdown("### 📜 Propostas de Naming Rights Disponíveis")
 
-for prop in propostas:
-    with st.expander(f"{prop['nome']} - {prop['descricao']} ({prop['cobertura']}%)"):
+for prop in beneficios:
+    with st.expander(f"{prop['nome']} - {prop['descricao']}"):
         st.markdown(f"- 📢 Patrocinador: **{prop['marca']}**")
-        st.markdown(f"- 📈 Cobertura: **{prop['cobertura']}%**")
         st.markdown(f"- 🧠 Benefício extra: **{prop['beneficio']}**")
         st.markdown(f"- ⏱️ Duração: **{prop['duracao_turnos']} turnos**")
-        valor = int((prop["cobertura"] / 100) * 250_000_000)
-        st.markdown(f"💰 Valor a receber: **R${valor:,.2f}**")
+        st.markdown(f"💰 Valor a receber: **R${valor_evolucao:,.0f}**".replace(",", "."))
         if st.button(f"📄 Assinar contrato com {prop['marca']}", key=prop["marca"]):
             agora = datetime.now()
             fim = agora + timedelta(weeks=prop["duracao_turnos"] * 5)
 
-            entrada_caixa = valor
+            entrada_caixa = valor_evolucao
             id_contrato = str(uuid.uuid4())
 
             # 💾 Salvar contrato
@@ -78,13 +83,13 @@ for prop in propostas:
                 "id_time": id_time,
                 "nome_patrocinador": prop["marca"],
                 "nome_estadio_custom": prop["nome"],
-                "percentual_cobertura": prop["cobertura"],
+                "percentual_cobertura": 100,
                 "entrada_caixa": entrada_caixa,
                 "data_inicio": agora.isoformat(),
                 "data_fim": fim.isoformat(),
                 "ativo": True,
                 "beneficio_extra": prop["beneficio"],
-                "desconto_upgrade": prop.get("desconto_upgrade", 0)
+                "desconto_upgrade": 0
             }).execute()
 
             # 💰 Atualizar saldo do time
@@ -98,4 +103,3 @@ for prop in propostas:
 
             st.success(f"✅ Contrato com {prop['marca']} assinado com sucesso!")
             st.rerun()
-
