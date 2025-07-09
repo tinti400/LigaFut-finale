@@ -134,13 +134,10 @@ for idx, jogador in enumerate(jogadores_filtrados):
                     if beneficio_extra == "bonus_venda_atletas":
                         valor_venda = round(valor_venda * 1.05)
 
-                    res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-                    saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
-                    novo_saldo = saldo_atual + valor_venda
+                    novo_saldo = saldo + valor_venda
+
                     supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
-
                     supabase.table("elenco").delete().eq("id", jogador["id"]).execute()
-
                     supabase.table("mercado_transferencias").insert({
                         "nome": nome,
                         "posicao": posicao,
@@ -191,4 +188,3 @@ for idx, jogador in enumerate(jogadores_filtrados):
                 st.error(f"Erro ao excluir jogador: {e}")
 
         st.markdown("</div>", unsafe_allow_html=True)
-
