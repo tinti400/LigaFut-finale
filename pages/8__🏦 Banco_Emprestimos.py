@@ -18,7 +18,21 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
 st.title("🏦 Banco LigaFut")
-st.markdown("Simule e solicite um empréstimo para investir no seu time!")
+st.markdown("Invista no seu time com um empréstimo escalonado por divisão.")
+
+# 🔍 Verifica divisão do time
+res_div = supabase.table("times").select("divisao", "saldo").eq("id", id_time).execute()
+time_data = res_div.data[0]
+divisao = time_data.get("divisao", "Outros").lower()
+saldo_atual = time_data.get("saldo", 0)
+
+# 💳 Limite por divisão
+limites_divisao = {
+    "1": 500_000_000,
+    "2": 300_000_000,
+    "3": 150_000_000
+}
+limite_maximo = limites_divisao.get(divisao, 100_000_000)
 
 # 🔍 Verifica se já tem empréstimo ativo
 res = supabase.table("emprestimos").select("*").eq("id_time", id_time).eq("status", "ativo").execute()
@@ -39,25 +53,27 @@ if emprestimo_ativo:
     
     st.success("Status: 🟢 Empréstimo Ativo")
 else:
-    st.info("📌 Você pode solicitar um novo empréstimo abaixo:")
+    st.info(f"📌 Seu limite de crédito disponível é de **R$ {limite_maximo:,}** com base na divisão atual.")
 
-    valor_milhoes = st.slider("Valor desejado (em milhões)", 10, 100, 20, step=5)
+    valor_milhoes = st.slider("Valor desejado (em milhões)", 10, int(limite_maximo / 1_000_000), 20, step=5)
     valor = valor_milhoes * 1_000_000
 
-    parcelas = st.selectbox("Número de parcelas", [3, 6, 10])
+    parcelas = st.selectbox("Número de parcelas (rodadas)", [3, 6, 10])
     juros = 0.10 if parcelas == 3 else 0.08 if parcelas == 6 else 0.05
 
     valor_total = int(valor * (1 + juros))
     valor_parcela = int(valor_total / parcelas)
 
     st.markdown("---")
-    st.markdown(f"**💵 Valor Total a Pagar:** R$ {valor_total:,}")
-    st.markdown(f"**📆 Parcelas:** {parcelas}x de R$ {valor_parcela:,}")
-    st.markdown(f"**📈 Juros aplicados:** {int(juros * 100)}%")
+    st.markdown(f"**💵 Valor Total com Juros:** R$ {valor_total:,}")
+    st.markdown(f"**📆 Parcelas:** {parcelas} rodadas")
+    st.markdown(f"**🔁 Valor por Rodada:** R$ {valor_parcela:,}")
+    st.markdown(f"**📈 Juros Aplicados:** {int(juros * 100)}%")
 
-    if st.button("✅ Solicitar Empréstimo"):
+    if valor > limite_maximo:
+        st.error(f"🚫 Valor excede o limite permitido para sua divisão.")
+    elif st.button("✅ Solicitar Empréstimo"):
         try:
-            # 🔽 Cria novo empréstimo
             supabase.table("emprestimos").insert({
                 "id": str(uuid.uuid4()),
                 "id_time": id_time,
@@ -71,13 +87,9 @@ else:
                 "data_inicio": datetime.now().isoformat()
             }).execute()
 
-            # 💰 Atualiza saldo do time
-            res_saldo = supabase.table("times").select("saldo").eq("id", id_time).execute()
-            saldo_atual = res_saldo.data[0]["saldo"] if res_saldo.data else 0
             novo_saldo = saldo_atual + valor
             supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-            # 📌 Registro da movimentação
             from utils import registrar_movimentacao
             registrar_movimentacao(
                 id_time=id_time,
