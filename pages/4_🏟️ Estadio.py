@@ -33,7 +33,7 @@ capacidade_por_nivel = {
     5: 110000
 }
 
-# 🧠 Verifica naming rights com área VIP
+# 🧠 Verifica naming rights com benefícios extras
 res_naming = supabase.table("naming_rights").select("*").eq("id_time", id_time).eq("ativo", True).execute()
 beneficio_extra = res_naming.data[0].get("beneficio_extra", "") if res_naming.data else ""
 
@@ -67,7 +67,7 @@ limites_precos = {
     5: {"geral": 300.0, "norte": 350.0, "sul": 350.0, "central": 600.0, "camarote": 3000.0, "vip": 5000.0},
 }
 
-# 🔍 Funções
+# 🔍 Funções auxiliares
 def buscar_posicao_time(id_time):
     try:
         res = supabase.table("classificacao").select("id_time").order("pontos", desc=True).execute()
@@ -125,7 +125,7 @@ else:
         estadio["capacidade"] = capacidade_correta
         supabase.table("estadios").update({"capacidade": capacidade_correta}).eq("id_time", id_time).execute()
 
-# Dados atuais
+# Dados auxiliares
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
@@ -145,7 +145,7 @@ if novo_nome and novo_nome != nome:
 
 st.markdown(f"- **Nível atual:** {nivel}\n- **Capacidade:** {capacidade:,} torcedores")
 
-# 💸 Preços e projeções por setor
+# 💸 Preços por setor
 st.markdown("### 🎛 Preços por Setor")
 publico_total = 0
 renda_total = 0
@@ -178,8 +178,17 @@ for setor, proporcao in setores.items():
     publico_total += publico
     renda_total += renda
 
+# 🚗 Renda de Estacionamento
+renda_estacionamento = 0
+if beneficio_extra == "estacionamento":
+    veiculos = publico_total // 3
+    renda_estacionamento = veiculos * 10
+    st.markdown(f"🚗 Estacionamento estimado: **{veiculos:,} veículos**")
+    st.markdown(f"💵 Renda de estacionamento: **R${renda_estacionamento:,.2f}**")
+    renda_total += renda_estacionamento
+
 st.markdown(f"### 📊 Público total estimado: **{publico_total:,}**")
-st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
+st.markdown(f"### 💸 Renda total estimada (com estacionamento): **R${renda_total:,.2f}**")
 
 # 🔧 Melhorias
 if nivel < 5:
