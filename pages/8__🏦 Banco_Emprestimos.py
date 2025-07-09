@@ -46,26 +46,28 @@ if emprestimo_ativo:
     with col1:
         st.markdown(f"**💵 Valor Total:** R$ {emprestimo_ativo['valor_total']:,}")
         st.markdown(f"**📆 Parcelas Totais:** {emprestimo_ativo['parcelas_totais']}")
-        st.markdown(f"**🔁 Parcelas Restantes:** {emprestimo_ativo['parcelas_restantes']}")
+        st.markdown(f"**📅 Tipo de Parcelamento:** Por Turno")
     with col2:
-        st.markdown(f"**📊 Valor da Parcela:** R$ {emprestimo_ativo['valor_parcela']:,}")
+        st.markdown(f"**🔁 Parcelas Restantes:** {emprestimo_ativo['parcelas_restantes']}")
+        st.markdown(f"**💸 Valor por Turno:** R$ {emprestimo_ativo['valor_parcela']:,}")
         st.markdown(f"**📈 Juros:** {int(emprestimo_ativo['juros'] * 100)}%")
-        st.markdown(f"**📅 Início:** {datetime.fromisoformat(emprestimo_ativo['data_inicio']).strftime('%d/%m/%Y %H:%M')}")
 
     if "jogador_garantia" in emprestimo_ativo:
         g = emprestimo_ativo["jogador_garantia"]
         st.info(f"🎯 **Garantia:** {g['nome']} ({g['posicao']}) - R$ {g['valor']:,}")
 
 else:
-    with st.expander("ℹ️ Como funcionam os juros?"):
+    with st.expander("ℹ️ Como funciona o parcelamento por turno?"):
         st.markdown("""
-        Os juros variam conforme o prazo para pagamento:
+        Em vez de pagar por rodada, o valor do empréstimo é dividido por turnos da liga:
 
-        - **3 parcelas** ➜ 5%  
-        - **6 parcelas** ➜ 10%  
-        - **10 parcelas** ➜ 15%
+        - **1 turno** ➜ 5% de juros  
+        - **2 turnos** ➜ 10%  
+        - **3 turnos** ➜ 15%  
+        - **4 turnos** ➜ 20%
 
-        Também é necessário **escolher 1 jogador como garantia**, entre os 7 mais valiosos do elenco.
+        Ao final de cada turno, será cobrada 1 parcela automaticamente.  
+        **É obrigatório escolher um jogador como garantia**, entre os 7 mais valiosos do elenco.
         """)
 
     st.info(f"💳 Limite de crédito disponível para sua divisão (**{divisao.upper()}**): R$ {limite_maximo:,}")
@@ -73,9 +75,9 @@ else:
     valor_milhoes = st.slider("💰 Valor do Empréstimo (milhões)", 10, int(limite_maximo / 1_000_000), 20, step=5)
     valor = valor_milhoes * 1_000_000
 
-    parcelas = st.selectbox("📆 Número de Parcelas (rodadas)", [3, 6, 10])
-    juros_por_parcela = {3: 0.05, 6: 0.10, 10: 0.15}
-    juros = juros_por_parcela.get(parcelas, 0.15)
+    parcelas = st.selectbox("📆 Quantidade de Turnos para pagamento", [1, 2, 3, 4])
+    juros_por_turno = {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20}
+    juros = juros_por_turno.get(parcelas, 0.20)
 
     valor_total = int(valor * (1 + juros))
     valor_parcela = int(valor_total / parcelas)
@@ -94,8 +96,8 @@ else:
 
     st.markdown("---")
     st.markdown(f"**💵 Valor Total com Juros:** R$ {valor_total:,}")
-    st.markdown(f"**📆 Parcelas:** {parcelas} rodadas")
-    st.markdown(f"**💸 Valor por Rodada:** R$ {valor_parcela:,}")
+    st.markdown(f"**📆 Parcelas:** {parcelas}x (por turno)")
+    st.markdown(f"**💸 Valor por Turno:** R$ {valor_parcela:,}")
     st.markdown(f"**📈 Juros Aplicados:** {int(juros * 100)}%")
     st.markdown(f"**🛡️ Garantia:** {jogador_garantia['nome']} ({jogador_garantia['posicao']}) - R$ {jogador_garantia['valor']:,}")
 
@@ -131,7 +133,7 @@ else:
                 id_time=id_time,
                 tipo="entrada",
                 valor=valor,
-                descricao=f"Empréstimo com garantia: {jogador_garantia['nome']}",
+                descricao=f"Empréstimo (por turno) com garantia: {jogador_garantia['nome']}",
                 categoria="empréstimo"
             )
 
