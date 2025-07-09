@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from supabase import create_client
-from utils import verificar_sessao
+from utils import verificar_sessao, registrar_movimentacao
 from datetime import datetime
 import uuid
 
@@ -18,7 +18,7 @@ id_time = st.session_state["id_time"]
 nome_time = st.session_state["nome_time"]
 
 st.title("🏦 Banco LigaFut")
-st.markdown("Invista no seu time com um empréstimo escalonado por divisão.")
+st.markdown("Invista no seu clube e escolha um jogador como garantia do empréstimo.")
 
 # 🔍 Verifica divisão do time
 res_div = supabase.table("times").select("divisao", "saldo").eq("id", id_time).execute()
@@ -35,13 +35,13 @@ limites_divisao = {
 }
 limite_maximo = limites_divisao.get(divisao, 100_000_000)
 
-# 🔍 Verifica se já tem empréstimo ativo
+# 🔍 Verifica empréstimo ativo
 res = supabase.table("emprestimos").select("*").eq("id_time", id_time).eq("status", "ativo").execute()
 emprestimo_ativo = res.data[0] if res.data else None
 
 if emprestimo_ativo:
-    st.warning("❗ Você já possui um empréstimo ativo. Quite-o antes de solicitar outro.")
-    
+    st.warning("📛 Empréstimo ativo detectado. Quite-o antes de solicitar um novo.")
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**💵 Valor Total:** R$ {emprestimo_ativo['valor_total']:,}")
@@ -51,30 +51,59 @@ if emprestimo_ativo:
         st.markdown(f"**📊 Valor da Parcela:** R$ {emprestimo_ativo['valor_parcela']:,}")
         st.markdown(f"**📈 Juros:** {int(emprestimo_ativo['juros'] * 100)}%")
         st.markdown(f"**📅 Início:** {datetime.fromisoformat(emprestimo_ativo['data_inicio']).strftime('%d/%m/%Y %H:%M')}")
-    
-    st.success("Status: 🟢 Empréstimo Ativo")
-else:
-    st.info(f"📌 Seu limite de crédito disponível é de **R$ {limite_maximo:,}** com base na divisão atual.")
 
-    valor_milhoes = st.slider("Valor desejado (em milhões)", 10, int(limite_maximo / 1_000_000), 20, step=5)
+    if "jogador_garantia" in emprestimo_ativo:
+        g = emprestimo_ativo["jogador_garantia"]
+        st.info(f"🎯 **Garantia:** {g['nome']} ({g['posicao']}) - R$ {g['valor']:,}")
+
+else:
+    with st.expander("ℹ️ Como funcionam os juros?"):
+        st.markdown("""
+        Os juros variam conforme o prazo para pagamento:
+
+        - **3 parcelas** ➜ 5%  
+        - **6 parcelas** ➜ 10%  
+        - **10 parcelas** ➜ 15%
+
+        Também é necessário **escolher 1 jogador como garantia**, entre os 7 mais valiosos do elenco.
+        """)
+
+    st.info(f"💳 Limite de crédito disponível para sua divisão (**{divisao.upper()}**): R$ {limite_maximo:,}")
+
+    valor_milhoes = st.slider("💰 Valor do Empréstimo (milhões)", 10, int(limite_maximo / 1_000_000), 20, step=5)
     valor = valor_milhoes * 1_000_000
 
-    parcelas = st.selectbox("Número de parcelas (rodadas)", [3, 6, 10])
-    juros = 0.10 if parcelas == 3 else 0.08 if parcelas == 6 else 0.05
+    parcelas = st.selectbox("📆 Número de Parcelas (rodadas)", [3, 6, 10])
+    juros_por_parcela = {3: 0.05, 6: 0.10, 10: 0.15}
+    juros = juros_por_parcela.get(parcelas, 0.15)
 
     valor_total = int(valor * (1 + juros))
     valor_parcela = int(valor_total / parcelas)
 
+    # 🔍 Buscar os 7 jogadores mais valiosos
+    elenco_data = supabase.table("elenco").select("*").eq("id_time", id_time).execute().data
+    jogadores_valiosos = sorted(elenco_data, key=lambda x: x.get("valor", 0), reverse=True)[:7]
+
+    if not jogadores_valiosos:
+        st.error("❌ Seu time não possui jogadores cadastrados para oferecer como garantia.")
+        st.stop()
+
+    jogador_nomes = [f"{j['nome']} - {j['posicao']} (R$ {j['valor']:,})" for j in jogadores_valiosos]
+    jogador_escolhido = st.selectbox("🎯 Selecione um jogador como garantia:", jogador_nomes)
+    jogador_garantia = jogadores_valiosos[jogador_nomes.index(jogador_escolhido)]
+
     st.markdown("---")
     st.markdown(f"**💵 Valor Total com Juros:** R$ {valor_total:,}")
     st.markdown(f"**📆 Parcelas:** {parcelas} rodadas")
-    st.markdown(f"**🔁 Valor por Rodada:** R$ {valor_parcela:,}")
+    st.markdown(f"**💸 Valor por Rodada:** R$ {valor_parcela:,}")
     st.markdown(f"**📈 Juros Aplicados:** {int(juros * 100)}%")
+    st.markdown(f"**🛡️ Garantia:** {jogador_garantia['nome']} ({jogador_garantia['posicao']}) - R$ {jogador_garantia['valor']:,}")
 
     if valor > limite_maximo:
-        st.error(f"🚫 Valor excede o limite permitido para sua divisão.")
+        st.error("🚫 Valor excede o limite permitido para sua divisão.")
     elif st.button("✅ Solicitar Empréstimo"):
         try:
+            # 💾 Registra o empréstimo
             supabase.table("emprestimos").insert({
                 "id": str(uuid.uuid4()),
                 "id_time": id_time,
@@ -85,22 +114,28 @@ else:
                 "valor_parcela": valor_parcela,
                 "juros": juros,
                 "status": "ativo",
-                "data_inicio": datetime.now().isoformat()
+                "data_inicio": datetime.now().isoformat(),
+                "jogador_garantia": {
+                    "nome": jogador_garantia["nome"],
+                    "posicao": jogador_garantia["posicao"],
+                    "valor": jogador_garantia["valor"]
+                }
             }).execute()
 
+            # 💰 Atualiza saldo
             novo_saldo = saldo_atual + valor
             supabase.table("times").update({"saldo": novo_saldo}).eq("id", id_time).execute()
 
-            from utils import registrar_movimentacao
+            # 🧾 Registrar movimentação
             registrar_movimentacao(
                 id_time=id_time,
                 tipo="entrada",
                 valor=valor,
-                descricao=f"Empréstimo bancário: R$ {valor_milhoes} mi",
+                descricao=f"Empréstimo com garantia: {jogador_garantia['nome']}",
                 categoria="empréstimo"
             )
 
-            st.success("✅ Empréstimo solicitado com sucesso! Valor adicionado ao seu saldo.")
+            st.success("✅ Empréstimo aprovado e valor adicionado ao saldo.")
             st.rerun()
         except Exception as e:
-            st.error(f"❌ Erro ao solicitar empréstimo: {e}")
+            st.error(f"❌ Erro ao registrar empréstimo: {e}")
