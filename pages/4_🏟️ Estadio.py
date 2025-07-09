@@ -124,7 +124,6 @@ capacidade = capacidade_por_nivel.get(nivel, 25000)
 if estadio.get("capacidade") != capacidade:
     supabase.table("estadios").update({"capacidade": capacidade}).eq("id_time", id_time).execute()
 
-# Dados auxiliares
 res_d = supabase.table("classificacao").select("vitorias").eq("id_time", id_time).execute()
 desempenho = res_d.data[0]["vitorias"] if res_d.data else 0
 posicao = buscar_posicao_time(id_time)
@@ -176,11 +175,11 @@ st.markdown(f"### 💸 Renda total estimada: **R${renda_total:,.2f}**")
 # 🔧 Melhorias de estádio
 if nivel < 5:
     custo_base = 250_000_000 + nivel * 120_000_000
+    custo = custo_base
+
     if percentual_evolucao > 0 and not evolucao_utilizada:
         custo = int(custo_base * (1 - percentual_evolucao / 100))
         st.markdown(f"🔖 Desconto aplicado: **{percentual_evolucao}%** via naming rights")
-    else:
-        custo = custo_base
 
     st.markdown(f"### 🔧 Melhorar para Nível {nivel + 1}")
     st.markdown(f"💸 Custo: **R${custo:,.2f}**")
