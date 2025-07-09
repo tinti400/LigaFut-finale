@@ -60,59 +60,59 @@ propostas = [
     {
         "marca": "NeoBank",
         "nome": "NeoBank Arena",
-        "descricao": "Contrato mais longo: 3 turnos + bônus fixo de R$25mi",
         "duracao_turnos": 3,
+        "bonus_fixo": 25_000_000,
         "beneficio": "duracao_3_turnos",
-        "bonus_fixo": 25_000_000
+        "descricao_beneficio": "Contrato mais longo (3 turnos) e recebe R$25 milhões extras ao assinar"
     },
     {
         "marca": "FastFuel",
         "nome": "FastFuel Stadium",
-        "descricao": "+R$5 por torcedor (estacionamento)",
         "duracao_turnos": 2,
-        "beneficio": "estacionamento"
+        "beneficio": "estacionamento",
+        "descricao_beneficio": "R$5 extras por torcedor nos jogos como mandante (estacionamento)"
     },
     {
         "marca": "GoMobile",
         "nome": "GoMobile Park",
-        "descricao": "+5% nas vendas de jogadores",
         "duracao_turnos": 2,
-        "beneficio": "bonus_venda_atletas"
+        "beneficio": "bonus_venda_atletas",
+        "descricao_beneficio": "Recebe 5% a mais sempre que vender um jogador"
     },
     {
         "marca": "TechOne",
         "nome": "TechOne Field",
-        "descricao": "Setor VIP ao estádio",
         "duracao_turnos": 2,
-        "beneficio": "vip_gold"
+        "beneficio": "vip_gold",
+        "descricao_beneficio": "Seu estádio ganha setor VIP, aumentando a renda geral"
     },
     {
         "marca": "SuperBet",
         "nome": "Arena SuperBet",
-        "descricao": "-10% nos salários dos jogadores",
         "duracao_turnos": 2,
-        "beneficio": "desconto_salarios"
+        "beneficio": "desconto_salarios",
+        "descricao_beneficio": "Reduz em 10% o custo mensal dos salários do elenco"
     },
     {
         "marca": "PlayZone",
         "nome": "Estádio PlayZone",
-        "descricao": "+10% na renda dos jogos",
         "duracao_turnos": 2,
-        "beneficio": "renda_bonus"
+        "beneficio": "renda_bonus",
+        "descricao_beneficio": "Você ganha +10% em toda renda dos jogos como mandante"
     },
     {
         "marca": "Brahza",
         "nome": "Brahza Arena",
-        "descricao": "+5% com bebidas/comidas",
         "duracao_turnos": 2,
-        "beneficio": "comida_bebida"
+        "beneficio": "comida_bebida",
+        "descricao_beneficio": "Lucro extra de 5% com vendas de bebidas e alimentos no estádio"
     },
     {
         "marca": "ZaraBank",
         "nome": "ZaraBank Stadium",
-        "descricao": "+12% de torcida como visitante",
         "duracao_turnos": 2,
-        "beneficio": "bonus_visitante"
+        "beneficio": "bonus_visitante",
+        "descricao_beneficio": "Aumenta sua torcida em jogos como visitante em 12%"
     },
 ]
 
@@ -123,13 +123,12 @@ cols = st.columns(2)
 for i, prop in enumerate(propostas):
     with cols[i % 2]:
         with st.container():
-            st.markdown(f"#### 🏢 {prop['nome']}")
-            st.markdown(f"**🧾 Descrição:** {prop['descricao']}")
-            st.markdown(f"⏱️ **Duração:** `{prop['duracao_turnos']} turnos`")
-            st.markdown(f"🎁 **Benefício:** `{prop['beneficio']}`")
+            st.markdown(f"#### 🏢 {prop['nome']} ({prop['marca']})")
+            st.markdown(f"🕒 **Duração:** `{prop['duracao_turnos']} turnos`")
+            st.markdown(f"🎁 **Benefício:** `{prop['descricao_beneficio']}`")
 
             valor_total = preco_evolucao + prop.get("bonus_fixo", 0)
-            st.markdown(f"💰 <span style='color:green;font-size:18px;'>Valor da proposta: R${valor_total:,.2f}</span>", unsafe_allow_html=True)
+            st.markdown(f"💰 <span style='color:green;font-size:18px;'>Valor total a receber: R${valor_total:,.2f}</span>", unsafe_allow_html=True)
 
             if st.button(f"📄 Assinar contrato com {prop['marca']}", key=prop['marca']):
                 agora = datetime.now()
