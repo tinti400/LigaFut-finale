@@ -36,7 +36,7 @@ else:
         with st.container():
             st.markdown("---")
             st.markdown(f"### {proposta['jogador_nome']} ({proposta['jogador_posicao']})")
-            st.write(f"🌍 **Nacionalidade:** {proposta.get('nacionalidade', '-')}")
+            st.write(f"🌍 **Nacionalidade:** {proposta.get('nacionalidade', '-')}")            
             st.write(f"📌 **Posição:** {proposta['jogador_posicao']}")
             st.write(f"⭐ **Overall:** {proposta['jogador_overall']}")
             st.write(f"💰 **Valor do Jogador:** R$ {proposta['jogador_valor']:,.0f}".replace(",", "."))
@@ -62,12 +62,12 @@ else:
                 with col1:
                     if st.button("✅ Aceitar", key=f"aceitar_{proposta['id']}"):
                         try:
-                            # ➕ Adiciona o jogador comprado ao time comprador
+                            # ➕ Adiciona o jogador comprado ao time comprador com novo valor
                             jogador = {
                                 "nome": proposta["jogador_nome"],
                                 "posicao": proposta["jogador_posicao"],
                                 "overall": proposta["jogador_overall"],
-                                "valor": proposta["valor_oferecido"],
+                                "valor": proposta["valor_oferecido"],  # valor atualizado!
                                 "imagem_url": proposta.get("imagem_url", ""),
                                 "nacionalidade": proposta.get("nacionalidade", "-"),
                                 "origem": proposta.get("origem", "-"),
@@ -134,7 +134,6 @@ else:
                                 destino=proposta["nome_time_origem"]
                             )
 
-                            # Também registra os jogadores oferecidos no BID
                             for j in jogadores_oferecidos:
                                 registrar_bid(
                                     id_time=proposta["id_time_alvo"],
@@ -176,4 +175,3 @@ else:
                 st.success("✅ Proposta aceita.")
             elif status == "recusada":
                 st.error("❌ Proposta recusada.")
-
