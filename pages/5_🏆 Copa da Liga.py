@@ -8,7 +8,7 @@ import random
 st.set_page_config(page_title="🏆 Copa da LigaFut", layout="wide")
 st.markdown("<h1 style='text-align:center;'>🏆 Copa da LigaFut</h1><hr>", unsafe_allow_html=True)
 
-# 🔐 Conexão com Supabase
+# 🔐 Conexão Supabase
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
@@ -43,7 +43,7 @@ def buscar_grupos_todos(data):
     res = supabase.table("copa_ligafut").select("*").eq("fase", "grupos").eq("data_criacao", data).execute()
     return res.data if res.data else []
 
-# 🎨 Card visual
+# 🎨 Exibir card de jogo
 def exibir_card(jogo):
     id_m, id_v = jogo.get("mandante"), jogo.get("visitante")
     gm, gv = jogo.get("gols_mandante"), jogo.get("gols_visitante")
@@ -69,7 +69,7 @@ def exibir_card(jogo):
     """
     st.markdown(card, unsafe_allow_html=True)
 
-# 📊 Classificação
+# 📊 Calcular classificação grupos
 def calcular_classificacao(jogos):
     tabela = {}
     for jogo in jogos:
@@ -108,7 +108,7 @@ def calcular_classificacao(jogos):
     df = df.sort_values(by=["P", "SG", "GP"], ascending=False).reset_index(drop=True)
     return df
 
-# 📋 Exibição por fase
+# 📋 Exibir fase mata-mata
 def exibir_fase_mata(nome, dados, col):
     with col:
         st.markdown(f"### {nome}")
@@ -125,7 +125,7 @@ quartas = buscar_fase("quartas", data_atual)
 semis = buscar_fase("semifinal", data_atual)
 final = buscar_fase("final", data_atual)
 
-# ✅ Grupos
+# ✅ Classificação Grupos
 grupos_por_nome = {}
 for g in grupos:
     nome = g.get("grupo", "?")
@@ -133,7 +133,6 @@ for g in grupos:
         grupos_por_nome[nome] = []
     grupos_por_nome[nome].extend(g.get("jogos", []))
 
-# 📈 Classificação
 if not oitavas:
     st.subheader("📈 Classificação dos Grupos")
 else:
@@ -209,7 +208,7 @@ if is_admin:
         st.success("✅ Confrontos das oitavas definidos!")
         st.experimental_rerun()
 
-# 🚀 Avançar fase (jogo único)
+# 🚀 Avançar Fase (jogo único)
 def avancar_fase(fase_atual, proxima_fase):
     dados_fase = buscar_fase(fase_atual, data_atual)
     if not dados_fase:
@@ -233,7 +232,7 @@ def avancar_fase(fase_atual, proxima_fase):
             classificados.append(random.choice([jogo["mandante"], jogo["visitante"]]))
 
     if len(set(classificados)) != len(classificados):
-        st.error("❌ Erro: Time classificado duplicado. Verifique os resultados.")
+        st.error("❌ Erro: Time classificado duplicado.")
         return
 
     random.shuffle(classificados)
@@ -253,7 +252,7 @@ def avancar_fase(fase_atual, proxima_fase):
         "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "jogos": jogos_novos
     }).execute()
-    st.success(f"✅ {proxima_fase.capitalize()} criada com sucesso!")
+    st.success(f"✅ {proxima_fase.capitalize()} criada!")
     st.experimental_rerun()
 
 # ⬅️ Voltar fase
@@ -264,7 +263,7 @@ def voltar_fase(fase):
         return
     for dado in dados_fase:
         supabase.table("copa_ligafut").delete().eq("id", dado["id"]).execute()
-    st.success(f"✅ {fase.capitalize()} removida com sucesso!")
+    st.success(f"✅ {fase.capitalize()} removida!")
     st.experimental_rerun()
 
 # 🔘 Botões admin
