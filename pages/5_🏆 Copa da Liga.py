@@ -68,6 +68,7 @@ def exibir_card(jogo):
     </div>
     """
     st.markdown(card, unsafe_allow_html=True)
+
 # 📊 Classificação
 def calcular_classificacao(jogos):
     tabela = {}
@@ -186,7 +187,7 @@ if is_admin:
         confrontos = []
 
         for i in range(0, 8, 2):
-            g1, g2 = ordem_grupos[i], ordem_grupos[i+1]
+            g1, g2 = ordem_grupos[i], ordem_grupos[i + 1]
             confrontos.extend([
                 {"mandante": classificados[g1][0], "visitante": classificados[g2][1], "gols_mandante": None, "gols_visitante": None},
                 {"mandante": classificados[g2][0], "visitante": classificados[g1][1], "gols_mandante": None, "gols_visitante": None}
@@ -224,6 +225,12 @@ def avancar_fase(fase_atual, proxima_fase):
         else:
             classificados.append(random.choice([ida["mandante"], ida["visitante"]]))
 
+    if len(set(classificados)) != len(classificados):
+        st.error("❌ Erro: Time classificado duplicado. Verifique os resultados anteriores.")
+        return
+
+    random.shuffle(classificados)
+
     jogos_novos = []
     for i in range(0, len(classificados), 2):
         a, b = classificados[i], classificados[i + 1]
@@ -240,12 +247,33 @@ def avancar_fase(fase_atual, proxima_fase):
     st.success(f"✅ Avançou de {fase_atual} para {proxima_fase}!")
     st.experimental_rerun()
 
-# 🔘 Botões de avanço (somente admin)
+def voltar_fase(fase):
+    dados_fase = buscar_fase(fase, data_atual)
+    if not dados_fase:
+        st.warning(f"Nenhuma rodada encontrada para {fase}.")
+        return
+    for dado in dados_fase:
+        supabase.table("copa_ligafut").delete().eq("id", dado["id"]).execute()
+    st.success(f"✅ {fase.capitalize()} removida com sucesso!")
+    st.experimental_rerun()
+
+# 🔘 Botões de avanço e volta (somente admin)
 if is_admin:
-    st.subheader("🚀 Avançar Fases")
-    if st.button("➡️ Avançar para Quartas"):
-        avancar_fase("oitavas", "quartas")
-    if st.button("➡️ Avançar para Semifinal"):
-        avancar_fase("quartas", "semifinal")
-    if st.button("➡️ Avançar para Final"):
-        avancar_fase("semifinal", "final")
+    st.subheader("🚀 Avançar ou Voltar Fases")
+
+    col_a1, col_a2 = st.columns(2)
+    with col_a1:
+        if st.button("➡️ Avançar para Quartas"):
+            avancar_fase("oitavas", "quartas")
+        if st.button("➡️ Avançar para Semifinal"):
+            avancar_fase("quartas", "semifinal")
+        if st.button("➡️ Avançar para Final"):
+            avancar_fase("semifinal", "final")
+
+    with col_a2:
+        if st.button("⬅️ Voltar Quartas (Excluir)"):
+            voltar_fase("quartas")
+        if st.button("⬅️ Voltar Semifinal (Excluir)"):
+            voltar_fase("semifinal")
+        if st.button("⬅️ Voltar Final (Excluir)"):
+            voltar_fase("final")
