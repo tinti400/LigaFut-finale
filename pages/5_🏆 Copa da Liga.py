@@ -201,7 +201,7 @@ if is_admin:
         st.success("✅ Confrontos das oitavas definidos com sucesso!")
         st.experimental_rerun()
 
-# 🚀 Avançar fases mantendo chaveamento
+# 🚀 Avançar fases com sorteio e chaveamento
 def avancar_fase(fase_atual, proxima_fase):
     dados_fase = buscar_fase(fase_atual, data_atual)
     if not dados_fase:
@@ -244,9 +244,10 @@ def avancar_fase(fase_atual, proxima_fase):
         "data_criacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "jogos": jogos_novos
     }).execute()
-    st.success(f"✅ Avançou de {fase_atual} para {proxima_fase}!")
+    st.success(f"✅ Sorteio realizado e {proxima_fase.capitalize()} criada com sucesso!")
     st.experimental_rerun()
 
+# ⬅️ Voltar (excluir) uma fase
 def voltar_fase(fase):
     dados_fase = buscar_fase(fase, data_atual)
     if not dados_fase:
@@ -257,12 +258,13 @@ def voltar_fase(fase):
     st.success(f"✅ {fase.capitalize()} removida com sucesso!")
     st.experimental_rerun()
 
-# 🔘 Botões de avanço e volta (somente admin)
+# 🔘 Botões de avanço e volta de fase
 if is_admin:
     st.subheader("🚀 Avançar ou Voltar Fases")
 
-    col_a1, col_a2 = st.columns(2)
-    with col_a1:
+    col1, col2 = st.columns(2)
+
+    with col1:
         if st.button("➡️ Avançar para Quartas"):
             avancar_fase("oitavas", "quartas")
         if st.button("➡️ Avançar para Semifinal"):
@@ -270,7 +272,7 @@ if is_admin:
         if st.button("➡️ Avançar para Final"):
             avancar_fase("semifinal", "final")
 
-    with col_a2:
+    with col2:
         if st.button("⬅️ Voltar Quartas (Excluir)"):
             voltar_fase("quartas")
         if st.button("⬅️ Voltar Semifinal (Excluir)"):
